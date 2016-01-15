@@ -5,10 +5,7 @@ function imgs = nii_lime_gui(loadprev)
 % nii_lime_gui %use gui
 % nii_lime_gui(1) %use gui to select previous mat file
 % nii_lime_gui('T1_M2094_limegui.mat') %specify previous mat file
-if nargin < 1
-    loadprev = [];
-end
-if ~isempty(loadprev)
+if nargin > 0
     if ischar(loadprev) && exist(loadprev, 'file')
         [p, n, x] = fileparts(loadprev);
         f = [n, x];
@@ -18,6 +15,42 @@ if ~isempty(loadprev)
     imgs = load(fullfile(p,f));
     imgs = checkPathSub (imgs);
     imgs = stripGzSub (imgs);
+%     if ~isempty(imgs.T1)%assumes .gz
+%         [p,n,ext] = fileparts(imgs.T1);
+%         if strcmpi(ext,'.gz')
+%             imgs.T1 = fullfile(p,n);
+%         end
+%     end
+%     if ~isempty(imgs.T2)%assumes .gz
+%         [p,n,ext] = fileparts(imgs.T2);
+%         if strcmpi(ext,'.gz')
+%             imgs.T2 = fullfile(p,n);
+%         end
+%     end
+%     if ~isempty(imgs.ASL)%assumes .gz
+%         [p,n,ext] = fileparts(imgs.ASL);
+%         if strcmpi(ext,'.gz')
+%             imgs.ASL = fullfile(p,n);
+%         end
+%     end
+%     if ~isempty(imgs.fMRI)%assumes .gz
+%         [p,n,ext] = fileparts(imgs.fMRI);
+%         if strcmpi(ext,'.gz')
+%             imgs.fMRI = fullfile(p,n);
+%         end
+%     end
+%     if ~isempty(imgs.Rest)%assumes .gz
+%         [p,n,ext] = fileparts(imgs.Rest);
+%         if strcmpi(ext,'.gz')
+%             imgs.Rest = fullfile(p,n);
+%         end
+%     end
+%     if ~isempty(imgs.Lesion)%assumes .gz
+%         [p,n,ext] = fileparts(imgs.Lesion);
+%         if strcmpi(ext,'.gz')
+%             imgs.Lesion = fullfile(p,n);
+%         end
+%     end
     nii_lime(imgs);
     return;
 end
@@ -45,45 +78,7 @@ for i = 1: numel(imgs)
     %process the data
     nii_lime(img);
 end
-%end %nii_lime_gui()
-
-function imgs = stripGzSub (imgs)
-fields = fieldnames(imgs);
-for i = 1:numel(fields)
-    if ~ischar(imgs.(fields{i})) || isempty(imgs.(fields{i})), continue; end;
-    fnm = imgs.(fields{i});
-    [p,n,ext] = fileparts(imgs.T1);
-    if strcmpi(ext,'.gz')
-        fprintf('Note: removed gz from %s\n', fnm);
-        imgs.(fields{i}) = fullfile(p,n);
-    end
-end
-%stripGzSub()
-
-function imgs = checkPathSub (imgs)
-fields = fieldnames(imgs);
-for i = 1:numel(fields)
-    if ~ischar(imgs.(fields{i})) || isempty(imgs.(fields{i})), continue; end;
-    fnm = imgs.(fields{i});
-    if exist(fnm, 'file'), continue; end;
-    [~,n,x] = spm_fileparts(fnm);
-    fnmPwd = fullfile(pwd,[n,x]);
-    if exist(fnmPwd,'file'),
-        imgs.(fields{i}) = fnmPwd;
-        fprintf('Note: unable to find %s, will use %s\n', fnm, fnmPwd);
-        continue;
-    end;
-    if strcmpi(x,'.gz') %.nii.gz
-        fnmPwd = fullfile(pwd,n);
-        if exist(fnmPwd,'file'),
-            imgs.(fields{i}) = fnmPwd;
-            fprintf('Note: unable to find %s, will use %s\n', fnm, fnmPwd);
-            continue;
-        end;
-    end
-    fprintf('WARNING: unable to find %s\n', fnm);
-end
-%checkPathSub
+end %nii_lime_gui()
 
 function [img, go, Xpressed] = getfiles_x
 go = true;
@@ -162,16 +157,16 @@ uiwait(d);
                    'position',[500 10 100 15],...
                    'string','Rename files');
         
-    %end nestedfx()
+    end
     function next_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
         go = false;
         delete(gcf);
-    %end %end next_callback()
+    end %end next_callback()
     function my_closereq(~,~,~)
         go = false;
         delete(gcf);
         Xpressed = true;
-    %end my_closereq()
+    end
 %     function check_callback(hObject, ~, ~) %filename_callback(obj,callbackdata,myField)
 %         checkValue = get(hObject,'Value');
 %         disp(checkValue);
@@ -236,7 +231,49 @@ uiwait(d);
             set(btns(myIndex),'string', [myField, ': ', fullfile(Apth,[A ext])]);
         end
         %disp(Apth);
+        if strcmpi(deblank(Apth),filesep)
+            cd(pwd)
+        else
+            cd(Apth); %change directory for next search
+        end
+    end %end filename_callback()
+end %end nestedfx()
 
-        cd(Apth); %change directory for next search
-    %end %end filename_callback()
-%end %end nestedfx()
+
+function imgs = checkPathSub (imgs)
+    fields = fieldnames(imgs);
+    for i = 1:numel(fields)
+        if ~ischar(imgs.(fields{i})) || isempty(imgs.(fields{i})), continue; end;
+        fnm = imgs.(fields{i});
+        if exist(fnm, 'file'), continue; end;
+        [~,n,x] = spm_fileparts(fnm);
+        fnmPwd = fullfile(pwd,[n,x]);
+        if exist(fnmPwd,'file'),
+            imgs.(fields{i}) = fnmPwd;
+            fprintf('Note: unable to find %s, will use %s\n', fnm, fnmPwd);
+            continue;
+        end;
+        if strcmpi(x,'.gz') %.nii.gz
+            fnmPwd = fullfile(pwd,n);
+            if exist(fnmPwd,'file'),
+                imgs.(fields{i}) = fnmPwd;
+                fprintf('Note: unable to find %s, will use %s\n', fnm, fnmPwd);
+                continue;
+            end;
+        end
+        fprintf('WARNING: unable to find %s\n', fnm);
+    end
+end%checkPathSub
+
+function imgs = stripGzSub (imgs)
+    fields = fieldnames(imgs);
+    for i = 1:numel(fields)
+        if ~ischar(imgs.(fields{i})) || isempty(imgs.(fields{i})), continue; end;
+        fnm = imgs.(fields{i});
+        [p,n,ext] = fileparts(imgs.T1);
+        if strcmpi(ext,'.gz')
+            fprintf('Note: removed gz from %s\n', fnm);
+            imgs.(fields{i}) = fullfile(p,n);
+        end
+    end
+end%stripGzSub()
