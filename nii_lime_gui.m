@@ -9,7 +9,7 @@ if nargin < 1
     loadprev = [];
 end
 if ~isempty(loadprev)
-    if ischar(loadprev)
+    if ischar(loadprev) && exist(loadprev, 'file')
         [p, n, x] = fileparts(loadprev);
         f = [n, x];
     else
