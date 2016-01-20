@@ -49,8 +49,9 @@ if ~isempty(imgs.DTI)
     tStart = timeSub(tStart,'DTI');
 end
 printSub(imgs, matName); %show results - except DTI
+printDTISub(imgs, matName); %show results - DTI
 diary off
-%printDTISub(imgs, matName); %show results - DTI
+%
 %nii_multimodal()
 
 function tStart = timeSub(tStart, timeComment)
