@@ -184,7 +184,7 @@ for i = 1:(knROI)
         nROI = nROI + 1;
     end;
 end;
-fprintf('Found %d of %d ROIs', nROI, knROI);
+fprintf('Found %d of %d ROIs\n', nROI, knROI);
 for i = 1:(knROI-1)  
     if ~isnan(vx(i)) && ~isnan(vxp (i))
         %if mod(i,10) == 0, fprintf('Row %d\n', i); end;
