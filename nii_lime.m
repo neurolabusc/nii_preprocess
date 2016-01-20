@@ -510,7 +510,7 @@ setenv('FSLPARALLEL', num2str(maxThreads));
 %end fslEnvSub()
 
 function doDtiWarpJhuSub(imgs)
-fprintf('################################ doDtiWarpJhuSub\n');
+%fprintf('################################ doDtiWarpJhuSub\n');
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 FA = prepostfixSub('', '_FA', imgs.DTI);
@@ -950,7 +950,11 @@ if strcmpi(ext,'.gz') %.nii.gz
     ofnm = fnm;
     fnm = char(gunzip(fnm));
     if isunix && ~ismac
-        fnm = fullfile(pth,fnm); %Taylor Hanayik added on 08Sep2015 to fix error in processing
+        if ~exist(fnm,'file') %current working directory?
+            fprintf('#######  Taylor''s special code executed "%s" "%s"\n', pth, fnm);
+            fnm = fullfile(pth,fnm); %Taylor Hanayik added on 08Sep2015 to fix error in processing
+        end;
+        %fnm = fullfile(pth,fnm); %Taylor Hanayik added on 08Sep2015 to fix error in processing
     end
     isGz = true;
     delete(ofnm);
