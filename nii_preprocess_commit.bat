@@ -5,6 +5,7 @@ if [[ ! -e /usr/local/nii_preprocess ]]; then
 fi
 cd /usr/local/nii_preprocess
 #commit with message
+git add .
 d=`date`
 h=`hostname`
 git commit -a -m "$h-$d"
