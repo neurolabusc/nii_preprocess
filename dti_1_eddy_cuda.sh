@@ -86,7 +86,7 @@ else #dual DTI: run topup
 	dti_tb0=${dti}tp #topup b0 map
 	echo "topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0"
 	##topup requires about 6 minutes for LIME data
-	### time topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0
+	time topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0
 	#applytopup --imain=$dti,$dtir --inindex=1,2 --datain=$dti_txt --topup=$dti_t --out=$dti_u 
 	#http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/EDDY/UsersGuide
 	fslmaths $dti_tb0 -Tmean $dti_tb0
@@ -102,15 +102,10 @@ else #dual DTI: run topup
 	paste ${dti}.bval ${dtir}.bval > $dti_bvalm
 	dti_merge=${dti}both #merged
 	fslmerge -t $dti_merge $dti $dtir
-	
-
-	echo eddy_cuda --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
+##eddy_cuda7.0 instead of eddy_openmp
+	echo eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
 	##eddy takes about 11 minutes for LIME data
-	### time eddy_cuda --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
-	
-	#echo eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
-	##eddy takes about 11 minutes for LIME data
-	#time eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
+	time eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
 	#use merged dataset for dtifit
 	dti_bvec=$dti_bvecm
 	dti_bval=$dti_bvalm

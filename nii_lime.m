@@ -11,7 +11,6 @@ function matName = nii_lime(imgs, matName)
 %Examples
 % imgs.T1 = 'T1.nii'; imgs.ASL = 'ASL.nii';
 % nii_lime(imgs);
-
 %check dependencies
 if nargin < 1, error('Please use nii_lime_gui to select images'); end;
 if isempty(which('nii_nii2mat')), error('NiiStat required'); end;
@@ -29,11 +28,16 @@ if ~exist('matName','var')
     [p,n] = filepartsSub(imgs.T1);
     matName = fullfile(p, [n, '_lime.mat']);
 end
+diary([matName, '.log.txt'])
 imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
+tStart = tic;
 imgs = doT1Sub(imgs, matName); %normalize T1
 imgs = doI3MSub(imgs, matName);
+tStart = timeSub(tStart,'T1');
 imgs = doAslSub(imgs, matName);
+tStart = timeSub(tStart,'ASL');
 imgs = doRestSub(imgs, matName, 1.85, 2); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study 
+tStart = timeSub(tStart,'REST');
 %imgs = dofMRISub(imgs, matName);
 if ~isempty(imgs.DTI)
     imgs = removeDotDtiSub(imgs);
@@ -41,11 +45,18 @@ if ~isempty(imgs.DTI)
     dtiDir = fileparts(imgs.DTI);
     nii_fiber_quantify(matName, dtiDir);
     doFaMdSub(imgs, matName);
+    doTractographySub(imgs);
+    tStart = timeSub(tStart,'DTI');
 end
-
 printSub(imgs, matName); %show results - except DTI
+diary off
 %printDTISub(imgs, matName); %show results - DTI
 %nii_multimodal()
+
+function tStart = timeSub(tStart, timeComment)
+fprintf('Stage %s required\t%g\tseconds\n', timeComment, toc(tStart));
+tStart = tic;
+%timeSub
 
 function printSub(imgs, matName)
 if isempty(imgs.T1), return; end; %required
@@ -156,6 +167,35 @@ XYZmm = hdr.mat * coivox; %convert from voxels to millimeters
 XYZmm = XYZmm(1:3);
 %end setCenterOfIntensitySub()
 
+function doTractographySub(imgs)
+if isempty(imgs.DTI), return; end; %required
+Mask = prepostfixSub('', '_FA_thr', imgs.DTI);
+if ~exist(Mask,'file') , return; end; %required
+[p,n] = fsl_filepartsSub(imgs.DTI);
+basename = fullfile(p,n);
+imgCnv = [basename, '_dtitk.nii.gz'];
+ConvExe = 'TVFromEigenSystem';
+PathConvExe = findExeSub(ConvExe);
+if isempty(PathConvExe), fprintf('Tractography skipped: unable to find %s', ConvExe); return; end;
+TrakExe = 'SingleTensorFT';
+PathTrakExe = findExeSub(TrakExe);
+if isempty(PathTrakExe), fprintf('Tractography skipped: unable to find %s', TrakExe); return; end;
+cmd = sprintf('%s -basename "%s" -out %s -type FSL',ConvExe,basename, imgCnv); 
+[status, fullnam]  = system(cmd,'-echo');
+%e.g. TVFromEigenSystem -basename 199_99_AP_7 -type FSL
+cmd = sprintf('%s -in "%s" -seed "%s" -out "%s"',TrakExe, imgCnv, Mask, [basename, '.vtk'] );
+%e.g. SingleTensorFT -in 199_99_AP_7.nii.gz -seed 199_99_AP_7_FA_thr.nii.gz -out t.vtk
+[status, fullnam]  = system(cmd,'-echo');
+%end doTractographySub()
+
+function fullnam = findExeSub(nam)
+%findExeSub('nano') returns path of executable ("/usr/bin/nano") or empty if not found
+cmd=sprintf('which "%s"',nam);
+[status, fullnam]  = system(cmd);
+if (fullnam(1) ~= filesep), fullnam = []; end;
+%end findExeSub
+
+
 function doFaMdSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
@@ -232,11 +272,11 @@ if exist(dti_u, 'file')
 else
     clipSub (imgs); %topup requires images with even dimensions
     %1 - eddy current correct
-    % if isGpuInstalledSub()
-    %     command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
-    % else
+    if isEddyCuda7Sub()
+         command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+    else
         command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
-    % end
+    end
     if isempty(imgs.DTIrev)
         command=sprintf('%s "%s"',command, imgs.DTI);
     else
@@ -254,6 +294,15 @@ doDtiBedpostSub(imgs.DTI);
 doDtiWarpJhuSub(imgs); %warp atlas to DTI
 doDtiTractSub(imgs.DTI); %tractography
 %end doDtiSub()
+
+function isEddyCuda = isEddyCuda7Sub
+%eddy_cuda7.0 is a beta version supplied by Jesper Andersson that supports the GTX970 and has new features 
+isEddyCuda = false;
+if ~isGpuInstalledSub(), return; end;
+eddyName = '/usr/local/fsl/bin/eddy_cuda7.0';
+isEddyCuda = exist(eddyName,'file') > 0;
+if ~isEddyCuda, printf('Hint: Eddy will run faster if you install %s', eddyName); end;
+%end isEddyCuda7Sub
 
 function done = isDtiDone(imgs)
 done = false;
@@ -461,11 +510,14 @@ setenv('FSLPARALLEL', num2str(maxThreads));
 %end fslEnvSub()
 
 function doDtiWarpJhuSub(imgs)
+fprintf('################################ doDtiWarpJhuSub\n');
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 FA = prepostfixSub('', '_FA', imgs.DTI);
 MD = prepostfixSub('', '_MD', imgs.DTI);
-if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file') , return; end; %required
+if ~exist(T1,'file') fprintf('Unable to find image: %s\n',T1); return; end; %required
+if ~exist(FA,'file') fprintf('Unable to find image: %s\n',FA); return; end; %required
+if ~exist(MD,'file') fprintf('Unable to find image: %s\n',MD); return; end; %required
 FA = unGzSub (FA);
 MD = unGzSub (MD);
 nFA = rescaleSub(FA);
@@ -488,12 +540,22 @@ wroiname = prepostfixSub('w', '_roi', imgs.DTI);
 movefile(wroiname, roiname);
 %end doFaMdSub()
 
+function [p,n,x] = fsl_filepartsSub(imgname)
+[p, n, x] = fileparts(imgname);
+if strcmpi(deblank(x),'.gz') %.nii.gz
+    [p, n, x] = fileparts(fullfile(p,n));
+    x = [x, '.gz'];
+end
+%end unGzNameSub()
+
 function imgname = unGzNameSub(imgname)
 [p, n, x] = fileparts(imgname);
 if strcmpi(deblank(x),'.gz') %.nii.gz
     imgname = fullfile(p,n);
 end
 %end unGzNameSub()
+
+
 
 function oldNormSub(src, tar, smoref, reg, interp)
 %coregister T2 to match T1 image, apply to lesion
@@ -566,7 +628,7 @@ cmd = fslCmdSub(command);
 if verbose
     fprintf('Running \n %s\n', cmd);
 end
-[status,cmdout]  = system(cmd);
+[status,cmdout]  = system(cmd,'-echo');
 %end doFslCmd()
 
 % function [status,cmdout]  = doFslCmd (command, verbose)
@@ -1016,7 +1078,7 @@ v = ~isempty(strfind(getenv('PATH'),'cuda'));
 %[s, thisVer] = system(['/usr/local/cuda/bin/nvcc --version | grep -o "' vstr '"']);
 %v = strcmpi(deblank(thisVer),vstr);
 
-%end isCorrectVersion
+%end isGpuInstalledSub()
 
 
 
