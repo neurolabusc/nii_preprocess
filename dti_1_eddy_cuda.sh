@@ -90,7 +90,7 @@ else #dual DTI: run topup
 	#applytopup --imain=$dti,$dtir --inindex=1,2 --datain=$dti_txt --topup=$dti_t --out=$dti_u 
 	#http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/EDDY/UsersGuide
 	fslmaths $dti_tb0 -Tmean $dti_tb0
-	bet $dti_tb0 $dti_b  -f 0.2 -R -n -m
+	bet $dti_tb0 $dti_b  -f 0.15 -R -n -m
 	dti_b=${dti}b_mask #masked brain-extracted dti
 	dti_txt2=${dti}_index.txt
 	nvol=$(fslnvols $dti)
@@ -115,7 +115,7 @@ fi #if single DTI else dual DTI
 echo "2 DTIFIT + THRESHOLD FA MAPS : Compute anisotropy"
 dtifit --data=$dti_u --out=$dti --mask=$dti_b --bvecs=$dti_bvec --bvals=$dti_bval
 fslmaths $dti_fa -ero $dti_faEro
-fslmaths $dti_fa -ero -thr 0.2 -bin $dti_faThr
+fslmaths $dti_fa -ero -thr 0.15 -bin $dti_faThr
 
 #########
 #	echo "3 BEDPOSTX : Model fibers"

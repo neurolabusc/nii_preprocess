@@ -16,7 +16,6 @@ function matName = nii_lime(imgs, matName)
 if nargin < 1, error('Please use nii_lime_gui to select images'); end;
 if isempty(which('nii_nii2mat')), error('NiiStat required'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
-if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 %set structures
 if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end; 
 if ~isfield(imgs,'T2'), imgs.T2 = []; end;
@@ -44,6 +43,7 @@ imgs = doRestSub(imgs, matName, 1.85, 2); %TR= 1.850 sec, descending; %doRestSub
 tStart = timeSub(tStart,'REST');
 imgs = dofMRISub(imgs, matName);
 tStart = timeSub(tStart,'fMRI');
+ return; %666
 if ~isempty(imgs.DTI)
     imgs = removeDotDtiSub(imgs);
     doDtiSub(imgs);
@@ -688,7 +688,7 @@ function imgs = doRestSub(imgs, matName, TRsec, SliceOrder)
 if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
 %if isFieldSub(matName, 'rest_aal'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
-if isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
+%666 if isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
 nii_rest(imgs.Rest, imgs.T1, TRsec, SliceOrder);
 nii_nii2mat (prefixSub('fdwa',imgs.Rest), 'rest', matName)
 nii_nii2mat (prefixSub('alf_dwa',imgs.Rest), 'alf', matName)
@@ -703,7 +703,7 @@ if idx < 1, error('Invalid roi name %s', roiName); end;
 function imgs = doAslSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end; %we need these images
 imgs.ASL = removeDotSub (imgs.ASL);
-if isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
+%666 if isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
 [nV, nSlices] = nVolSub (imgs.ASL) ;
 [mx, ind] = max(nV);
 if (mod(mx,2) == 0) && ( (nSlices ~= 17) || (nSlices ~= 16))

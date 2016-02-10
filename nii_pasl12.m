@@ -45,11 +45,11 @@ tic; %start timer...
 % 0 - ONCE PER INDIVIDUAL normalize T1 scan using unified normalization-segmentation...
 [T1nameBet, T1name] = priorSegnormSub(T1name); %bT1.nii, y_T1.nii 
 if isempty(T1name), return; end;
-%REMAINING STEPS ONCE PER ASL SCAN
+%REMAINING STEPS ONCE PER ASL SESSION
 nses = length(ASLnames(:,1));
 for ses = 1 : nses
     Filename = deblank (ASLnames(ses,:));
-    setOriginSub(Filename, 3)
+    setOriginSub(Filename, 3);
     [nVol, nSlices] = numVolumesSub(Filename);
     if nVol < 5 %this script uses 4d data
         fprintf('ERROR: %s requires multiple volumes %s\n',which(mfilename), Filename);
@@ -87,7 +87,7 @@ for ses = 1 : nses
     end
     M0seg = binarizeSub(M0seg, 0.95,true);%resliced WM
     % 4 - smooth with 6mm FWHM Gaussian
-    Filename = smoothSub(Filename, 6)
+    Filename = smoothSub(Filename, 6);
     % 5 - conduct CBF estimates...
     fprintf('\nWARNING: next values must be correct - please match Siemens protocol PDF with %s\n',which(mfilename));
     fprintf('White matter mask is %s\n', M0seg);
@@ -118,7 +118,7 @@ for ses = 1 : nses
             RFBlocks = 82;
             TE=6.7; %Echo time, in ms
         else
-            error('Unknown pCASL sequence');
+            error('Unknown pCASL sequence (%d slices): %s', nSlices, Filename{1});
         end
         Labeltime =  RFBlocks*0.0185; %in seconds, The CFN pCASL RF block duration is ALWAYS = 0.0185s (20 RF pulses with gaps) - 18500us 
         Slicetime = (MinTRms - (Delaytime *1000) - (Labeltime * 1000) ) / nSlices; %Slicetime in ms, not sec!!!
