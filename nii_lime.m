@@ -31,30 +31,33 @@ if ~exist('matName','var')
     [p,n] = filepartsSub(imgs.T1);
     matName = fullfile(p, [n, '_lime.mat']);
 end
-
-diary([matName, '.log.txt'])
-imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
-tStart = tic;
-imgs = doT1Sub(imgs, matName); %normalize T1
-imgs = doI3MSub(imgs, matName);
-tStart = timeSub(tStart,'T1');
-imgs = doAslSub(imgs, matName);
-tStart = timeSub(tStart,'ASL');
-imgs = doRestSub(imgs, matName, 1.85, 2); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study 
-tStart = timeSub(tStart,'REST');
-imgs = dofMRISub(imgs, matName);
-tStart = timeSub(tStart,'fMRI');
-if ~isempty(imgs.DTI)
-    imgs = removeDotDtiSub(imgs);
-    doDtiSub(imgs);
-    dtiDir = fileparts(imgs.DTI);
-    nii_fiber_quantify(matName, dtiDir);
-    doFaMdSub(imgs, matName);
-    doTractographySub(imgs);
-    tStart = timeSub(tStart,'DTI');
+if false
+    diary([matName, '.log.txt'])
+    imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
+    tStart = tic;
+    imgs = doT1Sub(imgs, matName); %normalize T1
+    imgs = doI3MSub(imgs, matName);
+    tStart = timeSub(tStart,'T1');
+    imgs = doRestSub(imgs, matName, 1.85, 2); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study 
+    tStart = timeSub(tStart,'REST');
+    imgs = doAslSub(imgs, matName);
+    tStart = timeSub(tStart,'ASL');
+    imgs = dofMRISub(imgs, matName);
+    tStart = timeSub(tStart,'fMRI');
+    if ~isempty(imgs.DTI)
+        imgs = removeDotDtiSub(imgs);
+        doDtiSub(imgs);
+        dtiDir = fileparts(imgs.DTI);
+        nii_fiber_quantify(matName, dtiDir);
+        doFaMdSub(imgs, matName);
+        doTractographySub(imgs);
+        tStart = timeSub(tStart,'DTI');
+    end
 end
-printSub(imgs, matName); %show results - except DTI
-printDTISub(imgs, matName); %show results - DTI
+%pdfName = 'MasterNormalized';
+%printSub(imgs, pdfName); %show results - except DTI
+pdfName = 'MasterDTI';
+printDTISub(imgs, pdfName); %show results - DTI
 diary off
 %
 %nii_multimodal()
@@ -65,13 +68,14 @@ tStart = tic;
 %timeSub
 
 function printSub(imgs, matName)
+if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 if isempty(imgs.T1), return; end; %required
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 if isempty(imgs.Lesion)
     LS = [];
 else
     LS = prefixSub('wsr', imgs.Lesion);
-    if ~exist(LS,'file'), error('Unable to find %s', LS); end; %required
+    if ~exist(LS,'file'), fprintf('Unable to find %s\n', LS); return; end; %required
 end;
 if ~exist(T1,'file'), return; end; %required
 spm_clf;
@@ -98,7 +102,8 @@ end;
 spm_print(matName);
 %end printSub()
 
-function printDTISub(imgs, matName)    
+function printDTISub(imgs, matName) 
+if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 if  isempty(imgs.DTI) , return; end; %required
 spm_clf;
 spm_figure('Clear', 'Graphics');
@@ -137,7 +142,8 @@ imgs.fMRI = removeDotSub (imgs.fMRI);
 [p] = fileparts(imgs.fMRI);
 cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
-if exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI);end;
+if exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+
 nii_fmri60(imgs.fMRI); %use fMRI for normalization
 
 if ~exist(cstat, 'file') || ~exist(bstat,'file')
@@ -455,7 +461,6 @@ mask_dir=fullfile(pth, 'masks');
 if ~exist(mask_dir, 'file'), mkdir(mask_dir); end;
 nROI = 189; %666
 %now run probtrackx
-
 prob_dir=fullfile(pth, 'probtrackx');
 if ~exist(prob_dir, 'file'), mkdir(prob_dir); end;
 nPerm = 5000; %666
@@ -687,7 +692,7 @@ fclose(fileID);
 function imgs = doRestSub(imgs, matName, TRsec, SliceOrder)
 if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
-%if isFieldSub(matName, 'rest_aal'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
+if isFieldSub(matName, 'rest'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
 if isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
 nii_rest(imgs.Rest, imgs.T1, TRsec, SliceOrder);
 nii_nii2mat (prefixSub('fdwa',imgs.Rest), 'rest', matName)

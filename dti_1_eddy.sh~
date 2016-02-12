@@ -68,7 +68,7 @@ dti_faEro=${dti}_FA_ero #eroded dti fractional anisotropy map
 if [ ${#dtir} -eq 0 ]; then  #only given a single DTI
 	echo "1 EDDY_CORRECT: undistort DTI data"
 	eddy_correct $dti $dti_u 0
-	bet $dti_u $dti_b  -f 0.2 -n -m
+	bet $dti_u $dti_b -f 0.2 -R -n -m
 	dti_b=${dti}b_mask #masked brain-extracted dti
 else #dual DTI: run topup
 	echo "1 TOPUP+EDDY: undistort DTI data"

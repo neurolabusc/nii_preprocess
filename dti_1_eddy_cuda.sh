@@ -68,7 +68,7 @@ dti_faEro=${dti}_FA_ero #eroded dti fractional anisotropy map
 if [ ${#dtir} -eq 0 ]; then  #only given a single DTI
 	echo "1 EDDY_CORRECT: undistort DTI data"
 	eddy_correct $dti $dti_u 0
-	bet $dti_u $dti_b  -f 0.3 -n -m
+	bet $dti_u $dti_b  -f 0.2 -n -R -m
 	dti_b=${dti}b_mask #masked brain-extracted dti
 else #dual DTI: run topup
 	echo "1 TOPUP+EDDY: undistort DTI data"
@@ -90,7 +90,7 @@ else #dual DTI: run topup
 	#applytopup --imain=$dti,$dtir --inindex=1,2 --datain=$dti_txt --topup=$dti_t --out=$dti_u 
 	#http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/EDDY/UsersGuide
 	fslmaths $dti_tb0 -Tmean $dti_tb0
-	bet $dti_tb0 $dti_b  -f 0.15 -R -n -m
+	bet $dti_tb0 $dti_b  -f 0.2 -R -n -m
 	dti_b=${dti}b_mask #masked brain-extracted dti
 	dti_txt2=${dti}_index.txt
 	nvol=$(fslnvols $dti)
