@@ -33,11 +33,11 @@ if ~exist('matName','var')
     matName = fullfile(p, [n, '_lime.mat']);
 end
 
-%     if ~isempty(imgs.DTI)
-%         imgs = removeDotDtiSub(imgs);
-%         doDkiSub(imgs, matName);
-%     end
-%     return
+    if ~isempty(imgs.DTI)
+        imgs = removeDotDtiSub(imgs);
+        doDkiSub(imgs);
+    end
+    return
 
 if true
     diary([matName, '.log.txt'])
@@ -217,6 +217,26 @@ if (fullnam(1) ~= filesep), fullnam = []; end;
 %end findExeSub
 
 
+function doFaMdSub(imgs, matName)
+if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
+T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
+FA = prepostfixSub('', '_FA', imgs.DTI);
+MD = prepostfixSub('', '_MD', imgs.DTI);
+if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file') , return; end; %required
+FA = unGzSub (FA);
+MD = unGzSub (MD);
+wFA = prepostfixSub('w', '', FA);
+wMD = prepostfixSub('w', '', MD);
+if ~exist(wFA,'file') || ~exist(wMD,'file')
+    nFA = rescaleSub(FA);
+    %nii_setOrigin12({nFA, FA, MD}, 1,false); %rFA looks like T1
+    oldNormSub( {nFA, FA,MD}, T1, 8, 10 );
+end
+if isFieldSub(matName, 'fa'), return; end; %stats already exist
+nii_nii2mat(wFA, 'fa', matName); %6
+nii_nii2mat(wMD, 'md', matName); %8
+%end doFaMdSub()
+
 function nam = prepostfixSub (pre, post, nam)
 if isempty(nam), return; end;
 [p, n, x] = filepartsSub(nam);
@@ -249,61 +269,26 @@ hdr.fname = fname;
 spm_write_vol(hdr,img);
 %end rescaleSub()
 
-function doDkiSub(imgs, matName)
-if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
-if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
-wbT1 = prefixSub('wb',imgs.T1); %warped brain extracted image
+function doDkiSub(imgs)
+if  isempty(imgs.DTI), return; end; %required
 if ~exist('dkifx','file'),  fprintf('skipping DKI: requires dkifx script\n'); return; end;
 mask=prepostfixSub('', 'b_mask', imgs.DTI);
 dti_u=prepostfixSub('', 'u', imgs.DTI);
-[pth,nam] = filepartsSub(imgs.DTI);
-bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
-if ~exist(bvalnm, 'file')
-    bvalnm = fullfile(pth, [nam, '.bval']);
-end
-if ~exist(mask, 'file') || ~exist(dti_u, 'file') || ~exist(bvalnm, 'file')|| ~exist(wbT1, 'file')
-    fprintf('Skipping DKI preprocessing. Missing file(s): %s %s %s %s\n', mask, dti_u, bvalnm, wbT1);
+[pth, nam]
+bnm = fullfile(pth, [imgs.DTI, '.bval']);
+if ~exist(mask, 'file') || ~exist(dti_u, 'file') || ~exist(bnm, 'file')
+    fprintf('Skipping DTI preprocessing. Missing images: %s %s %s\n', mask, dti_u, bnm);
 end;
-bval=load(bvalnm);
-if max(bval(:)) < 1500
-    fprintf('Skipping DKI preprocessing. Require B-values >1500. Max b-value: %d\n',max(bval(:)));
-    return;
-end
-dkifx(dti_u, bvalnm, mask);
-MK=prepostfixSub('', 'u_ldfDKI_MK', imgs.DTI);
-if ~exist(MK, 'file')
-    fprintf('Serious error: no mean kurtosis image named %s\n', MK);
-    return;
-end;
-%normalize mean kurtosis to match normalized, brain extracted T1
-wMK = prepostfixSub('w', '', MK);
-oldNormSub( {MK}, wbT1, 8, 10 );
-nii_nii2mat(wMK, 'mk', matName);
-%save note
-fid = fopen('dki.txt', 'a+');
-fprintf(fid, '%s\n', matName);
-fclose(fid);
-%end doDkiSub()
+nr = bvalCountSub(imgs.DTIrev);
+mask
+dti_u 
+bnm
 
-function doFaMdSub(imgs, matName)
-if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
-T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
-FA = prepostfixSub('', '_FA', imgs.DTI);
-MD = prepostfixSub('', '_MD', imgs.DTI);
-if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file') , return; end; %required
-FA = unGzSub (FA);
-MD = unGzSub (MD);
-wFA = prepostfixSub('w', '', FA);
-wMD = prepostfixSub('w', '', MD);
-if ~exist(wFA,'file') || ~exist(wMD,'file')
-    nFA = rescaleSub(FA);
-    %nii_setOrigin12({nFA, FA, MD}, 1,false); %rFA looks like T1
-    oldNormSub( {nFA, FA,MD}, T1, 8, 10 );
-end
-if isFieldSub(matName, 'fa'), return; end; %stats already exist
-nii_nii2mat(wFA, 'fa', matName); %6
-nii_nii2mat(wMD, 'md', matName); %8
-%end doFaMdSub()
+%/home/crlab/Desktop/dummy/M4208/DTI_M4208_CTb_mask.nii.gz
+
+
+
+%end doDkiSub()
 
 function doDtiSub(imgs)
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
