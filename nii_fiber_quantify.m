@@ -1,29 +1,62 @@
 
-function nii_fiber_quantify (matName, baseDir)
+function  nii_fiber_quantify (matName, baseDir, atlas, forceRecalc, num_samples)
 %For each region of interest find connection to every other region
-%
-%
+% matName : name of file to store calculations (.mat format)
+% baseDir: file that includes the probtrackx folder
+% atlas: name of atlas from LIME roi folder ('jhu', 'aicha', etc)
+% forceRecalc : if true, this function runs even if values were previously calculated
+% num_samples: how many probtrackx samples were generated? (default = 5000)
 
-probDir = [baseDir,filesep,  'probtrackx' ]; %no filesep
-maskDir = [baseDir,filesep, 'masks']; %no filesep 
-if ~exist(probDir,'file') || ~exist(maskDir, 'file')
+%see if we can run this faster
+exeName = [];
+if ismac
+    exeName = fullfile(fileparts(which(mfilename)), 'fiberQuantOSX');
+elseif isunix % Code to run on Linux plaform
+    exeName = fullfile(fileparts(which(mfilename)), 'fiberQuantLX');
+end
+
+if ~isempty(exeName) && ~exist(exeName,'file')
+    fprintf('HINT: %s will run much faster if you install %s',mfilename, exeName);
+    exeName = [];
+end
+
+if ~exist('atlas','var'), atlas = 'jhu'; end;
+if ~exist('forceRecalc','var'), forceRecalc = false; end;
+if ~exist('num_samples','var'), num_samples = 5000; end;
+probDir = [baseDir,filesep,  'probtrackx_' atlas ]; %no filesep
+if ~exist(probDir,'dir') && strcmpi(atlas,'jhu')
+    probDir = [baseDir,filesep,  'probtrackx' ]; %no filesep
+end
+maskDir = [baseDir,filesep, 'masks_' atlas]; %no filesep 
+if ~exist(maskDir,'dir') && strcmpi(atlas,'jhu')
+    maskDir = [baseDir,filesep, 'masks']; %no filesep 
+end
+if ~exist(probDir,'dir') || ~exist(maskDir, 'dir')
     fprintf('%s skipped: can not find %s or %s\n',mfilename, probDir, maskDir);
     return
 end
-label = jhuLabelSub;
-if  ~isFieldSub(matName, 'dtimx_jhu')
+[label, numLabel] = labelSub (atlas);
+if forceRecalc || ~isFieldSub(matName, ['dtimx_', atlas])
     fprintf('%s processing %s\n', mfilename, matName);
-    t_start=tic;
-    [d, fc, mn, mx, ok] = fiberQXSub (maskDir, probDir);
+    if isempty(exeName) 
+        t_start=tic;
+        [d, fc, mn, mx, ok] = fiberQXSub (maskDir, probDir, numLabel, num_samples);
+        fprintf ('Quantify took %f seconds to run.\n', toc(t_start) );
+    else
+       cmd = sprintf('%s "%s" "%s" %d %d',exeName, maskDir, probDir, numLabel, num_samples); 
+       system(cmd,'-echo'); 
+       mn = loadMtxSub(fullfile(maskDir, 'mean.mtx'), numLabel);
+       mx = loadMtxSub(fullfile(maskDir, 'max.mtx'), numLabel);
+       d = loadMtxSub(fullfile(maskDir, 'density.mtx'), numLabel);
+       fc = loadMtxSub(fullfile(maskDir, 'fiber_count.mtx'), numLabel);
+       ok = true;
+    end
     
-    %[d, fc, ok] = fiberQSub (maskDir, probDir);
-    %[mn, mx, ok] = fiberQMeanMaxSub (maskDir, probDir);
-    fprintf ('Quantify took %f seconds to run.\n', toc(t_start) );
     if (ok)
-        mergeSub(matName, mn, label, 'dtimn_jhu');
-        mergeSub(matName, mx, label, 'dtimx_jhu');
-        mergeSub(matName, d, label, 'dti_jhu');
-        mergeSub(matName, fc, label, 'dtifc_jhu');
+        mergeSub(matName, mn, label, ['dtimn_', atlas]);
+        mergeSub(matName, mx, label, ['dtimx_', atlas]);
+        mergeSub(matName, d, label, ['dti_', atlas]);
+        mergeSub(matName, fc, label, ['dtifc_', atlas]);
     else
        fprintf('%s failed with matName: %s basedir: %s\n', mfilename, matName, baseDir);
        fid = fopen('fiber_errors.txt', 'at');
@@ -31,8 +64,24 @@ if  ~isFieldSub(matName, 'dtimx_jhu')
        fclose(fid);
     end %if ok
 else
-	fprintf('%s skipping %s (already computed)\n', mfilename, matName);
+	fprintf('%s of %s atlas skipped for %s (already computed)\n', mfilename, atlas, matName);
 end
+
+function mtx = loadMtxSub(fnm, nROI)
+%load raw binary little-endian double-precision matrix
+num = nROI * nROI;
+f=dir(fnm);
+if (f.bytes ~= (num * 8))
+	error('Incorrect file size (expected %d*%d*8 bytes) %s', nROI, nROI, fnm);	
+end
+fid=fopen(fnm,'rb'); % opens the file for reading
+[mtx, COUNT] = fread(fid, num, 'double', 'ieee-le'); 
+fclose(fid);
+if COUNT ~= num
+	error('Unable to read %s', fnm); 
+end;
+mtx = reshape(mtx, nROI, nROI);
+%end loadMatSub()
        
 function is = isFieldSub(matname, fieldname)
 is = false;
@@ -52,26 +101,26 @@ if length(matName) < 1, return; end
 if exist(matName,'file')
     old = load(matName);
     %old = rmfield(old,statname);
-    if isfield(old,'rest_aal')
-        if max(old.rest_aal.r(:)) == min(old.rest_aal.r(:))
-            fprintf('WARNING: Please check resting state data of %s\n',matName);
-            old = rmfield(old,'rest_aal');
-            old = rmfield(old,'rest_aalcat');
-            old = rmfield(old,'rest_bro');
-            old = rmfield(old,'rest_cat');		
-            old = rmfield(old,'rest_fox');
-            old = rmfield(old,'rest_jhu');
-        end
-      end
+%     if isfield(old,'rest_aal')
+%         if max(old.rest_aal.r(:)) == min(old.rest_aal.r(:))
+%             fprintf('WARNING: Please check resting state data of %s\n',matName);
+%             old = rmfield(old,'rest_aal');
+%             old = rmfield(old,'rest_aalcat');
+%             old = rmfield(old,'rest_bro');
+%             old = rmfield(old,'rest_cat');		
+%             old = rmfield(old,'rest_fox');
+%             old = rmfield(old,'rest_jhu');
+%         end
+%       end
     stat = nii_mergestruct(stat,old);
 end
 save(matName, '-struct', 'stat');
 %end mergeSub()
 
-function label = jhuLabelSub 
+function [label, numLabel] = labelSub(atlas) 
 pth = which('nii_stat');
 [pth] = fileparts (pth);
-pth = [pth filesep 'roi' filesep 'jhu.txt'];
+pth = [pth filesep 'roi' filesep atlas '.txt'];
 if ~exist(pth,'file'), error('Unable to find %s\n',pth); end;
 fid = fopen(pth);  % Open file
 label=[];
@@ -82,6 +131,8 @@ while ischar(tline)
     tline = fgetl(fid);
 end
 fclose(fid); 
+numLabel = size(label,1);
+if numLabel < 2, error('%s unable to read %s', mfilename, pth); end;
 %end labelSub()
 
 function nameFolds=subFolderSub(pathFolder)
@@ -91,70 +142,69 @@ nameFolds = {d(isub).name}';
 nameFolds(ismember(nameFolds,{'.','..'})) = [];
 %end subFolderSub()
 
-function [mean_mat, max_mat, OK] = fiberQMeanMaxSub (maskDir, probDir)
+% function [mean_mat, max_mat, OK] = fiberQMeanMaxSub (maskDir, probDir)
+% %maskDir = '/Volumes/SSD/P042/masks';
+% %probDir = '/Volumes/SSD/P042/probtrackx';
+% num_samples = 5000;
+% knROI = 189; %number of regions of interest
+% mean_mat = eye(knROI);
+% max_mat = eye(knROI);
+% nvox = nan;
+% for i = 1:(knROI)  
+%     [im, vx] = imgSub(maskDir, i);
+%     if ~isnan(vx)
+%         nvox = numel(im);
+%         break;
+%     end
+% end;
+% if isnan(nvox)
+%    error('No regions!'); 
+% end
+% OK = false;
+% vx = zeros(knROI, 1);
+% vxp = zeros(knROI, 1);
+% img = zeros(knROI,nvox);
+% imgp = zeros(knROI,nvox);
+% 
+% for i = 1:(knROI)  
+%     [im, vx(i)] = imgSub(maskDir, i);
+%     if ~isempty(im), img(i,:) = im; end;
+%     [im, vxp(i)] = imgSubP(probDir, i); %#ok<AGROW,NASGU>
+%     if ~isempty(im), imgp(i,:) = im; end;
+% end;
+% %fprintf('images loaded\n');
+% for i = 1:(knROI-1)  
+%     if ~isnan(vx(i)) && ~isnan(vxp (i))
+%         %if mod(i,10) == 0, fprintf('Row %d\n', i); end;
+%         for j = i+1 : knROI
+%             if ~isnan(vx(j)) && ~isnan(vxp(j))
+%                 %fprintf('%dx%d\n',i,j);
+%                 OK = true;
+%                 [ij_mean, ij_max] = fslstatsKMeanMaxSub (imgp(i,:), img(j,:));
+%                 [ji_mean, ji_max] = fslstatsKMeanMaxSub (imgp(j,:), img(i,:));
+%                 %fprintf('i %d j %d iVox %d, jVox %d ji_mean %g ij_mean %g norm %g density %g\n', i, j, voxi, voxj, ji_mean, ij_mean, normalizing_factor, density);
+%                 mean_mat(i,j) = ij_mean+ji_mean;
+%                 mean_mat(j,i) = mean_mat(i,j);
+%                 %ij_max = fslstatsKMaxSub (imgp(i,:), img(j,:));
+%                 %ji_max = fslstatsKMaxSub (imgp(j,:), img(i,:));
+%                 
+%                 max_mat(i,j) = ij_max+ji_max;
+%                 max_mat(j,i) = max_mat(i,j);
+%                 %fprintf('%gx%g\n',fiber_count, density); error('1123');
+%             end %j not empty
+%          end %for j
+%     end %i not empty
+% end
+% mean_mat( ~isfinite(mean_mat)) = 0;
+% max_mat( ~isfinite(max_mat)) = 0;
+% %end fiberQ2Sub()
+
+
+function [density_mat, fiber_count_mat, mean_mat, max_mat, OK] = fiberQXSub (maskDir, probDir, numLabel, num_samples)
 %maskDir = '/Volumes/SSD/P042/masks';
 %probDir = '/Volumes/SSD/P042/probtrackx';
-num_samples = 5000;
-knROI = 189; %number of regions of interest
-mean_mat = eye(knROI);
-max_mat = eye(knROI);
-nvox = nan;
-for i = 1:(knROI)  
-    [im, vx] = imgSub(maskDir, i);
-    if ~isnan(vx)
-        nvox = numel(im);
-        break;
-    end
-end;
-if isnan(nvox)
-   error('No regions!'); 
-end
 OK = false;
-vx = zeros(knROI, 1);
-vxp = zeros(knROI, 1);
-img = zeros(knROI,nvox);
-imgp = zeros(knROI,nvox);
-
-for i = 1:(knROI)  
-    [im, vx(i)] = imgSub(maskDir, i);
-    if ~isempty(im), img(i,:) = im; end;
-    [im, vxp(i)] = imgSubP(probDir, i); %#ok<AGROW,NASGU>
-    if ~isempty(im), imgp(i,:) = im; end;
-end;
-%fprintf('images loaded\n');
-for i = 1:(knROI-1)  
-    if ~isnan(vx(i)) && ~isnan(vxp (i))
-        %if mod(i,10) == 0, fprintf('Row %d\n', i); end;
-        for j = i+1 : knROI
-            if ~isnan(vx(j)) && ~isnan(vxp(j))
-                %fprintf('%dx%d\n',i,j);
-                OK = true;
-                [ij_mean, ij_max] = fslstatsKMeanMaxSub (imgp(i,:), img(j,:));
-                [ji_mean, ji_max] = fslstatsKMeanMaxSub (imgp(j,:), img(i,:));
-                %fprintf('i %d j %d iVox %d, jVox %d ji_mean %g ij_mean %g norm %g density %g\n', i, j, voxi, voxj, ji_mean, ij_mean, normalizing_factor, density);
-                mean_mat(i,j) = ij_mean+ji_mean;
-                mean_mat(j,i) = mean_mat(i,j);
-                %ij_max = fslstatsKMaxSub (imgp(i,:), img(j,:));
-                %ji_max = fslstatsKMaxSub (imgp(j,:), img(i,:));
-                
-                max_mat(i,j) = ij_max+ji_max;
-                max_mat(j,i) = max_mat(i,j);
-                %fprintf('%gx%g\n',fiber_count, density); error('1123');
-            end %j not empty
-         end %for j
-    end %i not empty
-end
-mean_mat( ~isfinite(mean_mat)) = 0;
-max_mat( ~isfinite(max_mat)) = 0;
-%end fiberQ2Sub()
-
-
-function [density_mat, fiber_count_mat, mean_mat, max_mat, OK] = fiberQXSub (maskDir, probDir)
-%maskDir = '/Volumes/SSD/P042/masks';
-%probDir = '/Volumes/SSD/P042/probtrackx';
-OK = false;
-num_samples = 5000;
-knROI = 189; %number of regions of interest
+knROI = numLabel; %number of regions of interest
 density_mat = eye(knROI);
 fiber_count_mat = eye(knROI);
 mean_mat = eye(knROI);
@@ -184,7 +234,8 @@ for i = 1:(knROI)
         nROI = nROI + 1;
     end;
 end;
-fprintf('Found %d of %d ROIs\n', nROI, knROI);
+%cr 02032016 - parfor provides virtually no benefit, I don't know why
+fprintf('Found %d of %d ROIs (serial processing)\n', nROI, knROI);
 for i = 1:(knROI-1)  
     if ~isnan(vx(i)) && ~isnan(vxp (i))
         %if mod(i,10) == 0, fprintf('Row %d\n', i); end;
@@ -220,66 +271,7 @@ density_mat( ~isfinite(density_mat)) = 0;
 fiber_count_mat( ~isfinite(fiber_count_mat)) = 0;
 mean_mat( ~isfinite(mean_mat)) = 0;
 max_mat( ~isfinite(max_mat)) = 0;
-%end fiberQX()
-
-% function [density_mat, fiber_count_mat, OK] = fiberQSub (maskDir, probDir)
-% %maskDir = '/Volumes/SSD/P042/masks';
-% %probDir = '/Volumes/SSD/P042/probtrackx';
-% num_samples = 5000;
-% knROI = 189; %number of regions of interest
-% density_mat = eye(knROI);
-% fiber_count_mat = eye(knROI);
-% nvox = nan;
-% for i = 1:(knROI)  
-%     [im, vx] = imgSub(maskDir, i);
-%     if ~isnan(vx)
-%         nvox = numel(im);
-%         break;
-%     end
-% end;
-% if isnan(nvox)
-%    error('No regions!'); 
-% end
-% OK = false;
-% vx = zeros(knROI, 1);
-% vxp = zeros(knROI, 1);
-% img = zeros(knROI,nvox);
-% imgp = zeros(knROI,nvox);
-% 
-% for i = 1:(knROI)  
-%     [im, vx(i)] = imgSub(maskDir, i);
-%     if ~isempty(im), img(i,:) = im; end;
-%     [im, vxp(i)] = imgSubP(probDir, i); %#ok<AGROW,NASGU>
-%     if ~isempty(im), imgp(i,:) = im; end;
-% end;
-% for i = 1:(knROI-1)  
-%     if ~isnan(vx(i)) && ~isnan(vxp (i))
-%         %if mod(i,10) == 0, fprintf('Row %d\n', i); end;
-%         for j = i+1 : knROI
-%             if ~isnan(vx(j)) && ~isnan(vxp(j))
-%                 %fprintf('%dx%d\n',i,j);
-%                 OK = true;
-%                 ij_mean = fslstatsKSub (imgp(i,:), img(j,:));
-%                 ji_mean = fslstatsKSub (imgp(j,:), img(i,:));
-%                 %fprintf('%gx%g\n',ij_mean, ji_mean); error('mean check');
-%                 ij_sum= ij_mean * vx(j);
-%                 ji_sum= ji_mean * vx(i);
-%                 fiber_count = ij_sum + ji_sum;  
-%                 normalizing_factor = (vx(i) + vx(j) ) * ( num_samples + 1 );
-%                 density = fiber_count/normalizing_factor;
-%                 %fprintf('i %d j %d iVox %d, jVox %d ji_mean %g ij_mean %g norm %g density %g\n', i, j, voxi, voxj, ji_mean, ij_mean, normalizing_factor, density);
-%                 density_mat(i,j) = density;
-%                 density_mat(j,i) = density;
-%                 fiber_count_mat(i,j) = fiber_count;
-%                 fiber_count_mat(j,i) = fiber_count;
-%                 %fprintf('%gx%g\n',fiber_count, density); error('1123');
-%             end %j not empty
-%          end %for j
-%     end %i not empty
-% end
-% density_mat( ~isfinite(density_mat)) = 0;
-% fiber_count_mat( ~isfinite(fiber_count_mat)) = 0;
-% %end fiberQ()
+%end fiberQXSub()
 
 function [imgi,voxi] = imgSubP(dir, index)
 inam = fullfile(dir, sprintf('%d',index), 'fdt_paths.nii.gz');

@@ -33,11 +33,10 @@ if ~exist('matName','var')
     matName = fullfile(p, [n, '_lime.mat']);
 end
 
-%     if ~isempty(imgs.DTI)
-%         imgs = removeDotDtiSub(imgs);
-%         doDkiSub(imgs, matName);
-%     end
-%     return
+
+doDtiTractSub(imgs,'AICHA'); %tractography
+return
+
 
 if true
     diary([matName, '.log.txt'])
@@ -59,6 +58,7 @@ if true
         nii_fiber_quantify(matName, dtiDir);
         doFaMdSub(imgs, matName);
         doTractographySub(imgs);
+        doDkiSub(imgs, matName);
         tStart = timeSub(tStart,'DTI');
     end
 end
@@ -194,6 +194,8 @@ Mask = prepostfixSub('', '_FA_thr', imgs.DTI);
 if ~exist(Mask,'file') , return; end; %required
 [p,n] = fsl_filepartsSub(imgs.DTI);
 basename = fullfile(p,n);
+vtkname = [basename, '.vtk'];
+if exist(vtkname,'file') , fprintf('Skipping tractography (alredy done): %s\n', vtkname); return; end; %required
 imgCnv = [basename, '_dtitk.nii.gz'];
 ConvExe = 'TVFromEigenSystem';
 PathConvExe = findExeSub(ConvExe);
@@ -204,7 +206,7 @@ if isempty(PathTrakExe), fprintf('Tractography skipped: unable to find %s', Trak
 cmd = sprintf('%s -basename "%s" -out %s -type FSL',ConvExe,basename, imgCnv); 
 [status, fullnam]  = system(cmd,'-echo');
 %e.g. TVFromEigenSystem -basename 199_99_AP_7 -type FSL
-cmd = sprintf('%s -in "%s" -seed "%s" -out "%s"',TrakExe, imgCnv, Mask, [basename, '.vtk'] );
+cmd = sprintf('%s -in "%s" -seed "%s" -out "%s"',TrakExe, imgCnv, Mask, vtkname );
 %e.g. SingleTensorFT -in 199_99_AP_7.nii.gz -seed 199_99_AP_7_FA_thr.nii.gz -out t.vtk
 [status, fullnam]  = system(cmd,'-echo');
 %end doTractographySub()
@@ -251,7 +253,7 @@ spm_write_vol(hdr,img);
 
 function doDkiSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
-if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
+%if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
 wbT1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 if ~exist('dkifx','file'),  fprintf('skipping DKI: requires dkifx script\n'); return; end;
 mask=prepostfixSub('', 'b_mask', imgs.DTI);
@@ -270,14 +272,15 @@ if max(bval(:)) < 1500
     return;
 end
 dkifx(dti_u, bvalnm, mask);
+MKmask = prepostfixSub('', 'u_ldfDKI_MASK', imgs.DTI);
 MK=prepostfixSub('', 'u_ldfDKI_MK', imgs.DTI);
-if ~exist(MK, 'file')
-    fprintf('Serious error: no mean kurtosis image named %s\n', MK);
+if ~exist(MK, 'file') || ~exist(MKmask, 'file')
+    fprintf('Serious error: no kurtosis images named %s %s\n', MK, MKmask);
     return;
 end;
 %normalize mean kurtosis to match normalized, brain extracted T1
 wMK = prepostfixSub('w', '', MK);
-oldNormSub( {MK}, wbT1, 8, 10 );
+oldNormSub( {MKmask, MK}, wbT1, 8, 8 );
 nii_nii2mat(wMK, 'mk', matName);
 %save note
 fid = fopen('dki.txt', 'a+');
@@ -348,8 +351,8 @@ else
     doFslCmd (command);
 end
 doDtiBedpostSub(imgs.DTI);
-doDtiWarpJhuSub(imgs); %warp atlas to DTI
-doDtiTractSub(imgs.DTI); %tractography
+
+doDtiTractSub(imgs); %tractography
 %end doDtiSub()
 
 function isEddyCuda = isEddyCuda7Sub
@@ -480,7 +483,10 @@ bval = [dti '.bval'];
 if ~exist(bvec,'file') || ~exist(bval,'file'), error('Can not find files %s %s', bvec, bval); end;
 %end getBVec()
 
-function doDtiTractSub(dti)
+function doDtiTractSub(imgs, atlas)
+dti = imgs.DTI;
+if ~exist('atlas','var'), atlas = 'jhu'; end;
+doDtiWarpSub(imgs, atlas); %warp atlas to DTI
 pth = fileparts(dti);
 bed_dir=fullfile(pth, 'bedpost');
 bed_dirX=fullfile(pth, 'bedpost.bedpostX');
@@ -490,36 +496,59 @@ if ~exist(bed_dir,'file') || ~exist(bed_dirX,'file')
     fprintf('Please run bedpost to create files %s %s\n',bed_dir, bed_dirX);
     return;
 end
-template_roiW=prepostfixSub('', '_roi', dti);
 dti_u=prepostfixSub('', 'u', dti);
+if ~exist(dti_u,'file') 
+    fprintf('Can not find undistorted DTI %s\n',dti_u);
+    return;
+end
+template_roiW=prepostfixSub('', '_roi', dti);
+if exist(template_roiW,'file') && strcmpi(atlas,'jhu')
+    atlasext = '';
+else
+   atlasext = ['_' atlas]; 
+end
+template_roiW=prepostfixSub('', ['_roi', atlasext], dti);
 dti_faThr=prepostfixSub('', '_FA_thr', dti);
+mask_dir=fullfile(pth, ['masks', atlasext]);
+
 if ~exist(template_roiW,'file') || ~exist(dti_u,'file') || ~exist(dti_faThr,'file')
     fprintf('Can not find %s or %s or %s\n',template_roiW, dti_u, dti_faThr);
     return;
 end
-template_roiWThr=prepostfixSub('', '_roi_thr', dti);
+template_roiWThr=prepostfixSub('', ['_roi_thr', atlasext], dti);
 command=sprintf('fslmaths "%s" -mas "%s" "%s"',template_roiW, dti_faThr, template_roiWThr);
 fprintf('Creating thresholded image %s\n', template_roiWThr);
 doFslCmd (command);
+template_roiWThr=prepostfixSub('', ['_roi_thr', atlasext], dti);
 fprintf('PROBTRACKX: Create seed data\n');
-mask_dir=fullfile(pth, 'masks');
+
 if ~exist(mask_dir, 'file'), mkdir(mask_dir); end;
-nROI = 189; %666
+nROI = nRoiSub(template_roiWThr);
 %now run probtrackx
-prob_dir=fullfile(pth, 'probtrackx');
+prob_dir=fullfile(pth, ['probtrackx' atlasext]);
 if ~exist(prob_dir, 'file'), mkdir(prob_dir); end;
 nPerm = 5000; %666
 t_start=tic;
 commands = [];
+[hdr,img] = loadSub(template_roiWThr);
+hdr.dt = [2 0]; 
+hdr.pinfo = [1; 0; 0];
 for i = 1: nROI
-    maski=fullfile(mask_dir, [num2str(i),'.nii.gz']);
-    command=sprintf('fslmaths "%s" -thr %d -uthr %d -bin "%s" -odt char', template_roiWThr, i,i, maski);
-    doFslCmd (command, i == 1); %only show text for 1st region
-    command=sprintf('fslstats "%s" -M',  maski);
-    [~,cmdout] = doFslCmd (command, i == 1); %only show text for 1st region
-    if str2num(cmdout) < 1.0  %#ok<ST2NM>
-        delete(maski);
-    else
+    %maski=fullfile(mask_dir, [num2str(i),'.nii.gz']);
+    %command=sprintf('fslmaths "%s" -thr %d -uthr %d -bin "%s" -odt char', template_roiWThr, i,i, maski);
+    %doFslCmd (command, i == 1); %only show text for 1st region
+    imgi = zeros(size(img));
+    imgi(img == i) = 1;
+    if max(imgi) == 0, continue; end;
+    maski=fullfile(mask_dir, [num2str(i),'.nii']);
+    hdr.fname = maski;
+    spm_write_vol(hdr,imgi);
+    
+    %command=sprintf('fslstats "%s" -M',  maski);
+    %[~,cmdout] = doFslCmd (command, i == 1); %only show text for 1st region
+    %if str2num(cmdout) < 1.0  %#ok<ST2NM>
+    %    %delete(maski);
+    %else
         prob_diri=fullfile(prob_dir, num2str(i));
         if exist(prob_diri, 'file'), rmdir(prob_diri, 's'); end;
         mkdir(prob_diri);
@@ -531,7 +560,7 @@ for i = 1: nROI
         command=sprintf('%s -x "%s" --dir="%s" --forcedir  -P %d -s "%s" -m "%s" --opd --pd -l -c 0.2 --distthresh=0', ...
             exeName, maski, prob_diri, nPerm ,bed_merged, bed_mask );
         commands = [commands {command}]; %#ok<AGROW>
-    end %if voxels survive
+    %end %if voxels survive
 end %for each region
 if numel(commands) < 1
    fprintf('No regions survive thresholding with FA (poor normalization?) %s', dti); 
@@ -541,6 +570,28 @@ fprintf ('computing probtrackx for %d regions (this may take a while)\n',numel(c
 doThreads(commands, prob_dir);
 fprintf ('probtrackx2 took %f seconds to run.\n', toc(t_start) ); %t_start=tic;
 %sum(nOK(:))
+
+function [hd,im] = loadSub(fnm);
+[p,n,x] = spm_fileparts(fnm);
+if (length(x)==3)  && min((x=='.gz')==1) 
+    fnm = char(gunzip(fnm));
+    delnam = fnm;
+    [p,n,x] = spm_fileparts(char(fnm));
+else
+    delnam = '';
+end
+hd = spm_vol(fnm); %input header
+im = spm_read_vols(hd);%Input image
+hd = hd(1);
+if ~isempty(delnam), delete(delnam); end;
+%end loadSub()
+
+function nROI = nRoiSub(fnm)
+hdr = spm_vol(fnm);
+img = spm_read_vols(hdr);
+nROI = max(img(:));
+%if ~spm_type(hdr.dt,'intt'), fprintf('WARNING: expected integer datatype %s\n', fnm); end;
+%end nRoiSub()
 
 function doThreads(commands, out_dir)
 fslParallelSub;
@@ -565,9 +616,16 @@ end
 setenv('FSLPARALLEL', num2str(maxThreads));
 %end fslEnvSub()
 
-function doDtiWarpJhuSub(imgs)
-%fprintf('################################ doDtiWarpJhuSub\n');
+
+function doDtiWarpSub(imgs, atlas)
+
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
+if ~exist('atlas','var'), atlas = 'jhu'; end;
+if strcmpi(atlas,'jhu')
+    atlasext = '_roi';
+else
+   atlasext = ['_roi_' atlas]; 
+end
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 FA = prepostfixSub('', '_FA', imgs.DTI);
 MD = prepostfixSub('', '_MD', imgs.DTI);
@@ -577,22 +635,26 @@ if ~exist(MD,'file') fprintf('Unable to find image: %s\n',MD); return; end; %req
 FA = unGzSub (FA);
 MD = unGzSub (MD);
 nFA = rescaleSub(FA);
-JHU = fullfile(fileparts(which(mfilename)) , 'jhu_spm.nii');
-if ~exist(JHU,'file')
-    error('Unable to find template %s', JHU);
+atlasImg = fullfile(fileparts(which('nii_stat')), 'roi' , [atlas '.nii']);
+if ~exist(atlasImg,'file')
+    error('Unable to find template %s', atlasImg);
 end
-[outhdr, outimg] = nii_reslice_target(JHU, '', T1, 0) ;
-roiname = prepostfixSub('', '_roi', imgs.DTI);
+[outhdr, outimg] = nii_reslice_target(atlasImg, '', T1, 0) ;
+roiname = prepostfixSub('', atlasext, imgs.DTI);
+if ~strcmpi(atlas,'jhu') &&  exist(roiname,'file')
+    fprintf('Skipping doDtiWarpSub: file exists %s\n', roiname);
+    return;
+end
 if exist(roiname,'file') %e.g. FSL made .nii.gz version
     delete(roiname);
-    roiname = prepostfixSub('', '_roi', imgs.DTI);
+    roiname = prepostfixSub('', atlasext, imgs.DTI);
 end
 roiname = unGzNameSub(roiname);
 outhdr.fname = roiname;
 spm_write_vol(outhdr,outimg);
 oldNormSub({T1, roiname}, nFA, 8, 10, 0 );
 delete(roiname);
-wroiname = prepostfixSub('w', '_roi', imgs.DTI);
+wroiname = prepostfixSub('w', atlasext, imgs.DTI);
 movefile(wroiname, roiname);
 %end doFaMdSub()
 
@@ -683,8 +745,11 @@ fslEnvSub;
 cmd = fslCmdSub(command);
 if verbose
     fprintf('Running \n %s\n', cmd);
+    [status,cmdout]  = system(cmd,'-echo');
+else
+  [status,cmdout]  = system(cmd);  
 end
-[status,cmdout]  = system(cmd,'-echo');
+
 %end doFslCmd()
 
 % function [status,cmdout]  = doFslCmd (command, verbose)
@@ -756,8 +821,8 @@ imgs.ASL = removeDotSub (imgs.ASL);
 if isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
 [nV, nSlices] = nVolSub (imgs.ASL) ;
 [mx, ind] = max(nV);
-if (mod(mx,2) == 0) && ( (nSlices ~= 17) || (nSlices ~= 16))
-	fprintf('Error: nii_pasl12 only designed for pCASL sequences with 17 or 16 slices not %d: %s', nSlices);
+if (mod(mx,2) == 0) && ( (nSlices ~= 17) && (nSlices ~= 16))
+	fprintf('Error: nii_pasl12 only designed for pCASL sequences with 17 or 16 slices not %d: %s\n', nSlices);
 	return;
 end 
 if mx < 60, 
