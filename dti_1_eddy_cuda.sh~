@@ -94,9 +94,10 @@ else #dual DTI: run topup
 	dti_b=${dti}b_mask #masked brain-extracted dti
 	dti_txt2=${dti}_index.txt
 	nvol=$(fslnvols $dti)
+	nvolr=$(fslnvols $dtir)
 	indx=""
 	for ((i=1; i<=nvol; i+=1)); do indx="$indx 1"; done
-	for ((i=1; i<=nvol; i+=1)); do indx="$indx 2"; done
+	for ((i=1; i<=nvolr; i+=1)); do indx="$indx 2"; done
 	echo $indx > $dti_txt2
 	paste ${dti}.bvec ${dtir}.bvec > $dti_bvecm
 	paste ${dti}.bval ${dtir}.bval > $dti_bvalm

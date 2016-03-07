@@ -34,10 +34,6 @@ if ~exist('matName','var')
 end
 
 
-doDtiTractSub(imgs,'AICHA'); %tractography
-return
-
-
 if true
     diary([matName, '.log.txt'])
     imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
@@ -342,8 +338,8 @@ else
     else
         nr = bvalCountSub(imgs.DTIrev);
         if (nr ~= n)
-            fprintf('BVECS/BVALS DO NOT MATCH %s %s\n', imgs.DTI, imgs.DTIrev);
-            return    
+            fprintf('WARNING: BVECS/BVALS DO NOT MATCH %s %s\n', imgs.DTI, imgs.DTIrev);
+            %return    
         end
         command=sprintf('%s "%s" "%s"',command, imgs.DTI, imgs.DTIrev);
     end
