@@ -1,26 +1,33 @@
-function nii_rest (Restnames, T1name, TRsec, SliceOrder, doSliceTime)
+function nii_rest (imgs, TRsec, SliceOrder, doSliceTime)
 %preprocesses resting state data using SPM
-%  Restnames  : 4D Resting State image(s)
-%  T1name     : (optional) T1-weighted anatomical scan from participant
+%  imgs : (optional) structure of image names (imgs.T1, imgs.Rest imgs.SE, imgs.SErev)
 %  TRsec      : Time between volumes in seconds
 %  SliceOrder : see nii_sliceTime 0=auto-detect,1=ascend,2=descend
 %Examples
-% nii_rest('rs.nii','t1.nii');
-% nii_rest('REST_LM1019.nii','T1_LM1019.nii',1.85, 2);
+% nii_rest; %use GUI
+% imgs.T1 = 'T1.nii'; imgs.Rest = 'Rest.nii'; imgs.SE = 'RestSE.nii'; imgs.SErev = 'RestSErev.nii';
+% nii_rest(imgs);
+%
+% History:
+%
+% TH 03/16: now pass in imgs structure rather than separate images for T1, rest, spin echo, and spin echo rev. 
+
 if nargin < 5
     doSliceTime = true;
 end
 isSPM12orNewerSub;
 %doSliceTime = true; %determine whether you want slice time correction 
-doDeleteTemporary = true; %remove images generated during the middle stages of pipeline
+doDeleteTemporary = false; %remove images generated during the middle stages of pipeline
 resliceMM = 3; %reslicing resolution, e.g. if 3 then data will be 3x3x3 mm
 if exist('spm','file')~=2; fprintf('%s requires SPM\n',mfilename); return; end;
-if nargin <1 %no input: select ASL file[s]
- Restnames = spm_select(inf,'image','Select 4D resting state volumes[s]');
+if nargin < 1 %no input: select imgs[s]
+ imgs.Rest = spm_select(inf,'image','Select 4D resting state volumes[s]');
+ imgs.T1 = spm_select(1,'image','Select T1 anatomical scan');
+ imgs.SE = spm_select(1,'image','(Optional) select spin-echo scan for undistortion');
+ imgs.SE = spm_select(1,'image','(Optional) select reversed-phase spin-echo scan for undistortion');
 end
-if nargin <2 %no input: select T1 file[s]
- T1name = spm_select(1,'image','Select T1 anatomical scan');
-end
+Restnames = imgs.Rest;
+T1name = imgs.T1;
 if (~exist('TRsec','var')) || (TRsec == 0)
     Filename = deblank (Restnames(1,:));
     TRsec = getTRSub(Filename);
@@ -59,9 +66,21 @@ for ses = 1 : nses
     end;
     %2 motion correct data:
     prefixRealign = prefix;
-    meanfmri = realignSub(fullfile(pth,[prefix, nam, ext])); %does not change prefix - only new matrix
+    if isfield(imgs,'SE') && isfield(imgs,'SErev') && ~isempty(imgs.SE) && ~isempty(imgs.SErev)
+        meanfmri = realignSub(fullfile(pth,[prefix, nam, ext]), true); %does not change prefix - only new matrix
+        prefix = ['r' prefix]; %#ok<AGROW> %realigned data has prefix 'r'
+        % nii_bold_undistort(prefix, 'fmri.nii', 'se.nii', 'seRev.nii');
+        rfMRIname = prefixSub(prefix, fMRIname);
+        nii_bold_undistort(rfMRIname, meanfmri, imgs.SE, imgs.SErev);
+        prefix = ['u' prefix]; %#ok<AGROW> %realigned data has prefix 'r'
+        % char /media/FAT500/update/M2120/meanaxfRest_AP_M2120_15.nii
+        meanfmri = prefixSub('u', meanfmri);
+        %fMRIname = prefixSub(prefix, fMRIname);
+    else
+        meanfmri = realignSub(fullfile(pth,[prefix, nam, ext])); %does not change prefix - only new matrix
+    end
     %3 coregister fMRI to T1, then warp fMRI to standard space
-    coregEstSub(T1name, meanfmri, fullfile(pth,[prefix, nam, ext]))
+    coregEstSub(T1name, meanfmri, prefix, fMRIname)
     segnormwriteSub(defname, meanfmri, resliceMM);  % spm_write_sn
     prefix = [segnormwriteSub(defname,  getsesvolsSub(fullfile(pth,[prefix, nam, ext])), resliceMM), prefix]; %#ok<AGROW>
     %4 generate a brain mask - must load from disk, may save to memory
@@ -185,11 +204,6 @@ end
 if ischar(defname)
     defname = cellstr(defname);
 end
-defname
-targetname
-class(defname)
-class(targetname)
-%save_to_base(1);
 [pth,nam,ext] = spm_fileparts(targetname{1}); %orig
 %[pth,nam,ext] = spm_fileparts(targetname{1}(1,:));
 wtar = fullfile(pth, [prefix, nam, ext]); 
@@ -239,25 +253,35 @@ else
 end
 %end getTRSub()
 
-function meanfmri = realignSub(fMRIname)
-[pth,nam,ext] = spm_fileparts( deblank (fMRIname));
-meanfmri = fullfile(pth,['mean', nam, ext]);
-fprintf('Realigning data (motion correction), creating mean image named %s\n',meanfmri);
-matlabbatch{1}.spm.spatial.realign.estwrite.data = {getsesvolsSub(fMRIname)}';
-matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.quality = 0.9;
-matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.sep = 4;
-matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.fwhm = 5;
-matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.rtm = 1;
-matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.interp = 2;
-matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.wrap = [0 0 0];
-matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.weight = '';
-matlabbatch{1}.spm.spatial.realign.estwrite.roptions.which = [0 1];
-matlabbatch{1}.spm.spatial.realign.estwrite.roptions.interp = 4;
-matlabbatch{1}.spm.spatial.realign.estwrite.roptions.wrap = [0 0 0];
-matlabbatch{1}.spm.spatial.realign.estwrite.roptions.mask = 1;
-matlabbatch{1}.spm.spatial.realign.estwrite.roptions.prefix = 'r';
-spm_jobman('run',matlabbatch);
-%end  mocoSub()
+function meanImgOut = realignSub(inName, isReslice)
+%if isReslice = true then resliced data is created with 'r' prefix
+[pth,nam,ext] = spm_fileparts( deblank (inName));
+meanImgOut = fullfile(pth,['mean', nam, ext]);
+if ~exist(meanImgOut,'file')
+    fprintf('Realigning data (motion correction), creating mean image named %s\n',meanImgOut);
+    matlabbatch{1}.spm.spatial.realign.estwrite.data = {getsesvolsSub(inName)}';
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.quality = 0.9;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.sep = 4;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.fwhm = 5;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.rtm = 1;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.interp = 2;
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.wrap = [0 0 0];
+    matlabbatch{1}.spm.spatial.realign.estwrite.eoptions.weight = '';
+    if exist('isReslice','var') && isReslice
+       matlabbatch{1}.spm.spatial.realign.estwrite.roptions.which = [2 1]; 
+    else
+        matlabbatch{1}.spm.spatial.realign.estwrite.roptions.which = [0 1];
+    end
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.which = [2 1];
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.interp = 4;
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.wrap = [0 0 0];
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.mask = 1;
+    matlabbatch{1}.spm.spatial.realign.estwrite.roptions.prefix = 'r';
+    spm_jobman('run',matlabbatch);
+else
+    disp(['File already exists: ' meanImgOut]);
+end
+%end  realignSub()
 
 %function [imgNameVol1] = getVol1Sub(imgName)
 % input: nifti image, output: name of FIRST volume
@@ -266,17 +290,28 @@ spm_jobman('run',matlabbatch);
 %imgNameVol1 = fullfile(pth,[nam, ext, ',1']);
 % end getVol1Sub()
 
-function coregEstSub(t1, meanfmri, fMRIname)
-fprintf('Coregistering %s to match %s\n',meanfmri,t1);
-matlabbatch{1}.spm.spatial.coreg.estimate.ref = {t1};
-matlabbatch{1}.spm.spatial.coreg.estimate.source = {meanfmri};
-matlabbatch{1}.spm.spatial.coreg.estimate.other = getsesvolsSub(fMRIname);
+function coregEstSub(ref, imgToCoreg, prefix, otherImgs)
+if ~exist('prefix','var'), prefix =''; end
+if ~exist('otherImgs','var'), otherImgs = []; end
+%coregister fmri data to match T1 image
+fprintf('Coregistering %s to match %s\n',imgToCoreg,ref);
+%fMRIses = getsesvolsSubHier(prefix, fmriname);
+matlabbatch{1}.spm.spatial.coreg.estimate.ref = {ref};
+matlabbatch{1}.spm.spatial.coreg.estimate.source = {imgToCoreg};
+if isempty(otherImgs) 
+    matlabbatch{1}.spm.spatial.coreg.estimate.other = {''};
+else
+    otherNam = prefixSub(prefix, otherImgs);
+    if ~exist(otherNam,'file'), error('Coreg unable to find %s', otherNam); end;
+    otherImgsSes = getsesvolsSub(otherNam);
+    matlabbatch{1}.spm.spatial.coreg.estimate.other = otherImgsSes;
+end;
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.cost_fun = 'nmi';
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep = [4 2];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol = [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
 spm_jobman('run',matlabbatch);
-%end subfunction coregEstSub()
+%end coregEstSub()
 
 function maskName = makeMaskSub(imgNames, thresh)
 %creates a binary mask based on a series of images (e.g. white and gray matter tissue probability maps)
@@ -390,3 +425,8 @@ outHdr.pinfo = [1;0;0];
 outHdr.dt    =[16,0]; %32-bit real datatype
 spm_write_vol(outHdr,fALFFBrain);
 %end alffSub()
+
+function nam = prefixSub (pre, nam)
+[p, n, x] = spm_fileparts(nam);
+nam = fullfile(p, [pre, n, x]);
+%end prefixSub()

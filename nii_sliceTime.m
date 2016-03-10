@@ -59,6 +59,8 @@ if nslices <= 1 %automatically detect TR
 end;
 if (slice_order == kNIFTI_SLICE_ALT_INC2) || (slice_order == kNIFTI_SLICE_ALT_DEC2) %sequential
     isSiemens = true;
+else
+    isSiemens = false;
 end;
 if (slice_order == kNIFTI_SLICE_SEQ_INC) || (slice_order == kNIFTI_SLICE_SEQ_DEC) %sequential
 	so = 1:1:nslices;

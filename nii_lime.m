@@ -33,7 +33,6 @@ if ~exist('matName','var')
     matName = fullfile(p, [n, '_lime.mat']);
 end
 
-
 if true
     diary([matName, '.log.txt'])
     imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
@@ -57,6 +56,9 @@ if true
         doDkiSub(imgs, matName);
         tStart = timeSub(tStart,'DTI');
     end
+    doDkiSub(imgs, matName, true);
+    tStart = timeSub(tStart,'DKI');
+    
 end
 %print output
 pdfName = 'MasterNormalized';
@@ -247,14 +249,33 @@ hdr.fname = fname;
 spm_write_vol(hdr,img);
 %end rescaleSub()
 
-function doDkiSub(imgs, matName)
-if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
-%if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
-wbT1 = prefixSub('wb',imgs.T1); %warped brain extracted image
+function doDkiSub(imgs, matName, isDki)
+if exist('isDki','var') && (isDki)
+
+    if ~isfield(imgs,'DKI'), return; end;
+    if isempty(imgs.DKI), return; end; %nothing to do!
+    if isFieldSub(matName, 'mk'), return; end; %stats already exist
+    if isEddyCuda7Sub()
+         command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+    else
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
+    end
+    command=sprintf('%s "%s"',command, imgs.DKI);
+    doFslCmd (command);
+    doDkiCoreSub(imgs.T1, imgs.DKI, matName)
+else
+    doDkiCoreSub(imgs.T1, imgs.DTI, matName);
+end
+%end doDkiSub()
+
+function doDkiCoreSub(T1, DTI, matName)
+if isempty(T1) || isempty(DTI), return; end; %required
+if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
+wbT1 = prefixSub('wb',T1); %warped brain extracted image
 if ~exist('dkifx','file'),  fprintf('skipping DKI: requires dkifx script\n'); return; end;
-mask=prepostfixSub('', 'b_mask', imgs.DTI);
-dti_u=prepostfixSub('', 'u', imgs.DTI);
-[pth,nam] = filepartsSub(imgs.DTI);
+mask=prepostfixSub('', 'b_mask', DTI);
+dti_u=prepostfixSub('', 'u', DTI);
+[pth,nam] = filepartsSub(DTI);
 bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
 if ~exist(bvalnm, 'file')
     bvalnm = fullfile(pth, [nam, '.bval']);
@@ -268,8 +289,8 @@ if max(bval(:)) < 1500
     return;
 end
 dkifx(dti_u, bvalnm, mask);
-MKmask = prepostfixSub('', 'u_ldfDKI_MASK', imgs.DTI);
-MK=prepostfixSub('', 'u_ldfDKI_MK', imgs.DTI);
+MKmask = prepostfixSub('', 'u_ldfDKI_MASK', DTI);
+MK=prepostfixSub('', 'u_ldfDKI_MK', DTI);
 if ~exist(MK, 'file') || ~exist(MKmask, 'file')
     fprintf('Serious error: no kurtosis images named %s %s\n', MK, MKmask);
     return;
@@ -282,7 +303,8 @@ nii_nii2mat(wMK, 'mk', matName);
 fid = fopen('dki.txt', 'a+');
 fprintf(fid, '%s\n', matName);
 fclose(fid);
-%end doDkiSub()
+%end doDkiCoreSub()
+
 
 function doFaMdSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
@@ -610,7 +632,7 @@ if ~exist('maxThreads', 'var')
     if maxThreads > 15, maxThreads = maxThreads - 1; end;
 end
 setenv('FSLPARALLEL', num2str(maxThreads));
-%end fslEnvSub()
+%end fslParallelSub()
 
 
 function doDtiWarpSub(imgs, atlas)
@@ -715,7 +737,13 @@ if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 %end rmBedpostDir()
 
 function fsldir = fslDirSub;
-fsldir= '/usr/local/fsl/';
+fsldir= '/usr/local/fsl/'; %CentOS intall location
+if ~exist(fsldir,'dir')
+    fsldir = '/usr/share/fsl/5.0/'; %Debian install location (from neuro debian)
+    if ~exist(fsldir,'dir')
+        error('FSL is not in the standard CentOS or Debian locations, please check you installation!');
+    end
+end
 %end fslDirSub()
 
 function fslEnvSub
@@ -745,7 +773,6 @@ if verbose
 else
   [status,cmdout]  = system(cmd);  
 end
-
 %end doFslCmd()
 
 % function [status,cmdout]  = doFslCmd (command, verbose)
@@ -800,7 +827,7 @@ if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
 if isFieldSub(matName, 'rest'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
 if isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
-nii_rest(imgs.Rest, imgs.T1, TRsec, SliceOrder);
+nii_rest(imgs, TRsec, SliceOrder);
 nii_nii2mat (prefixSub('fdwa',imgs.Rest), 'rest', matName)
 nii_nii2mat (prefixSub('alf_dwa',imgs.Rest), 'alf', matName)
 %end doRestSub()
@@ -1225,6 +1252,13 @@ v = ~isempty(strfind(getenv('PATH'),'cuda'));
 %v = strcmpi(deblank(thisVer),vstr);
 
 %end isGpuInstalledSub()
+
+
+
+
+
+
+
 
 
 
