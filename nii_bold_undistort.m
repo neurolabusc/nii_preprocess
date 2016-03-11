@@ -154,7 +154,7 @@ end
 
 
 function p = fslMergeSpinEchoSub(fsldir,p)
-[pth,~,ext] = fileparts(p.spinechoAP); % get path of spinecho images
+[pth,~,ext] = spm_fileparts(p.spinechoAP); % get path of spinecho images
 p.spinechoMerged = fullfile(pth,['mSpinEcho' ext]); % construct merged spinecho filename. Order in new file will be AP then PA
 cmdstr = ['fslmerge -t ' p.spinechoMerged ' ' p.meanspinechoAP ' ' p.meanspinechoPA];
 disp(['Running: ' cmdstr]);
@@ -169,7 +169,7 @@ p = fslWriteTopUpParamFile(fsldir,p);
 
 function p = fslWriteTopUpParamFile(fsldir,p)
 if ~exist(p.spinechoMerged,'file'); error(['Cant find file: ' p.spinechoMerged]); end;
-[pth,nm,~] = fileparts(p.spinechoMerged);
+[pth,nm,~] = spm_fileparts(p.spinechoMerged);
 p.acqparamsfile = fullfile(pth,['acqparams_' nm '.txt']);
 fid = fopen(p.acqparamsfile,'w'); %open file for writing, discard existing contents if any
 %read number of volumes in merged spinecho file
@@ -197,7 +197,7 @@ fclose(fid);
 function p = fslRunTopupSub(fsldir, p)
 prevpth = pwd;
 %topup --imain=bothSpinEchoFieldMap --datain=acqparams.txt --config=b02b0.cnf --out=topupResults --fout=spinechoField --iout=umSpinEchoFieldMap --verbose
-[pth,nm,~] = fileparts(p.spinechoMerged);
+[pth,nm,~] = spm_fileparts(p.spinechoMerged);
 if ~isempty(pth); cd(pth); end;
 p.topupoutfile = 'topupResults';
 p.fieldfile = 'computedField';
@@ -221,7 +221,8 @@ numFiles = size(imgsToFix,2);
 for i = 1:numFiles
     img = imgsToFix{i};
     prevpth = pwd;
-    [pth, nm, ext] = fileparts(img);
+    [pth, nm, ext] = spm_fileparts(img);
+    img = fullfile(pth,[nm ext]);
     outname = fullfile(pth,['u' nm ext]);
     if ~isempty(pth), cd(pth); end;
     %cmdstr = (['applytopup --imain=' APfilename ',' PAfilename ' --datain=' p.acqparamsfile ' --inindex=' num2str(p.inindex1) ',' num2str(p.inindex2) ' --method=jac ' '--topup=' p.topupoutfile ' --out=' outname]);
@@ -273,27 +274,3 @@ cmd=sprintf('sh -c ". %setc/fslconf/fsl.sh; export FSLOUTPUTTYPE=NIFTI; ',fsldir
 command = [cmd command '"'];
 [status,output] = system(command);
 %fslCmdSub
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
