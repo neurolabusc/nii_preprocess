@@ -48,11 +48,18 @@ if true
     tStart = timeSub(tStart,'fMRI');
     if ~isempty(imgs.DTI)
         imgs = removeDotDtiSub(imgs);
-        doDtiSub(imgs);
         dtiDir = fileparts(imgs.DTI);
-        nii_fiber_quantify(matName, dtiDir);
+        %-->(un)comment next lines for JHU tractography
+        atlas = 'jhu'; %either 'jhu' or 'AICHA'
+        doDtiSub(imgs, atlas);
+        nii_fiber_quantify(matName, dtiDir, atlas); %ATLAS
+        %-->(un)comment next lines for AICHA tractography
+        % atlas = 'AICHA'; %either 'jhu' or 'AICHA'
+        % doDtiSub(imgs, atlas);
+        % nii_fiber_quantify(matName, dtiDir, atlas); %ATLAS
+        %-->compute scalar DTI metrics
         doFaMdSub(imgs, matName);
-        %doTractographySub(imgs); %xxx 
+        doTractographySub(imgs); 
         doDkiSub(imgs, matName);
         tStart = timeSub(tStart,'DTI');
     end
@@ -269,7 +276,7 @@ end
 
 function doDkiCoreSub(T1, DTI, matName)
 if isempty(T1) || isempty(DTI), return; end; %required
-%xxx if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
+if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
 wbT1 = prefixSub('wb',T1); %warped brain extracted image
 if ~exist('dkifx','file'),  fprintf('skipping DKI: requires dkifx script\n'); return; end;
 mask=prepostfixSub('', 'b_mask', DTI);
@@ -325,9 +332,10 @@ nii_nii2mat(wFA, 'fa', matName); %6
 nii_nii2mat(wMD, 'md', matName); %8
 %end doFaMdSub()
 
-function doDtiSub(imgs)
+function doDtiSub(imgs, atlas)
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
-%if isFieldSub(matName, 'dti_jhu'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
+if ~exist('atlas','var'), atlas = 'jhu'; end;
+if isFieldSub(matName, ['dti_' atlas]), fprintf('Skipping tractography (DTI already computed) %s\n', imgs.ASL); return; end;
 betT1 = prefixSub('b',imgs.T1); %brain extracted image
 if ~exist(betT1,'file'), fprintf('doDti unable to find %s\n', betT1); return; end; %required
 eT1 = prefixSub('e',imgs.T1); %enantimorphic image
@@ -367,8 +375,8 @@ else
     cleanupDtiDir(imgs.DTI);
     doFslCmd (command);
 end
-%xxxdoDtiBedpostSub(imgs.DTI); %xxx 
-%xxxdoDtiTractSub(imgs); %tractography %xxx 
+doDtiBedpostSub(imgs.DTI); %xxx 
+doDtiTractSub(imgs, atlas); %ATLAS tractography  
 %end doDtiSub()
 
 function isEddyCuda = isEddyCuda7Sub
