@@ -1,5 +1,5 @@
 function matName = nii_lime(imgs, matName)
-%preprocess data from multiple modalities
+%preprocess data from multiple modalities3
 % imgs.T1: filename of T1 scan - ONLY REQUIRED INPUT: ALL OTHERS OPTIONAL
 % imgs.T2: filename used to draw lesion, if absent lesion drawn on T1
 % imgs.lesion : lesion map
@@ -52,7 +52,7 @@ if true
         dtiDir = fileparts(imgs.DTI);
         nii_fiber_quantify(matName, dtiDir);
         doFaMdSub(imgs, matName);
-        doTractographySub(imgs);
+        %doTractographySub(imgs); %xxx 
         doDkiSub(imgs, matName);
         tStart = timeSub(tStart,'DTI');
     end
@@ -251,7 +251,6 @@ spm_write_vol(hdr,img);
 
 function doDkiSub(imgs, matName, isDki)
 if exist('isDki','var') && (isDki)
-
     if ~isfield(imgs,'DKI'), return; end;
     if isempty(imgs.DKI), return; end; %nothing to do!
     if isFieldSub(matName, 'mk'), return; end; %stats already exist
@@ -270,7 +269,7 @@ end
 
 function doDkiCoreSub(T1, DTI, matName)
 if isempty(T1) || isempty(DTI), return; end; %required
-if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
+%xxx if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
 wbT1 = prefixSub('wb',T1); %warped brain extracted image
 if ~exist('dkifx','file'),  fprintf('skipping DKI: requires dkifx script\n'); return; end;
 mask=prepostfixSub('', 'b_mask', DTI);
@@ -368,9 +367,8 @@ else
     cleanupDtiDir(imgs.DTI);
     doFslCmd (command);
 end
-doDtiBedpostSub(imgs.DTI);
-
-doDtiTractSub(imgs); %tractography
+%xxxdoDtiBedpostSub(imgs.DTI); %xxx 
+%xxxdoDtiTractSub(imgs); %tractography %xxx 
 %end doDtiSub()
 
 function isEddyCuda = isEddyCuda7Sub
