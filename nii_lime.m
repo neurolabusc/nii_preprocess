@@ -49,14 +49,11 @@ if true
     if ~isempty(imgs.DTI)
         imgs = removeDotDtiSub(imgs);
         dtiDir = fileparts(imgs.DTI);
+        doDtiSub(imgs);
         %-->(un)comment next lines for JHU tractography
-        atlas = 'jhu'; %either 'jhu' or 'AICHA'
-        doDtiSub(imgs, atlas);
-        nii_fiber_quantify(matName, dtiDir, atlas); %ATLAS
+        doDtiTractSub(imgs, matName, dtiDir, 'jhu');
         %-->(un)comment next lines for AICHA tractography
-        % atlas = 'AICHA'; %either 'jhu' or 'AICHA'
-        % doDtiSub(imgs, atlas);
-        % nii_fiber_quantify(matName, dtiDir, atlas); %ATLAS
+        % doDtiTractSub(imgs, matName, dtiDir, 'AICHA')
         %-->compute scalar DTI metrics
         doFaMdSub(imgs, matName);
         doTractographySub(imgs); 
@@ -332,10 +329,8 @@ nii_nii2mat(wFA, 'fa', matName); %6
 nii_nii2mat(wMD, 'md', matName); %8
 %end doFaMdSub()
 
-function doDtiSub(imgs, atlas)
+function doDtiSub(imgs)
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
-if ~exist('atlas','var'), atlas = 'jhu'; end;
-if isFieldSub(matName, ['dti_' atlas]), fprintf('Skipping tractography (DTI already computed) %s\n', imgs.ASL); return; end;
 betT1 = prefixSub('b',imgs.T1); %brain extracted image
 if ~exist(betT1,'file'), fprintf('doDti unable to find %s\n', betT1); return; end; %required
 eT1 = prefixSub('e',imgs.T1); %enantimorphic image
@@ -375,8 +370,7 @@ else
     cleanupDtiDir(imgs.DTI);
     doFslCmd (command);
 end
-doDtiBedpostSub(imgs.DTI); %xxx 
-doDtiTractSub(imgs, atlas); %ATLAS tractography  
+doDtiBedpostSub(imgs.DTI);
 %end doDtiSub()
 
 function isEddyCuda = isEddyCuda7Sub
@@ -507,9 +501,10 @@ bval = [dti '.bval'];
 if ~exist(bvec,'file') || ~exist(bval,'file'), error('Can not find files %s %s', bvec, bval); end;
 %end getBVec()
 
-function doDtiTractSub(imgs, atlas)
+function doDtiTractSub(imgs, matName, dtiDir, atlas)
 dti = imgs.DTI;
 if ~exist('atlas','var'), atlas = 'jhu'; end;
+if isFieldSub(matName, ['dti_' atlas]), fprintf('Skipping tractography (DTI already computed) %s\n', imgs.ASL); return; end;
 doDtiWarpSub(imgs, atlas); %warp atlas to DTI
 pth = fileparts(dti);
 bed_dir=fullfile(pth, 'bedpost');
@@ -534,7 +529,6 @@ end
 template_roiW=prepostfixSub('', ['_roi', atlasext], dti);
 dti_faThr=prepostfixSub('', '_FA_thr', dti);
 mask_dir=fullfile(pth, ['masks', atlasext]);
-
 if ~exist(template_roiW,'file') || ~exist(dti_u,'file') || ~exist(dti_faThr,'file')
     fprintf('Can not find %s or %s or %s\n',template_roiW, dti_u, dti_faThr);
     return;
@@ -593,6 +587,7 @@ end
 fprintf ('computing probtrackx for %d regions (this may take a while)\n',numel(commands) );   
 doThreads(commands, prob_dir);
 fprintf ('probtrackx2 took %f seconds to run.\n', toc(t_start) ); %t_start=tic;
+nii_fiber_quantify(matName, dtiDir, atlas);
 %sum(nOK(:))
 
 function [hd,im] = loadSub(fnm);
