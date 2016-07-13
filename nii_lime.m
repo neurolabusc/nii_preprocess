@@ -50,10 +50,10 @@ if true
         imgs = removeDotDtiSub(imgs);
         dtiDir = fileparts(imgs.DTI);
         doDtiSub(imgs);
-        %-->(un)comment next lines for JHU tractography
+        %-->(un)comment next line for JHU tractography
         doDtiTractSub(imgs, matName, dtiDir, 'jhu');
-        %-->(un)comment next lines for AICHA tractography
-        % doDtiTractSub(imgs, matName, dtiDir, 'AICHA')
+        %-->(un)comment next line for AICHA tractography
+        %doDtiTractSub(imgs, matName, dtiDir, 'AICHA')
         %-->compute scalar DTI metrics
         doFaMdSub(imgs, matName);
         doTractographySub(imgs); 
@@ -62,12 +62,11 @@ if true
     end
     doDkiSub(imgs, matName, true);
     tStart = timeSub(tStart,'DKI');
-    
 end
 %print output
 pdfName = 'MasterNormalized';
 printSub(imgs, pdfName); %show results - except DTI
-pdfName = 'MasterDTI';
+pdfName = '                                                        ';
 printDTISub(imgs, pdfName); %show results - DTI
 diary off
 %
