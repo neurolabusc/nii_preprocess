@@ -1,54 +1,69 @@
 function nii_batch12 (p)
 %preprocess and analyze fMRI data using standard settings
-% p
+% p 
 %   structure for preprocessing
 %  p.fmriname : name of 4D fMRI volumes
-%  p.fmriname, t1name, TRsec, slice_order, phase, magn
-%  p.t1name   : name of anatomical scan
+%  p.t1name   : name of anatomical scan (-1 to skip)
 %  p.TRsec    : TR for fMRI data, 0=auto
-%  p.slice_order : EPI slice order 0=auto,1=[1234],2=[4321],3=[1324],4=[4231], 5=[2413],6=[3142]
+%  p.slice_order : EPI slice order 0=auto,1=[1234],2=[4321],3=[1324],4=[4231], 5=[2413],6=[3142] 
 %  p.phase  (optional) name of fieldmap phase image
-%  p.magn : (optional) name of fieldmap magnitude image
+%  p.magn : (optional) name of fieldmap magnitude image 
 %   (optional) structure for statistical analysis
 %  p.names : condition names
 %  p.onset : condition onset times
 %  p.duration : duration of events (either a single value or array matching p.onset)
 %  p.mocoRegress : true or false: should motion parameters be modeled?
-%Versions
-%   7/7/2016 added "normIntensitySub" to deal with Philips data
-%Examples
-% TO DO
-
-resliceMM = 2; %resolution for reslicing data
-[fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized] = validatePreprocSub(p);
-%0.) set origin
-if ~isNormalized %if the T1 is not normalized, lets coregister it
-    setOriginSub(strvcat(t1name, fmriname, phase, magn), 1);  %#ok<REMFF1> align images to MNI space
-end
-%1.) motion correct, used fieldmap if specifiedclass
-[meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn);
-%2.) brain extact mean (for better coregistration)
-if ~isNormalized %bet can fail with patient scans
+%  p.setOrigin : true or false, if true automated attempt to set origin
+%  p.resliceMM : resolution for reslicing data (defaults to 3mm^3)
+%  p.smoothMM : Blur FWHM in mm (defaults to 8)
+%Examples 
+if ~isfield(p,'resliceMM'), p.resliceMM = 3; end; %resolution for reslicing data
+if ~isfield(p,'smoothMM'), p.smoothMM = 8; end; %resolution for reslicing data
+[fmriname, t1name, TRsec, slice_order, phase, magn, prefix] = validatePreprocSub(p);
+    %0.) set origin - only if explicitly requested
+    if isfield(p,'setOrigin') && (p.setOrigin == true)
+        if isempty(t1name)
+           setOriginSub(strvcat(fmriname, phase, magn), 3);  %#ok<REMFF1> align images to MNI space 
+        else
+            setOriginSub(strvcat(t1name, fmriname, phase, magn), 1);  %#ok<REMFF1> align images to MNI space
+        end
+    end
+    %1.) motion correct, used fieldmap if specified
+    [meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn);
+    %2.) brain extact mean (for better coregistration)
     meanname = betSub(meanname); %brain extract mean image for better coreg
-end
-%3.) slice-time correction
-prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order); %slice-time correct
-%4.) estimate normalization, coregister and reslice fMRI
-if isNormalized %if the image was previously normalized use existing paramters
-    prefix = normWriteSub(t1name, meanname, prefix, fmriname, resliceMM);
-else
-    prefix = normNewSegSub(t1name, meanname, prefix, fmriname, resliceMM);
-end
-%5.) blur data
-prefix = smoothSub(8, prefix, fmriname); %smooth images
-%-- get rid of images we don't need
-deleteImagesSub(prefix, fmriname); %delete intermediate images
+    %3.) slice-time correction
+
+
+    prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order); %slice-time correct
+    %4.) estimate normalization, coregister and reslice fMRI
+
+
+    prefix = normNewSegSub(t1name, meanname, prefix, fmriname, p.resliceMM);
+
+    %5.) blur data
+    prefix = smoothSub(p.smoothMM, prefix, fmriname); %smooth images
+
+    %-- get rid of images we don't need
+    deleteImagesSub(prefix, fmriname); %delete intermediate images
+
+
+%meanname = 'bmeanfMRI_P017.nii'
+%prefix = 'sw';
 %6.) compute statistics
 if ~isfield(p,'onsets'), return; end; %only if user provides details
 stat_1st_levelSub (prefix, fmriname, TRsec, p);
 %end nii_batch()
 
 %---------- LOCAL FUNCTIONS FOLLOW
+
+function deletePrevSub(fmriname) %delete previous files we will re-generate
+[p,n] = spm_fileparts(fmriname);
+matName = fullfile(p,[n,'.mat']);
+if exist(matName,'file'), fprintf('Deleting mat file (motion correction will replace this) : %\n', matName); delete(matName); end;
+rpName = fullfile(p,['rp_', n,'.txt']);
+if exist(rpName,'file'), fprintf('Deleting text file (motion correction will replace this) : %\n', rpName); delete(rpName); end;
+%end deletePrevSub()
 
 function [meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn) %motion correct with field map
 if isempty(phase) || isempty(magn)
@@ -187,25 +202,71 @@ if ~exist('meanname','var'), meanname = ''; end;
 if ~exist('prefix','var'), prefix = ''; end;
 if ~exist('fmriname','var'), fmriname = ''; end;
 if ~exist('resliceMM','var'), resliceMM = 2; end;
-newSegSub(t1); %normalize images
-extractSub(0.01, t1, prefixSub('c1', t1), prefixSub('c2', t1));
-prefix = normWriteSub(t1, meanname, prefix, fmriname, resliceMM);
-%end normNewSeg()
-
-function prefix = normWriteSub(t1, meanname, prefix, fmriname, resliceMM)
-coregEstSub(prefixSub('b', t1), meanname, prefix, fmriname); %make sure fMRI is aligned with T1
-newSegWriteSub(t1, t1, '', 0.9); %reslice anatomical with 0.9mm isotropic
-newSegWriteSub(t1, prefixSub('b', t1), '', 0.9); %reslice anatomical with 0.9mm isotropic
+if isempty(t1)
+   prefix = normSub( meanname, prefix, fmriname, resliceMM);
+   return;
+end
+et1 = enatNormSub(t1);
+if ~isempty(et1)
+    %coregister to the brain with the lesion
+    extractSub(0.01, t1, prefixSub('c1e', t1), prefixSub('c2e', t1));
+    coregEstSub(prefixSub('render', t1), meanname, prefix, fmriname); %make sure fMRI is aligned with T1
+    %use the maskedbrain for the parameters
+    t1 = et1; %use enatiomorphic files
+else
+    newSegSub(t1); %normalize images
+    extractSub(0.01, t1, prefixSub('c1', t1), prefixSub('c2', t1));
+    coregEstSub(prefixSub('render', t1), meanname, prefix, fmriname); %make sure fMRI is aligned with T1
+    newSegWriteSub(t1, prefixSub('render', t1), '', 0.9); %reslice anatomical with 0.9mm isotropic
+    
+end
 newSegWriteSub(t1, meanname, '', resliceMM);
 prefix = newSegWriteSub(t1, fmriname, prefix, resliceMM);
-% end normWriteSub()
+%end normNewSeg()
+
+function prefix = normSub( meanname, prefix, fmriname, resliceMM)
+mbatch{1}.spm.spatial.normalise.estwrite.subj.vol = {meanname};
+warpses = getsesvolsSubFlat(prefix, fmriname);
+warpses = [warpses; {meanname}];
+mbatch{1}.spm.spatial.normalise.estwrite.subj.resample = warpses;
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
+template = fullfile(spm('Dir'),'tpm','TPM.nii');
+if ~exist(template,'file')
+    error('Unable to find template named %s',template);
+end
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.tpm = {template};
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.affreg = 'mni';
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.reg = [0 0.001 0.5 0.05 0.2];
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.fwhm = 0;
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.samp = 3;
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.bb = [-78 -112 -70; 78 76 85];
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.vox = [resliceMM resliceMM resliceMM];
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.interp = 4;
+spm_jobman('run',mbatch);
+prefix = ['w' prefix];
+%end normSub()
+
+function et1 = enatNormSub(t1)
+%skip normalization if enantiomorphic normalization has been run (t1 has prefix 'e')
+et1 = prefixSub('e', t1);
+y_et1 = prefixSub('y_', et1);
+[p, n, x] = spm_fileparts(et1);
+eT1mat = fullfile(p,[n '_seg8.mat']);
+if exist(et1,'file') && exist(y_et1,'file') && exist(eT1mat,'file')
+    fprintf('Skipping normalization: enatiomorphic normalization files exist\n');
+else
+    et1 = '';
+end
+%enatNormSub()
+
 
 function nam = prefixSub (pre, nam)
 [p, n, x] = spm_fileparts(nam);
 nam = fullfile(p, [pre, n, x]);
 %end prefixSub()
 
-function t1Bet = extractSub(thresh, t1, c1, c2, c3)
+function t1Bet = extractSub(thresh, t1, c1, c2, c3)   
 %subroutine to extract brain from surrounding scalp
 % t1: anatomical scan to be extracted
 % c1: gray matter map
@@ -224,7 +285,7 @@ w = spm_read_vols(wi);
 if nargin > 4 && ~isempty(c3)
    ci = spm_vol(c3);%CSF map
    c = spm_read_vols(ci);
-   w = c+w;
+   w = c+w; 
 end;
 w = g+w;
 if thresh <= 0
@@ -240,34 +301,26 @@ else
     mask = mask / 255;
     m=m.*mask;
 end;
-mi.fname = fullfile(pth,['b',  nam, ext]);
+mi.fname = fullfile(pth,['render',  nam, ext]);
 mi.dt(1) = 4; %16-bit precision more than sufficient uint8=2; int16=4; int32=8; float32=16; float64=64
 spm_write_vol(mi,m);
 t1Bet = mi.fname;
 %end extractSub()
 
-function  prefix = newSegWriteSub(t1name, warpname, prefix, resliceMM, bb)
+function  prefix = newSegWriteSub(t1name, warpname, prefix, resliceMM)
 %reslice img using pre-existing new-segmentation deformation field
 if isempty(warpname) || isempty(t1name), return; end;
-[pth,nam,ext, vol] = spm_fileparts(t1name);
+[pth,nam,ext, vol] = spm_fileparts(t1name); 
 defname = fullfile(pth,['y_' nam ext]);
 if ~exist(defname,'file')
-    defname = fullfile(pth,['y_e' nam ext]);
-    if ~exist(defname,'file')
-        defname2 = fullfile(pth,['y_' nam ext]);
-        error('Unable to find new-segment deformation image %s or %s',defname2, defname);
-    end
+    error('Unable to find new-segment deformation image %s',defname);
 end
 warpses = getsesvolsSubFlat(prefix, warpname);
 matlabbatch{1}.spm.spatial.normalise.write.subj.def = {defname};
 matlabbatch{1}.spm.spatial.normalise.write.subj.resample = warpses;
-if ~exist('bb','var')
-	matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70; 78 76 85];
-else
-	matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = bb;
-end
+matlabbatch{1}.spm.spatial.normalise.write.woptions.bb = [-78 -112 -70; 78 76 85];
 matlabbatch{1}.spm.spatial.normalise.write.woptions.vox = [resliceMM resliceMM resliceMM];
-matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 4;
+matlabbatch{1}.spm.spatial.normalise.write.woptions.interp = 1; %1=trilinear, 4=4th-degree b-spline (ringing)
 spm_jobman('run',matlabbatch);
 prefix = ['w' prefix];
 %end newsegwritesub()
@@ -282,7 +335,7 @@ fprintf('NewSegment of %s\n', t1);
 matlabbatch{1}.spm.spatial.preproc.channel(1).vols = {t1};
 matlabbatch{1}.spm.spatial.preproc.channel(1).biasreg = 0.001;
 matlabbatch{1}.spm.spatial.preproc.channel(1).biasfwhm = 60;
-matlabbatch{1}.spm.spatial.preproc.channel(1).write = [1 1];
+matlabbatch{1}.spm.spatial.preproc.channel(1).write = [0 0];
 if nargin > 1 && ~isempty(t2)
     matlabbatch{1}.spm.spatial.preproc.channel(2).vols = {t2};
     matlabbatch{1}.spm.spatial.preproc.channel(2).biasreg = 0.0001;
@@ -328,7 +381,7 @@ function deleteImagesSub(prefix, fmriname)
 if length(prefix) < 2, return; end;
 for s = 1 : length(fmriname(:,1))
     for i = 2 : length(prefix)
-        [pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:)));
+        [pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:))); 
         nam = fullfile(pth,[prefix(i:length(prefix)), nam, ext]);
         if exist(nam, 'file')
             fprintf('Deleting  %s\n',nam );
@@ -363,13 +416,14 @@ matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep = [4 2];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol = [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
 spm_jobman('run',matlabbatch);
-
 %end coregEstSub()
 
-function [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized] = validatePreprocSub(p)
+function [fmriname, t1name, TRsec, slice_order, phase, magn, prefix] = validatePreprocSub(p)
 %check all inputs
 if exist('spm','file')~=2; fprintf('%s requires SPM\n',which(mfilename)); return; end;
 isSPM12orNewerSub; %check recent SPM
+defaults = spm('GetGlobal','defaults');
+if isempty(defaults),  spm('fmri'); end; %make sure SPM is running
 prefix = ''; %originally '', if 'swa' it means we have smoothed, warped, aligned data
 if ~isfield(p,'fmriname'), error('%s requires field "fmriname"',mfilename); end;
 if ~isfield(p,'t1name'), error('%s requires field "t1name"',mfilename); end;
@@ -377,12 +431,15 @@ if ~isfield(p,'TRsec'), p.TRsec = 0; end;
 if ~isfield(p,'slice_order'), p.slice_order = 0; end;
 if ~isfield(p,'phase'), p.phase = ''; end;
 if ~isfield(p,'magn'), p.magn = ''; end;
-p.t1name = findImgSub(p.t1name, '');
+if ~ischar(p.t1name) %we use p.t1name = -1 to signify skipping T1
+    t1name = [];
+else
+    t1name = findImgSub(p.t1name, '');
+end;
 p.fmriname = findImgSub(p.fmriname, p.t1name);
 p.phase =  findImgSub(p.phase, p.t1name);
 p.magn = findImgSub(p.magn, p.t1name);
 fmriname = p.fmriname;
-t1name = p.t1name;
 TRsec = p.TRsec;
 slice_order = p.slice_order;
 phase = p.phase;
@@ -391,26 +448,19 @@ magn = p.magn;
 %X spm_jobman('initcfg'); % useful in SPM8 only
 clear matlabbatch
 fmriCell = getsesvolsSubHier(prefix, fmriname);
+deletePrevSub(fmriname);
 nSessions = numel(fmriCell);
 nVol = sum(cellfun('prodofsize',fmriCell));
 fprintf('fMRI has %d sessions for a total of %d volumes\n',nSessions, nVol);
-if (nVol < 12)
+if (nVol < 12) 
     error('Too few volumes: this script expects 4D fMRI images');
 end
-if (nSessions > 5)
+if (nSessions > 5) 
     error('Too many sessions: provide the FIRST volume from each 4D image');
 end
-if ~exist('t1name','var')  || isempty(t1name)
-  t1name = spm_select(1,'image','Select T1 image volume');
-end
 %determine TR for fMRI data (in secounds)
-TRfmri = getTRSub(deblank (fmriname(1,:)));
 if ~exist('TRsec','var')  || isempty(TRsec) || (TRsec == 0)
-    TRsec = TRfmri;
-else
-    if (TRfmri > 0) && (abs(TRsec - TRfmri) > 0.001)
-       warning('Please check TR, header reports %g (not %g)\n', TRfmri, TRsec);
-    end
+    TRsec = getTRSub(deblank (fmriname(1,:)));
 end
 if (TRsec ==0)
     answer = inputdlg('TR (sec)', 'Input required',1,{'2'});
@@ -424,25 +474,7 @@ if (slice_order ==0)
     answer = inputdlg('slice order (1=[1234],2=[4321],3=[1324],4=[4231], 5=[2413],6=[3142])', 'Input required',1,{'1'});
     slice_order = str2double(answer{1});
 end
-isNormalized = isNormalizedExists(t1name);
 %end validateInputsSub()
-
-function isNormalized = isNormalizedExists(t1name)
-%has the T1 scan been already normalized?
-% returns true if brain-extracted T1 ('b' prefix) and T1 deformation exists
-[pth,nam,ext, vol] = spm_fileparts(t1name);
-defname = fullfile(pth,['y_' nam ext]); %y_ deformation file
-if ~exist(defname,'file')
-    defname = fullfile(pth,['y_e' nam ext]); %y_e deformation for enantiomorphic normalization
-end
-bname = fullfile(pth,['b' nam ext]); %'b' = brain extracted image
-if (exist(defname,'file')) && (exist(bname,'file'))
-    isNormalized = true;
-    fprintf('Will use prior normalization estimate for %s\n', t1name)
-else
-    isNormalized = false;
-end
-%end()
 
 function slice_order =  getSliceOrderSub(fmriname)
 %detect whether slices were acquired ascending, descending, interleaved
@@ -490,13 +522,13 @@ img =  spm_select(1,'image',['Please find image ' nam]);
 %end findImg1Sub()
 
 function tr =  getTRSub(fmriname)
-%returns Repeat Time in seconds for volume fMRIname
+%returns Repeat Time in seconds for volume fMRIname 
 % n.b. for original images from dcm2nii - SPM will strip this information
 hdr = spm_vol(fmriname);
-if (sum(ismember(fieldnames(hdr(1,1).private),'timing')) > 0)  && isfield(hdr(1,1).private.timing,'tspace')
+if isfield(hdr(1,1).private.timing,'tspace')
   tr = hdr(1,1).private.timing.tspace;
 else
-  fprintf('%s error: unable to determine TR for image %s (perhaps SPM stripped this information)\n',mfilename,fmriname);
+  fprintf('%s error: unable to determine TR for image %s (perhaps SPM stripped this information)\n',mfilename,fmriname); 
   tr = 0;
 end
 %end getTRSub()
@@ -523,16 +555,19 @@ spm_jobman('run',matlabbatch);
 meanname = fullfile(pth,['mean', nam, ext]); %moco creates mean image, used for subsequent processing
 %end mocoSub()
 
-function prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order)
-if slice_order < 0, return; end; %skip slice order
+function prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order) 
 %slice time correct data
 kNIFTI_SLICE_SEQ_INC = 1; %1,2,3,4
 kNIFTI_SLICE_SEQ_DEC = 2; %4,3,2,1
 %kNIFTI_SLICE_ALT_INC = 3; %1,3,2,4 Siemens: interleaved with odd number of slices, interleaved for other vendors
 %kNIFTI_SLICE_ALT_DEC = 4; %4,2,3,1 descending interleaved
-kNIFTI_SLICE_ALT_INC2 = 5; %2,4,1,3 Siemens interleaved with even number of slices
-kNIFTI_SLICE_ALT_DEC2 = 6; %3,1,4,2 Siemens interleaved descending with even number of
-[pth,nam,ext,vol] = spm_fileparts( deblank(fmriname(1,:)));
+kNIFTI_SLICE_ALT_INC2 = 5; %2,4,1,3 Siemens interleaved with even number of slices 
+kNIFTI_SLICE_ALT_DEC2 = 6; %3,1,4,2 Siemens interleaved descending with even number of 
+if (slice_order < 0)
+    fprintf('Skipping slice timing correction (slice_order was less than zero)\n');
+    return;
+end
+[pth,nam,ext,vol] = spm_fileparts( deblank(fmriname(1,:))); 
 fMRIname1 = fullfile(pth,[ nam, ext]); %'img.nii,1' -> 'img.nii'
 if slice_order == 0 %attempt to autodetect slice order
     fid = fopen(fMRIname1);
@@ -550,11 +585,7 @@ if TRsec == 0
     TRsec = hdr.private.timing.tspace;
     if TRsec == 0
         error('%s error: unable to auto-detect slice timing. Please manually specify slice order or use recent versions of dcm2nii.\n');
-    end;
-else
-    if (sum(ismember(fieldnames(hdr.private),'timing')) > 0) && isfield(hdr.private.timing,'tspace') && (abs(TRsec - hdr.private.timing.tspace) > 0.001)
-       warning('Please check TR, header reports %g (not %g)\n', hdr.private.timing.tspace, TRsec);
-    end
+    end; 
 end
 nslices = hdr.dim(3);
 if nslices <= 1 %automatically detect TR
@@ -577,18 +608,18 @@ if (mod(slice_order,2) == 0) %isDescending
 end; %isDescending
 TA = (TRsec/nslices)*(nslices-1);
 fprintf('  Slice order=%d, slices=%d, TR= %0.3fsec, TA= %fsec, referenced to 1st slice.\n', slice_order,nslices, TRsec,TA);
-if (TRsec < 0.1) || (TRsec > 5.0)
+if (TRsec < 0.1) || (TRsec > 5.0) 
     fprintf('  Aborting: strange Repeat Time (TR). Please edit the m-file.\n');
-    if  (TRsec > 5.0)
+    if  (TRsec > 5.0) 
           fprintf('  Long TR often used with sparse imaging: if this is a sparse design please set the TA manually.\n');
-    end;
-    if  (TRsec < 0.1)
+    end; 
+    if  (TRsec < 0.1) 
           fprintf('  Short TR may be due to DICOM-to-NIfTI conversion. Perhaps use dcm2nii.\n');
-    end;
+    end; 
     return;
 end; %unusual TR
 fMRIses = getsesvolsSubHier(prefix, fmriname);
-matlabbatch{1}.spm.temporal.st.scans = fMRIses;
+matlabbatch{1}.spm.temporal.st.scans = fMRIses;                               
 matlabbatch{1}.spm.temporal.st.nslices = nslices;
 matlabbatch{1}.spm.temporal.st.tr = TRsec;
 matlabbatch{1}.spm.temporal.st.ta = TA;
@@ -606,7 +637,7 @@ function [fMRIses] = getsesvolsSubHier(prefix, fmriname)
 %load all images from all sessions... AS MULTIPLE SESSIONS (e.g. moco)
 nsessions = length(fmriname(:,1));
 fMRIses = cell(nsessions,1);
-for s = 1 : nsessions
+for s = 1 : nsessions 
 	[pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:)));
 	sesname = fullfile(pth,[prefix, nam, ext]);
     fMRIses(s,1) = {getsesvolsSub(sesname)};
@@ -617,8 +648,8 @@ function [fMRIses] = getsesvolsSubFlat(prefix, fmriname)
 %load all images from all sessions... AS SINGLE SESSION (e.g. norm writing)
 nsessions = length(fmriname(:,1));
 fMRIses = '';
-for s = 1 : nsessions
-	[pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:)));
+for s = 1 : nsessions 
+	[pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:))); 
 	sesname = fullfile(pth,[prefix, nam, ext]);
     fMRIses = [fMRIses; getsesvolsSub(sesname)]; %#ok<AGROW>
 end;
@@ -627,7 +658,7 @@ end;
 function [sesvols] = getsesvolsSub(sesvol1)
 % input: single volume from 4D volume, output: volume list
 %  example 4D file with 3 volumes input= 'img.nii', output= {'img.nii,1';'img.nii,2';'img.nii,3'}
-[pth,nam,ext,vol] = spm_fileparts( deblank (sesvol1));
+[pth,nam,ext,vol] = spm_fileparts( deblank (sesvol1)); 
 sesname = fullfile(pth,[nam, ext]);
 hdr = spm_vol(sesname);
 nvol = length(hdr);
@@ -640,13 +671,10 @@ end;
 
 function namBet = betSub(nam)
 %apply brain extraction tool on an image
-normIntensitySub(nam);
 hdr = spm_vol(nam);
 if numel(hdr) > 1, hdr = hdr(1); error('betSub is slow with 4D images - are you sure?'); end;
 pm_brain_mask(hdr);
-bnam = prefixSub('bmask', nam);
-bimg = spm_read_vols(spm_vol(bnam));
-if (min(bimg(:)) == max(bimg(:)) ), error('No variability in %s', bnam); end;
+bimg = spm_read_vols(spm_vol(prefixSub('bmask', nam)));
 hdr = spm_vol(nam);
 img = spm_read_vols(hdr);
 thresh = max(bimg(:))/2;
@@ -656,22 +684,10 @@ hdr.fname = namBet;
 spm_write_vol(hdr,img);
 %end betSub()
 
-function normIntensitySub(nam)
-%adjust NIfTI image so brightness ranges from 0..1
-% the wild intensity of some Philips scans disrupts pm_brain_mask()
-hdr = spm_vol(nam);
-img = spm_read_vols(hdr);
-if max(img(:)) == min(img(:)), return; end;
-img = img-min(img(:)); %translate to 0..max
-img = img/max(img(:)); %scale to 0..1
-hdr.pinfo = [0; 0; 352];
-spm_write_vol(hdr,img);
-%end normIntensitySub()
-
 function [longname] = addpth(shortname)
 %adds path if not specified
 [pth,nam,ext,~] = spm_fileparts(shortname);
-if isempty(pth), pth = pwd;end;
+if isempty(pth), pth = pwd;end;    
 longname = fullfile(pth,[nam, ext]);
 if exist(longname,'file')~=2; fprintf('Warning: unable to find image %s - cd to approrpiate working directory?\n',longname); end;
 longname = [longname, ',1'];
@@ -682,7 +698,7 @@ function stat_1st_levelSub (prefix, basefmriname, kTR, s)
 %  basefmriname : names of 4D fMRI data (one per session)
 %  kTR : repeat time in seconds
 %  s : structure with statistics
-%
+%   
 %Examples
 % stat_1st_blockSub('swa','fMRI.nii', 2)
 % stat_1st_blockSub('swa',strvcat('fMRI1.nii','fMRI2.nii'), 2)
@@ -696,7 +712,7 @@ nSessions = size(s.onsets,1);
 fprintf('Experiment has %d sessions with %d conditions\n',nSessions,nCond);
 if nSessions ~= size(basefmriname,1)
     error('There must be %d sessions of fMRI data', nSessions);
-end
+end    
 %prepare SPM
 if exist('spm','file')~=2; fprintf('%s requires SPM\n',which(mfilename)); return; end;
 spm('Defaults','fMRI');
@@ -705,13 +721,13 @@ clear matlabbatch
 %get files if not specified....
 if ~exist('kTR','var') || (kTR <= 0)
     error('%s requires the repeat-time (TR) in seconds', mfilename);
-end
+end 
 %next make sure each image has its full path
 fmriname = [];
 for ses = 1:nSessions
     [pth,nam,ext] = spm_fileparts( deblank (basefmriname(ses,:)));
     if isempty(pth)
-        pth = pwd;
+        pth = pwd; 
     end;
     fmriname = strvcat(fmriname, fullfile(pth, [nam ext])); %#ok<REMFF1>
 end
@@ -727,16 +743,13 @@ if isempty(pth); pth=pwd; end;
 statpth = fullfile(pth, statdirname);
 if exist(statpth, 'file') ~= 7; mkdir(statpth); end;
 fprintf(' SPM.mat file saved in %s\n',statdirname);
-hpf = 128;
-if (min([s.duration{:}]) > 2) && (max([s.duration{:}]) < 32);
-    if (min([s.duration{:}]) > 5)
-        hpf = mean([s.duration{:}]) * 4;
-        fprintf('Block design : using %.1fs high pass filter with no temporal derivative.\n',hpf);
-    end
+if (min([s.duration{:}]) > 2) && (max([s.duration{:}]) < 32); 
+    hpf = mean([s.duration{:}]) * 4;
 	temporalderiv = false;
+	fprintf('Block design : using %.1fs high pass filter with no temporal derivative.\n',hpf);
 else
     temporalderiv = true;
-
+    hpf = 128;
 	fprintf('Event-related design : using %.1fs high pass filter with a temporal derivative.\n',hpf);
 end;
 % MODEL SPECIFICATION
@@ -747,7 +760,7 @@ matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
 matlabbatch{1}.spm.stats.fmri_spec.timing.RT = kTR;
 matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = 16;
 matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = 1;
-for ses = 1:nSessions
+for ses = 1:nSessions 
     %sesFiles = fmriname{ses};%getsesvolsSubSingle(fmriname, ses);
     sesFiles = getsesvolsSubSingle(prefix, fmriname, ses);
     fprintf('Session %d has %d volumes\n',ses, length(sesFiles) );
@@ -759,7 +772,7 @@ for ses = 1:nSessions
         if numel(s.duration) == 1
             matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).duration = s.duration{1};
         else
-            matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).onset = cell2mat(s.duration(ses, c));
+            matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).duration = cell2mat(s.duration(ses, c));
         end
         matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).pmod = struct('name', {}, 'param', {}, 'poly', {});
@@ -775,14 +788,14 @@ for ses = 1:nSessions
         end
         matlabbatch{1}.spm.stats.fmri_spec.sess(ses).multi_reg = {motionFile};
     else
-        matlabbatch{1}.spm.stats.fmri_spec.sess(ses).multi_reg = {''};
+        matlabbatch{1}.spm.stats.fmri_spec.sess(ses).multi_reg = {''}; 
     end
     matlabbatch{1}.spm.stats.fmri_spec.sess(ses).hpf = hpf;
 end
 matlabbatch{1}.spm.stats.fmri_spec.fact = struct('name', {}, 'levels', {});
 if temporalderiv
 	matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [1 0];
-else
+else 
 	matlabbatch{1}.spm.stats.fmri_spec.bases.hrf.derivs = [0 0];
 end;
 matlabbatch{1}.spm.stats.fmri_spec.volt = 1;
@@ -813,6 +826,15 @@ if nCond > 1
         end %for j
     end %for i
 end % > 1 conditions
+if isfield(s,'statAddSimpleEffects') && s.statAddSimpleEffects
+    for pos = 1: nCond
+        nContrast = nContrast + 1;
+        c = zeros(1,nCond);
+        c(pos) = 1;
+        matlabbatch{3}.spm.stats.con.consess{nContrast}.tcon.convec = c;
+        matlabbatch{3}.spm.stats.con.consess{nContrast}.tcon.name = char(s.names{pos}) ;
+    end
+end
 if temporalderiv %zero pad temporal derivations
     for c = 1 : nContrast
         for cond = 1 : nCond
@@ -820,14 +842,14 @@ if temporalderiv %zero pad temporal derivations
             c2 = cond * 2;
             v = [v(1:(c2-1)) 0 v(c2:end)];
             matlabbatch{3}.spm.stats.con.consess{c}.tcon.convec = v;
-
+            
         end
     end
 end
 if s.mocoRegress %add 6 nuisance regressors for motion paramets (rotation + translation]
     for c = 1 : nContrast
     	 matlabbatch{3}.spm.stats.con.consess{c}.tcon.convec = [ matlabbatch{3}.spm.stats.con.consess{c}.tcon.convec  0 0 0 0 0 0];
-    end
+    end  
 end
 if (nSessions > 1) %replicate contrasts for each session
     for c = 1 : nContrast
@@ -874,15 +896,15 @@ if ~exist('modality','var') %no files specified
  fprintf('%s Modality not specified, assuming T1\n', mfilename);
 end
 coivox = ones(4,1);
-%extract filename
+%extract filename 
 [pth,nam,ext, ~] = spm_fileparts(deblank(vols{1}));
 fname = fullfile(pth,[nam ext]); %strip volume label
 %report if filename does not exist...
-if (exist(fname, 'file') ~= 2)
+if (exist(fname, 'file') ~= 2) 
  	fprintf('%s error: unable to find image %s.\n',mfilename,fname);
-	return;
+	return;  
 end;
-hdr = spm_vol([fname,',1']); %load header
+hdr = spm_vol([fname,',1']); %load header 
 img = spm_read_vols(hdr); %load image data
 img = img - min(img(:));
 img(isnan(img)) = 0;
@@ -893,13 +915,13 @@ coivox(1) = sum(sum(sum(img,3),2)'.*(1:size(img,1)))/sumTotal; %dimension 1
 coivox(2) = sum(sum(sum(img,3),1).*(1:size(img,2)))/sumTotal; %dimension 2
 coivox(3) = sum(squeeze(sum(sum(img,2),1))'.*(1:size(img,3)))/sumTotal; %dimension 3
 XYZ_mm = hdr.mat * coivox; %convert from voxels to millimeters
-fprintf('%s center of brightness differs from current origin by %.0fx%.0fx%.0fmm in X Y Z dimensions\n',fname,XYZ_mm(1),XYZ_mm(2),XYZ_mm(3));
-for v = 1:   numel(vols)
+fprintf('%s center of brightness differs from current origin by %.0fx%.0fx%.0fmm in X Y Z dimensions\n',fname,XYZ_mm(1),XYZ_mm(2),XYZ_mm(3)); 
+for v = 1:   numel(vols) 
     fname = deblank(vols{v});
     if ~isempty(fname)
         [pth,nam,ext, ~] = spm_fileparts(fname);
-        fname = fullfile(pth,[nam ext]);
-        hdr = spm_vol([fname ',1']); %load header of first volume
+        fname = fullfile(pth,[nam ext]); 
+        hdr = spm_vol([fname ',1']); %load header of first volume 
         fname = fullfile(pth,[nam '.mat']);
         if exist(fname,'file')
             destname = fullfile(pth,[nam '_old.mat']);
@@ -916,7 +938,7 @@ for v = 1:   numel(vols)
     end
 end%for each volume
 coregEstTemplateSub(vols, modality);
-for v = 1:   numel(vols)
+for v = 1:   numel(vols) 
     [pth, nam, ~, ~] = spm_fileparts(deblank(vols{v}));
     fname = fullfile(pth,[nam '.mat']);
     if exist(fname,'file')

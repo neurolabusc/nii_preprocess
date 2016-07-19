@@ -1,4 +1,4 @@
-function imgs = nii_lime_gui(loadprev, ignoreImgPaths)
+function imgs = nii_preprocess_gui(loadprev, ignoreImgPaths)
 %Allow user to select files for preprocessing
 % loadprev : (optional) if 1 then user is prompted to select existing mat file
 %                       if string, that mat file is loaded
@@ -6,9 +6,11 @@ function imgs = nii_lime_gui(loadprev, ignoreImgPaths)
 % 
 % ignoreImgPaths : (optional) if true images MUST exist in mat file's folder
 %Examples
-% nii_lime_gui %use gui
-% nii_lime_gui(1) %use gui to select previous mat file
-% nii_lime_gui('T1_M2094_limegui.mat') %specify previous mat file
+% nii_preprocess_gui %use gui
+% nii_preprocess_gui(1) %use gui to select previous mat file
+% nii_preprocess_gui('T1_M2094_limegui.mat') %specify previous mat file
+
+
 if nargin > 0
     if ischar(loadprev) && exist(loadprev, 'file')
         [p, n, x] = fileparts(loadprev);
@@ -27,24 +29,25 @@ if nargin > 0
     end
     imgs = checkPathSub (imgs,matName);
     imgs = stripGzSub (imgs);
-
-    nii_lime(imgs);
+    nii_preprocess(imgs);
     return;
 end
 %Graphical interface for running nii_lime processing
 imgs = [];
 go = false;
-Xpressed = false;
+Xpressed = false; %user closes window without pressing button
 while ~go && ~Xpressed
     [img, go, Xpressed] = getfiles_x;
-    if isempty(img.T1)
+    if isempty(img)
+        fprintf('Items cleared\n');
+    elseif isempty(img.T1)
         fprintf('Error: T1 scan required\n');
     else
         imgs = [imgs, img]; %#ok<AGROW>
     end;
 end
-if isempty(imgs), return; end;
-if Xpressed, return; end;
+if isempty(imgs), fprintf('Aborting: no images selected'); return; end;
+if Xpressed, fprintf('Aborting: user never pressed go'); return; end;
 for i = 1: numel(imgs)
     img = imgs(i);
     %save filenames that will be processed - 
@@ -53,83 +56,54 @@ for i = 1: numel(imgs)
     matName = fullfile(p, [n, '_limegui.mat']);
     save(matName,'-struct', 'img');
     %process the data
-    nii_lime(img);
+    nii_preprocess(img);
 end
-end %nii_lime_gui()
+end %nii_preprocess_gui()
 
 function [img, go, Xpressed] = getfiles_x
-go = true;
+go = false;
 Xpressed = false;
 alreadyWarned = false;
-btns = zeros(10,1);
-img.T1 = [];
-img.T2 = [];
-img.ASL = [];
-img.fMRI = [];
-img.Rest = [];
-img.DTI = [];
-img.DTIrev = [];
-img.Lesion = [];
+modalities = {'T1', 'T2', 'ASL', 'fMRI', 'Rest', 'DTI', 'DTIrev', 'Lesion'};
+modalitiesVerbose = {'T1', 'T2', 'ASL', 'fMRI', 'Resting State', 'DTI', 'DTI (reversed phase)', 'Lesion'};
+modalitiesDTI = [false, false, false, false, false, true, true, false];
+btns = zeros(numel(modalities),1);
+for i = 1: numel(modalities)
+	img.(char(modalities(i))) = [];
+end;
 renameCheck = 0;
-ed = 0;
+btnEd = 0;
 d = nestedfx;
 uiwait(d);
 
     function d = nestedfx
-      d = dialog('Position',[300 300 620 360],'Name','LIME image selection','CloseRequestFcn',@my_closereq);
+      d = dialog('Position',[300 300 620 360],'Name','image selection','CloseRequestFcn',@close_callback);
       topMostPos = 330;
       pos = 10:30:topMostPos;
-      ed = uicontrol('Parent',d,...
+      btnEd = uicontrol('Parent',d,...
                    'Style','Edit',...
                    'Position',[10 pos(end) 600 25],...
                    'String','Participant ID');
-      txt = uicontrol('Parent',d,...
+      btnTxt = uicontrol('Parent',d,...
                    'Style','text',...
                    'Position',[10 pos(end-1) 600 25],...
                    'String','Select the desired scans');
-      btns(1) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-2) 600 25],...
-                   'String','T1',...
-                   'Callback', {@filename_callback,'T1', 1});
-      btns(2) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-3) 600 25],...
-                   'String','T2',...
-                   'Callback',{@filename_callback,'T2', 2});
-      btns(3) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-4) 600 25],...
-                   'String','ASL',...
-                   'Callback',{@filename_callback,'ASL', 3});
-      btns(4) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-5) 600 25],...
-                   'String','fMRI',...
-                   'Callback',{@filename_callback,'fMRI', 4});
-      btns(5) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-6) 600 25],...
-                   'String','Resting State',...
-                   'Callback',{@filename_callback,'Rest', 5});
-      btns(6) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-7) 600 25],...
-                   'String','DTI',...
-                   'Callback',{@filename_callback,'DTI', 6, true});
-      btns(7) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-8) 600 25],...
-                   'String','DTI (reversed phase)',...
-                   'Callback',{@filename_callback,'DTIrev', 7, true});
-      btns(8) = uicontrol('Parent',d,...
-                   'Position',[10 pos(end-9) 600 25],...
-                   'String','Lesion',...
-                   'Callback',{@filename_callback,'Lesion', 8});
-               
+        for i = 1: numel(modalities)
+            btns(i) = uicontrol('Parent',d,...
+                    'Position',[10 pos(end- i - 1) 600 25],...
+                    'String', char(modalitiesVerbose(i)),...
+                    'Callback',{@filename_callback,char(modalities(i)), i, modalitiesDTI(i)});
+        end;  
         btnGo = uicontrol('Parent',d,...
-                   'Position',[320 10 140 25],...
-                   'String','Go',...
-                   'Callback','delete(gcf)');
-        btnNext = uicontrol('Parent',d,...
                    'Position',[10 10 140 25],...
-                   'String','Next subject',...
-                   'Callback',@next_callback);
-        btnLoad  = uicontrol('Parent',d,...
+                   'String','Go',...
+                   'Callback',@go_callback);
+        btnNext = uicontrol('Parent',d,...
                    'Position',[160 10 140 25],...
+                   'String','Save',...
+                   'Callback',@save_callback);
+        btnLoad  = uicontrol('Parent',d,...
+                   'Position',[320 10 140 25],...
                    'String','Load',...
                    'Callback',@load_callback);
         renameCheck = uicontrol('Parent',d,...
@@ -139,16 +113,46 @@ uiwait(d);
                    'string','Rename files');
         
     end
-    function load_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
-        go = false;
-        fprintf('TO DO: Load not yet functional\n');
-    end %end next_callback()
-    function next_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
-        go = false;
+    function go_callback(~,~,~)
+        go = true;
         delete(gcf);
+    end
+    function load_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
+        [f, p] = uigetfile('*limegui.mat', 'Select a mat file');
+        matName = fullfile(p,f);
+        imgNew = load(matName);
+        if ~isfield(imgNew,'T1'), fprintf('Not a valid limegui.mat file (no T1): %s\n', matName); return; end;
+        if ~ischar(imgNew.T1), fprintf('Not a valid limegui.mat file (T1 is not a file name): %s\n', matName); return; end;
+        imgNew = checkPathSub (imgNew,matName);
+        for i = 1: numel(modalities)
+            m = char(modalities(i));
+            img.(m) = [];
+            if (isfield(imgNew, m)) && (~isempty(imgNew.(m)))
+                img.(m) = imgNew.(m);
+            end
+            m
+            if isempty(img.(m))
+               set(btns(i),'string', char(modalitiesVerbose(i))); 
+            else
+                set(btns(i),'string', [m, ': ',img.(m)]);
+            end;
+        end
+    end %end load_callback()
+    function save_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
+        if isempty(img.T1)
+           warning('Please specify T1 scan');
+           return;
+        end
+        [p,n] = fileparts(img.T1);
+        matName = fullfile(p, [n, '_limegui.mat']);
+        %'*limegui.mat'
+        [f,p] = uiputfile(matName,'Save file name');
+        matName = fullfile(p,f);
+        save(matName,'-struct', 'img');
+        img = [];
+        delete(gcf); %create blank document
     end %end next_callback()
-    function my_closereq(~,~,~)
-        go = false;
+    function close_callback(~,~,~)
         delete(gcf);
         Xpressed = true;
     end
@@ -198,7 +202,7 @@ uiwait(d);
         end
         
         if dorename
-            ID = get(ed,'String');
+            ID = get(btnEd,'String');
             if strcmpi(ID,'Participant ID') %user did not provide ID so don't use the field value
                 ID = '';
             end
@@ -206,7 +210,8 @@ uiwait(d);
             copyfile(fullfile(Apth,[A ext]),fullfile(Apth,[Ashort newext]));
             img.(myField) = fullfile(Apth,[Ashort newext]);
             set(btns(myIndex),'string', [myField, ': ',fullfile(Apth,[Ashort newext])]);
-            if myIndex == 6 || myIndex == 7 %rename bvec and bval files too for DTI
+            %if myIndex == 6 || myIndex == 7 %rename bvec and bval files too for DTI
+            if exist('isDti','var') && isDti %rename bvec and bval files too for DTI
                 origbvecFile = fullfile(Apth, [realname '.bvec']);
                 origbvalFile = fullfile(Apth, [realname '.bval']);
                 newbvecFile = fullfile(Apth, [myField '_' ID '.bvec']);
