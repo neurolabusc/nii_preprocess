@@ -29,15 +29,15 @@ nSubjDir = numel(subjDirs);
 fslParallelSub;
 fprintf('Processing %d folders (subjects) in %s\n', nSubjDir, baseDir);
 %fprintf('Processing %d of %d folders (subjects) in %s\n',nSubjDir2,nSubjDir, baseDir);
-for s = 1:nSubjDir %1:nSubjDir2 %(nSubjDir2+1):nSubjDir    
+for s = 1:nSubjDir %1:nSubjDir2 %(nSubjDir2+1):nSubjDir
     subjDir = [baseDir,filesep, deblank(subjDirs{s}) ]; %no filesep
     imgs = subjStructSub(deblank(subjDirs{s}));
     imgChangeSub('DTIA_','APDTI_', subjDir);
     imgChangeSub('DTIP_','PADTI_', subjDir);
-    
+
     imgs.Lesion = imgfindSub(imgs.Lesion,strvcat('LS_'), subjDir); %#ok<REMFF1>
-    imgs.T1 = imgfindSub(imgs.T1,'T1_', subjDir); 
-    imgs.T2 = imgfindSub(imgs.T2,'T2_', subjDir); 
+    imgs.T1 = imgfindSub(imgs.T1,'T1_', subjDir);
+    imgs.T2 = imgfindSub(imgs.T2,'T2_', subjDir);
     imgs.ASL = imgfindSub(imgs.ASL,'ASL_', subjDir);
     imgs.DTI = imgfindSub(imgs.DTI,'APDTI_', subjDir);
     if isempty(imgs.DTI) %cannot find 'APDTI_' look for standard DTI
@@ -45,7 +45,7 @@ for s = 1:nSubjDir %1:nSubjDir2 %(nSubjDir2+1):nSubjDir
     else
         imgs.DTIrev = imgfindSub(imgs.DTIrev,'PADTI_', subjDir);
     end
-    %nii_lime2(imgs);
+    %nii_preprocess(imgs);
     imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
     if ~isempty(imgs.T1) && ~isempty(imgs.Lesion) %&& ~isempty(imgs.DTI)
         t = tic;
@@ -144,10 +144,10 @@ nii_nii2mat(MD, 8, matName);
 function nam = prepostfixSub (pre, post, nam)
 [p, n, x] = filepartsSub(nam);
 nam = fullfile(p, [pre, n, post, x]);
-if ~exist(nam) && strcmpi(x,'.nii') 
+if ~exist(nam) && strcmpi(x,'.nii')
    nam = fullfile(p, [pre, n, post, '.nii.gz']);
 end
-if ~exist(nam) && strcmpi(x,'.nii.gz') 
+if ~exist(nam) && strcmpi(x,'.nii.gz')
    nam = fullfile(p, [pre, n, post, '.nii']);
 end
 %end prefixSub()
@@ -173,7 +173,7 @@ img = img/max(img(:)); %scale from 0..1
 [pth nm ext] = spm_fileparts(fname);
 img = power(img, 0.5);
 fname = fullfile(pth, ['n' nm ext]);
-hdr.fname = fname;  
+hdr.fname = fname;
 spm_write_vol(hdr,img);
 %end rescaleSub()
 
@@ -213,7 +213,7 @@ else
         nr = bvalCountSub(imgs.DTIrev);
         if (nr ~= n)
             fprintf('BVECS/BVALS DO NOT MATCH %s %s\n', imgs.DTI, imgs.DTIrev);
-            return    
+            return
         end
         command=sprintf('%s "%s" "%s"',command, imgs.DTI, imgs.DTIrev);
     end
@@ -231,7 +231,7 @@ if isempty(imgs.DTI), return; end;
 p = fileparts( imgs.DTI );
 pDir = fullfile(p,'probtrackx');
 if exist(pDir, 'file')
-    done = true; 
+    done = true;
 end;
 %end isDtiDone()
 
@@ -346,7 +346,7 @@ bed_dir=fullfile(pth, 'bedpost');
 bed_dirX=fullfile(pth, 'bedpost.bedpostX');
 bed_merged=fullfile(bed_dirX, 'merged');
 bed_mask=fullfile(bed_dirX, 'nodif_brain_mask');
-if ~exist(bed_dir,'file') || ~exist(bed_dirX,'file')  
+if ~exist(bed_dir,'file') || ~exist(bed_dirX,'file')
     fprintf('Please run bedpost to create files %s %s\n',bed_dir, bed_dirX);
     return;
 end
@@ -389,10 +389,10 @@ for i = 1: nROI
     end %if voxels survive
 end %for each region
 if numel(commands) < 1
-   fprintf('No regions survive thresholding with FA (poor normalization?) %s', dti); 
+   fprintf('No regions survive thresholding with FA (poor normalization?) %s', dti);
    return;
 end
-fprintf ('computing probtrackx for %d regions (this may take a while)\n',numel(commands) );   
+fprintf ('computing probtrackx for %d regions (this may take a while)\n',numel(commands) );
 doThreads(commands, prob_dir);
 fprintf ('probtrackx2 took %f seconds to run.\n', toc(t_start) ); %t_start=tic;
 %sum(nOK(:))
@@ -404,12 +404,12 @@ log_dir=fullfile(out_dir, 'logs');
 if exist(log_dir, 'file'), rmdir(log_dir, 's'); end;
 mkdir(log_dir);
 fid = fopen(command_file, 'wt');
-for i = 1 : numel(commands)   
+for i = 1 : numel(commands)
     fprintf(fid,'%s\n',commands{i});
 end
 fclose(fid);
 command=sprintf('fsl_sub -l %s -N probtrackx -T 1 -t %s', log_dir, command_file );
-doFslCmd (command, false);  
+doFslCmd (command, false);
 %end doThreads
 
 function fslParallelSub
@@ -471,7 +471,7 @@ matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 16;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = reg;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
-matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [nan nan nan; nan nan nan];%[-78 -112 -70; 78 76 85]; 
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [nan nan nan; nan nan nan];%[-78 -112 -70; 78 76 85];
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [nan nan nan];%[1 1 1];
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = interp;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
@@ -516,7 +516,7 @@ command = [cmd command '"'];
 %fslCmdSub
 
 function [status,cmdout]  = doFslCmd (command, verbose)
-if ~exist('verbose', 'var'), 
+if ~exist('verbose', 'var'),
     verbose = true;
 end;
 fslEnvSub;
@@ -528,7 +528,7 @@ end
 %end doFslCmd()
 
 % function [status,cmdout]  = doFslCmd (command, verbose)
-% if ~exist('verbose', 'var'), 
+% if ~exist('verbose', 'var'),
 %     verbose = true;
 % end;
 % fsldir= '/usr/local/fsl/';
@@ -592,7 +592,7 @@ stat.cbf.c1R = c1R;
 stat.cbf.c2L = c2L;
 stat.cbf.c2R = c2R;
 save(matName,'-struct', 'stat');
-if (c1R < c2R) 
+if (c1R < c2R)
     fid = fopen('errors.txt','a');
     fprintf(fid, 'ASL CBF higher in white matter\t%s\n', matName);
     fclose(fid);
@@ -677,11 +677,11 @@ if strcmpi(ext,'.nii') %.nii.gz
 end
 fnmN = [fnm, '.nii'];
 if exist(fnmN,'file')
-  delete(fnmN);  
+  delete(fnmN);
 end
 fnmZ = [fnm, '.nii.gz'];
 if exist(fnmZ,'file')
-  delete(fnmZ);  
+  delete(fnmZ);
 end
 %
 function [fnm, isGz] = unGzCSub (fnm)
@@ -697,15 +697,15 @@ if strcmpi(ext,'.nii') % fsl can not handle .nii coexisting with .nii.gz
 end
 if strcmpi(ext,'.gz') %.nii.gz
     ofnm = fnm;
-    fnm = char(gunzip(fnm));  
+    fnm = char(gunzip(fnm));
     isGz = true;
     delete(ofnm);
-elseif strcmpi(ext,'.voi') %.voi -> 
+elseif strcmpi(ext,'.voi') %.voi ->
     onam = char(gunzip(fnm));
     fnm = fullfile(pth, [nam '.nii']);
     movefile(onam,fnm);
     isGz = true;
-end;  
+end;
 %end unGzSub()
 
 
@@ -735,7 +735,7 @@ for i=1:size(nameFiles,1)
     pos = isStringInKey (nameFiles(i), imgKey);
     if pos == 1 && isImgSub(char(nameFiles(i)))
         imgName = strvcat(imgName, [inDir, filesep, char(nameFiles(i))]);
-        
+
     end; %do not worry about bvec/bval
 end
 if isempty(imgName) && exist('doWarn','var') && doWarn, fprintf('WARNING: unable to find any "%s" images in folder %s\n',deblank(imgKey(1,:)), inDir); end;
@@ -751,13 +751,13 @@ for k = 1 : size(imgKey,1)
 end
 isKey = false;
 %isStringInKey()
-    
+
 % function imgName = imgfindSub (imgName, imgKey, inDir, imgKey2)
 % %look for a filename that includes imgKey in folder inDir or subfolders
 % % for example if imgKey is 'T1' then T1 must be in both folder and image name myFolder\T1\T1.nii
 % if ~exist('imgKey2','var'), imgKey2 = imgKey; end;
 % if ~isempty(imgName), return; end;
-% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder 
+% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder
 % if isempty(strfind(lower(char(nam)), lower(imgKey))), return; end;
 % if exist([inDir,filesep, 'Native'],'file')
 %     inDir = [inDir,filesep, 'Native'];
@@ -796,7 +796,7 @@ function isImg = isImgSub (fnm)
 isImg = false;
 if strcmpi(ext,'.gz') || strcmpi(ext,'.voi') || strcmpi(ext,'.hdr') || strcmpi(ext,'.nii')
     isImg = true;
-end;  
+end;
 %end isImgSub()
 
 function [pth,nam,ext,num] = nii_filepartsSub(fname)

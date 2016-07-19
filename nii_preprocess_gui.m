@@ -3,7 +3,7 @@ function imgs = nii_preprocess_gui(loadprev, ignoreImgPaths)
 % loadprev : (optional) if 1 then user is prompted to select existing mat file
 %                       if string, that mat file is loaded
 %                       otherwise, user creates mat file by selecting images
-% 
+%
 % ignoreImgPaths : (optional) if true images MUST exist in mat file's folder
 %Examples
 % nii_preprocess_gui %use gui
@@ -25,14 +25,14 @@ if nargin > 0
     end
     if ~isfield(imgs,'T1') || isempty(imgs.T1)
         fprintf('%s error: no T1 image for %s\n', mfilename, matName);
-        return; 
+        return;
     end
     imgs = checkPathSub (imgs,matName);
     imgs = stripGzSub (imgs);
     nii_preprocess(imgs);
     return;
 end
-%Graphical interface for running nii_lime processing
+%Graphical interface for running nii_preprocess
 imgs = [];
 go = false;
 Xpressed = false; %user closes window without pressing button
@@ -50,8 +50,8 @@ if isempty(imgs), fprintf('Aborting: no images selected'); return; end;
 if Xpressed, fprintf('Aborting: user never pressed go'); return; end;
 for i = 1: numel(imgs)
     img = imgs(i);
-    %save filenames that will be processed - 
-    % to rerun in future: img = load('name_limegui.mat'); nii_lime(img);
+    %save filenames that will be processed -
+    % to rerun in future: img = load('name_limegui.mat'); nii_preprocess(img);
     [p,n] = fileparts(img.T1);
     matName = fullfile(p, [n, '_limegui.mat']);
     save(matName,'-struct', 'img');
@@ -72,7 +72,7 @@ for i = 1: numel(modalities)
 	img.(char(modalities(i))) = [];
 end;
 renameCheck = 0;
-btnEd = 0;
+btnID = 0;
 d = nestedfx;
 uiwait(d);
 
@@ -80,7 +80,7 @@ uiwait(d);
       d = dialog('Position',[300 300 620 360],'Name','image selection','CloseRequestFcn',@close_callback);
       topMostPos = 330;
       pos = 10:30:topMostPos;
-      btnEd = uicontrol('Parent',d,...
+      btnID = uicontrol('Parent',d,...
                    'Style','Edit',...
                    'Position',[10 pos(end) 600 25],...
                    'String','Participant ID');
@@ -93,30 +93,59 @@ uiwait(d);
                     'Position',[10 pos(end- i - 1) 600 25],...
                     'String', char(modalitiesVerbose(i)),...
                     'Callback',{@filename_callback,char(modalities(i)), i, modalitiesDTI(i)});
-        end;  
+        end;
         btnGo = uicontrol('Parent',d,...
-                   'Position',[10 10 130 25],...
+                   'Position',[10 10 120 25],...
                    'String','Go',...
                    'Callback',@go_callback);
         btnNext = uicontrol('Parent',d,...
-                   'Position',[150 10 130 25],...
+                   'Position',[140 10 120 25],...
                    'String','Save',...
                    'Callback',@save_callback);
         btnLoad  = uicontrol('Parent',d,...
-                   'Position',[290 10 130 25],...
+                   'Position',[270 10 120 25],...
                    'String','Load',...
                    'Callback',@load_callback);
+        btnAuto  = uicontrol('Parent',d,...
+                   'Position',[400 10 120 25],...
+                   'String','Auto',...
+                   'Callback',@auto_callback);
         renameCheck = uicontrol('Parent',d,...
                    'style','checkbox',...
                    'units','pixels',...
-                   'position',[500 10 100 15],...
+                   'position',[520 15 100 15],...
                    'string','Rename files');
-        
+
     end
     function go_callback(~,~,~)
         go = true;
         delete(gcf);
     end
+    function auto_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
+        title = 'Select folder images (T1_*.nii, ASL_*.nii, etc)\n';
+        fprintf(title);
+        imgDir = uigetdir(pwd, title);
+        fnms = dir(fullfile(imgDir,'*.nii'));
+        if numel(fnms) < 1, disp('Unable to find .nii images'); return; end;
+
+        for i = 1: numel(modalities)
+            m = char(modalities(i));
+            img.(m) = [];
+            modalityKey = [m,'_'];
+            for f = 1 : numel(fnms)
+                if strncmpi(fnms(f).name,modalityKey,numel(modalityKey))
+                    img.(m) = fullfile(imgDir, fnms(f).name);
+                end
+            end
+            if isempty(img.(m))
+                set(btns(i),'string', char(modalitiesVerbose(i)));
+            else
+                set(btns(i),'string', [m, ': ',img.(m)]);
+            end
+        end
+        [p,n] = fileparts(imgDir);
+        set(btnID,'String',n);
+    end %end auto_callback()
     function load_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
         [f, p] = uigetfile('*limegui.mat', 'Select a mat file');
         matName = fullfile(p,f);
@@ -132,7 +161,7 @@ uiwait(d);
             end
             m
             if isempty(img.(m))
-               set(btns(i),'string', char(modalitiesVerbose(i))); 
+               set(btns(i),'string', char(modalitiesVerbose(i)));
             else
                 set(btns(i),'string', [m, ': ',img.(m)]);
             end;
@@ -176,9 +205,9 @@ uiwait(d);
             if isnumeric(A), return; end;
             [Apth,A,ext] = fileparts(fullfile(Apth,A));
             imgName = fullfile(Apth,[A '.nii']);
-            if exist(imgName, 'file'), 
+            if exist(imgName, 'file'),
                 ext = '.nii';
-            else 
+            else
                 A = [A, '.nii'];
                 ext = '.gz';
                 imgName = fullfile(Apth,[A, ext]);
@@ -186,13 +215,13 @@ uiwait(d);
                     error('Unable to find %s', imgName);
                 end
             end;
-            
+
         else
             [A,Apth] = uigetfile({'*.nii;*.gz;*.hdr;';'*.*'},['Select ', myField, ' image']);
             if isnumeric(A), return; end;
             [Apth,A,ext] = fileparts(fullfile(Apth,A));
         end;
-        
+
         if strfind(A,'nii') %if .nii still exists in filename 'A'
             newext = ['.nii' ext];
             realname = A(1:end-4);
@@ -200,9 +229,9 @@ uiwait(d);
             newext = ext;
             realname = A;
         end
-        
+
         if dorename
-            ID = get(btnEd,'String');
+            ID = get(btnID,'String');
             if strcmpi(ID,'Participant ID') %user did not provide ID so don't use the field value
                 ID = '';
             end
@@ -279,8 +308,8 @@ function imgs = checkPathSub (imgs, matName)
                 fprintf('Note: unable to find %s, will use %s\n', fnm, fnmPth);
                 continue;
             end;
-        end        
-        
+        end
+
         fprintf('WARNING: unable to find %s\n', fnm);
     end
 end%checkPathSub()

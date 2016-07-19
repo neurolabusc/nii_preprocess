@@ -29,8 +29,8 @@ for s = 1:numel(subjDirs)% :-1: 1 %for each participant
     subjDir = [baseDir,filesep, deblank(subjDirs{s}) ]; %no filesep
     imgs = subjStructSub(deblank(subjDirs{s}));
     imgs.Lesion = imgfindSub(imgs.Lesion,strvcat('LS_'), subjDir); %#ok<REMFF1>
-    imgs.T1 = imgfindSub(imgs.T1,'T1_', subjDir); 
-    imgs.T2 = imgfindSub(imgs.T2,'T2_', subjDir); 
+    imgs.T1 = imgfindSub(imgs.T1,'T1_', subjDir);
+    imgs.T2 = imgfindSub(imgs.T2,'T2_', subjDir);
     imgs.ASL = imgfindSub(imgs.ASL,'ASL_', subjDir);
     imgs.DTI = imgfindSub(imgs.DTI,'APDTI_', subjDir);
     if isempty(imgs.DTI) %cannot find 'APDTI_' look for standard DTI
@@ -38,7 +38,7 @@ for s = 1:numel(subjDirs)% :-1: 1 %for each participant
     else
         imgs.DTIrev = imgfindSub(imgs.DTIrev,'PADTI_', subjDir);
     end
-    %nii_lime2(imgs); 
+    %nii_preprocess(imgs);
     imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
     if ~isempty(imgs.T1) && ~isempty(imgs.Lesion)
         matName = [subjDirs{s} '.mat'];
@@ -96,10 +96,10 @@ spm_jobman('run',matlabbatch);
 function nam = prepostfixSub (pre, post, nam)
 [p, n, x] = filepartsSub(nam);
 nam = fullfile(p, [pre, n, post, x]);
-if ~exist(nam) && strcmpi(x,'.nii') 
+if ~exist(nam) && strcmpi(x,'.nii')
    nam = fullfile(p, [pre, n, post, '.nii.gz']);
 end
-if ~exist(nam) && strcmpi(x,'.nii.gz') 
+if ~exist(nam) && strcmpi(x,'.nii.gz')
    nam = fullfile(p, [pre, n, post, '.nii']);
 end
 %end prefixSub()
@@ -125,7 +125,7 @@ img = img/max(img(:)); %scale from 0..1
 [pth nm ext] = spm_fileparts(fname);
 img = power(img, 0.5);
 fname = fullfile(pth, ['n' nm ext]);
-hdr.fname = fname;  
+hdr.fname = fname;
 spm_write_vol(hdr,img);
 %end rescaleSub()
 
@@ -163,7 +163,7 @@ else
     nr = bvalCountSub(imgs.DTIrev);
     if (nr ~= n)
         fprintf('BVECS/BVALS DO NOT MATCH %s %s\n', imgs.DTI, imgs.DTIrev);
-        return    
+        return
     end
     command=sprintf('%s "%s" "%s"',command, imgs.DTI, imgs.DTIrev);
 end
@@ -237,7 +237,7 @@ fileID = fopen(bnm,'r');
 [A, n] = fscanf(fileID,'%g'); %#ok<ASGLU>
 fclose(fileID);
 
-%end 
+%end
 
 
 function doAslSub(imgs, matName)
@@ -257,7 +257,7 @@ stat.cbf.c1R = c1R;
 stat.cbf.c2L = c2L;
 stat.cbf.c2R = c2R;
 save(matName,'-struct', 'stat');
-if (c1R < c2R) 
+if (c1R < c2R)
     fid = fopen('errors.txt','a');
     fprintf(fid, 'ASL CBF higher in white matter\t%s\n', matName);
     fclose(fid);
@@ -335,15 +335,15 @@ if isempty(fnm), return; end;
 isGz = false;
 if strcmpi(ext,'.gz') %.nii.gz
     ofnm = fnm;
-    fnm = char(gunzip(fnm));  
+    fnm = char(gunzip(fnm));
     isGz = true;
     delete(ofnm);
-elseif strcmpi(ext,'.voi') %.voi -> 
+elseif strcmpi(ext,'.voi') %.voi ->
     onam = char(gunzip(fnm));
     fnm = fullfile(pth, [nam '.nii']);
     movefile(onam,fnm);
     isGz = true;
-end;  
+end;
 %end unGzSub()
 
 
@@ -370,7 +370,7 @@ for i=1:size(nameFiles,1)
     pos = isStringInKey (nameFiles(i), imgKey);
     if pos == 1 && isImgSub(char(nameFiles(i)))
         imgName = strvcat(imgName, [inDir, filesep, char(nameFiles(i))]);
-        
+
     end; %do not worry about bvec/bval
 end
 if isempty(imgName), fprintf('WARNING: unable to find any "%s" images in folder %s\n',deblank(imgKey(1,:)), inDir); end;
@@ -386,13 +386,13 @@ for k = 1 : size(imgKey,1)
 end
 isKey = false;
 %isStringInKey()
-    
+
 % function imgName = imgfindSub (imgName, imgKey, inDir, imgKey2)
 % %look for a filename that includes imgKey in folder inDir or subfolders
 % % for example if imgKey is 'T1' then T1 must be in both folder and image name myFolder\T1\T1.nii
 % if ~exist('imgKey2','var'), imgKey2 = imgKey; end;
 % if ~isempty(imgName), return; end;
-% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder 
+% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder
 % if isempty(strfind(lower(char(nam)), lower(imgKey))), return; end;
 % if exist([inDir,filesep, 'Native'],'file')
 %     inDir = [inDir,filesep, 'Native'];
@@ -431,7 +431,7 @@ function isImg = isImgSub (fnm)
 isImg = false;
 if strcmpi(ext,'.gz') || strcmpi(ext,'.voi') || strcmpi(ext,'.hdr') || strcmpi(ext,'.nii')
     isImg = true;
-end;  
+end;
 %end isImgSub()
 
 function [pth,nam,ext,num] = nii_filepartsSub(fname)

@@ -25,11 +25,11 @@ end;
 %1st: acquire data
 nSubj = 0;
 %subjDirs = []; subjDirs{1} = 'M2154';% _DONOTUSE
-for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir  
+for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
     subjName = deblank(subjDirs{s});
     if subjName(1) == '.', continue; end;
     %if (numel(subjName) > 1) && (subjName(2) == '4'), fprintf('SKIPPING %s\n', subjName); continue; end; %ignore folders with underscore, "M2015_needsmatfile"
-    
+
     if isStringInKeySub (subjName,'_'), continue; end; %ignore folders with underscore, "M2015_needsmatfile"
     subjDir = [baseDir,filesep, subjName]; %no filesep
     %fprintf('%s\n', subjDir);
@@ -57,7 +57,7 @@ for i = 1: numel(f)
 end
 fprintf('%s\n', str);
 % subsequent rows: source of images
-for s = 1: nSubj 
+for s = 1: nSubj
     str = imgs(s).subjName;
     for i = 1: numel(f)
         x = '';
@@ -71,7 +71,7 @@ end
 %copy core files to new folder
 % return
 if exist(outDir, 'file') ~= 7, error('Unable to find folder %s', outDir); end;
-for s = 1: nSubj 
+for s = 1: nSubj
     subj = deblank(imgs(s).subjName);
     subjDir = fullfile(outDir, subj);
     mat = [];
@@ -79,7 +79,7 @@ for s = 1: nSubj
     for i = 1: numel(f)
         if ~isempty(imgs(s).nii.(f{i}))
             m = f{i}; % modality: T1, T2..
-            x = imgs(s).nii.(f{i}).x; %e.g. experiment name "LIME", "CT" 
+            x = imgs(s).nii.(f{i}).x; %e.g. experiment name "LIME", "CT"
             imgin = imgs(s).nii.(f{i}).img; %e.g. '~/dir/m2000/CT/T1.nii'
             imgout = fullfile(subjDir, sprintf('%s_%s_%s.nii',m, subj, x));
             fprintf('%s -> %s\n',imgin, imgout);
@@ -93,7 +93,7 @@ for s = 1: nSubj
         save(matName,'-struct', 'mat');
         setAcpcSub(matName);
         %disable next lines if you do not want to compute
-        nii_lime(mat);
+        nii_preprocess(mat);
     end
 end
 %end nii_harvest
@@ -150,15 +150,15 @@ if isempty(nameFiles), return; end;
 f = fieldnames(imgs.nii);
 for i = 1: numel(f)
     if ~isempty(imgs.nii.(f{i})), continue; end;
-    if ~exist('modalityKeysVerbose','var') 
+    if ~exist('modalityKeysVerbose','var')
         modalityKey = f{i};
     else
         modalityKey = char(modalityKeysVerbose(i));
     end
-    for j = 1: numel(nameFiles) 
+    for j = 1: numel(nameFiles)
         if strncmpi(modalityKey,nameFiles(j), numel(modalityKey))
            fname = fullfile(xDir, char(nameFiles(j)) );
-           %fprintf('%d %s %s %s\n', i, char(f{i}), char(modalityKey), char(nameFiles(j)) ); 
+           %fprintf('%d %s %s %s\n', i, char(f{i}), char(modalityKey), char(nameFiles(j)) );
            imgs.nii.(f{i}).x = xLabel;
            imgs.nii.(f{i}).img = fname;
            break;
@@ -219,7 +219,7 @@ function nameFiles=subImgSub(pathFolder)
 nameFiles=subFileSub(pathFolder);
 if isempty(nameFiles), return; end;
 n = nameFiles; nameFiles = [];
-for i = 1: numel(n) 
+for i = 1: numel(n)
     [~,~,x] = fileparts(char(deblank(n(i))));
     if ~strncmpi('.gz',x, 3) && ~strncmpi('.nii',x, 4), continue; end;
     nameFiles = [nameFiles; n(i)]; %#ok<AGROW>

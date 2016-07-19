@@ -24,19 +24,19 @@ for s = 1:  size(subjDirs,1) %for each participant
     if size(modalDirs,1) < 1
         fprintf(' WARNING: No folders for %s\n',subjDir);
     else
-        imgs = subjStructSub(deblank(subjDirs{s})); 
+        imgs = subjStructSub(deblank(subjDirs{s}));
         fprintf(' Found %d folders (modalities) in %s\n',size(modalDirs,1), subjDir);
         for m = 1: size(modalDirs,1) %for each participant
             modalDir = [subjDir,filesep, deblank(modalDirs{m}) ]; %no filesep
-            imgs.fMRI = imgfindSub(imgs.fMRI,'fMRI', modalDir); 
+            imgs.fMRI = imgfindSub(imgs.fMRI,'fMRI', modalDir);
             imgs.ASL = imgfindSub(imgs.ASL,'ASL', modalDir);
             imgs.DTI = imgfindSub(imgs.DTI,strvcat('DTI','27AVE','DIFF'), modalDir);  %#ok<REMFF1>
              imgs.Lesion = imgfindSub(imgs.Lesion,strvcat('LESION','Lesion','LS'), modalDir); %#ok<REMFF1>
-            imgs.T1 = imgfindSub(imgs.T1,'T1', modalDir); 
-            imgs.T2 = imgfindSub(imgs.T2,'T2', modalDir); 
+            imgs.T1 = imgfindSub(imgs.T1,'T1', modalDir);
+            imgs.T2 = imgfindSub(imgs.T2,'T2', modalDir);
         end
         imgs.name = removeMusc(imgs.name);
-        nii_lime2(imgs);    
+        nii_preprocess(imgs);
     end
 end
 diary OFF
@@ -103,13 +103,13 @@ for k = 1 : size(imgKey,1)
 end
 isKey = false;
 %isStringInKey()
-    
+
 % function imgName = imgfindSub (imgName, imgKey, inDir, imgKey2)
 % %look for a filename that includes imgKey in folder inDir or subfolders
 % % for example if imgKey is 'T1' then T1 must be in both folder and image name myFolder\T1\T1.nii
 % if ~exist('imgKey2','var'), imgKey2 = imgKey; end;
 % if ~isempty(imgName), return; end;
-% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder 
+% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder
 % if isempty(strfind(lower(char(nam)), lower(imgKey))), return; end;
 % if exist([inDir,filesep, 'Native'],'file')
 %     inDir = [inDir,filesep, 'Native'];
@@ -148,5 +148,5 @@ function isImg = isImgSub (fnm)
 isImg = false;
 if strcmpi(ext,'.gz') || strcmpi(ext,'.voi') || strcmpi(ext,'.hdr') || strcmpi(ext,'.nii')
     isImg = true;
-end;  
+end;
 %end isImgSub()
