@@ -175,7 +175,13 @@ imgs.fMRI = removeDotSub (imgs.fMRI);
 cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
 if exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
-
+if ~exist('nii_fmri60.m','file')
+    fnm = fullfile(fileparts(mfilename), 'nii_fmri');
+    if ~exist(fnm,'file')
+        error('Unable to find %s', fnm);
+    end
+    addpath(fnm);
+end
 nii_fmri60(imgs.fMRI); %use fMRI for normalization
 
 if ~exist(cstat, 'file') || ~exist(bstat,'file')
