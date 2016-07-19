@@ -4,7 +4,7 @@ function nii_batch12 (p)
 %   structure for preprocessing
 %  p.fmriname : name of 4D fMRI volumes
 %  p.fmriname, t1name, TRsec, slice_order, phase, magn
-%  p.t1name   : name of anatomical scan
+%  p.t1name   : name of anatomical scan (-1 to skip)
 %  p.TRsec    : TR for fMRI data, 0=auto
 %  p.slice_order : EPI slice order 0=auto,1=[1234],2=[4321],3=[1324],4=[4231], 5=[2413],6=[3142]
 %  p.phase  (optional) name of fieldmap phase image
@@ -22,9 +22,13 @@ function nii_batch12 (p)
 resliceMM = 2; %resolution for reslicing data
 [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized] = validatePreprocSub(p);
 %0.) set origin
-if ~isNormalized %if the T1 is not normalized, lets coregister it
-    setOriginSub(strvcat(t1name, fmriname, phase, magn), 1);  %#ok<REMFF1> align images to MNI space
-end
+    if (~isNormalized) && isfield(p,'setOrigin') && (p.setOrigin == true)
+        if isempty(t1name)
+           setOriginSub(strvcat(fmriname, phase, magn), 3);  %#ok<REMFF1> align images to MNI space 
+        else
+            setOriginSub(strvcat(t1name, fmriname, phase, magn), 1);  %#ok<REMFF1> align images to MNI space
+        end
+    end
 %1.) motion correct, used fieldmap if specifiedclass
 [meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn);
 %2.) brain extact mean (for better coregistration)
@@ -187,10 +191,37 @@ if ~exist('meanname','var'), meanname = ''; end;
 if ~exist('prefix','var'), prefix = ''; end;
 if ~exist('fmriname','var'), fmriname = ''; end;
 if ~exist('resliceMM','var'), resliceMM = 2; end;
+if isempty(t1)
+   prefix = normSub( meanname, prefix, fmriname, resliceMM);
+   return;
+end
 newSegSub(t1); %normalize images
 extractSub(0.01, t1, prefixSub('c1', t1), prefixSub('c2', t1));
 prefix = normWriteSub(t1, meanname, prefix, fmriname, resliceMM);
 %end normNewSeg()
+
+function prefix = normSub( meanname, prefix, fmriname, resliceMM)
+mbatch{1}.spm.spatial.normalise.estwrite.subj.vol = {meanname};
+warpses = getsesvolsSubFlat(prefix, fmriname);
+warpses = [warpses; {meanname}];
+mbatch{1}.spm.spatial.normalise.estwrite.subj.resample = warpses;
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
+template = fullfile(spm('Dir'),'tpm','TPM.nii');
+if ~exist(template,'file')
+    error('Unable to find template named %s',template);
+end
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.tpm = {template};
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.affreg = 'mni';
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.reg = [0 0.001 0.5 0.05 0.2];
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.fwhm = 0;
+mbatch{1}.spm.spatial.normalise.estwrite.eoptions.samp = 3;
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.bb = [-78 -112 -70; 78 76 85];
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.vox = [resliceMM resliceMM resliceMM];
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.interp = 4;
+spm_jobman('run',mbatch);
+prefix = ['w' prefix];
+%end normSub()
 
 function prefix = normWriteSub(t1, meanname, prefix, fmriname, resliceMM)
 coregEstSub(prefixSub('b', t1), meanname, prefix, fmriname); %make sure fMRI is aligned with T1
@@ -377,12 +408,22 @@ if ~isfield(p,'TRsec'), p.TRsec = 0; end;
 if ~isfield(p,'slice_order'), p.slice_order = 0; end;
 if ~isfield(p,'phase'), p.phase = ''; end;
 if ~isfield(p,'magn'), p.magn = ''; end;
-p.t1name = findImgSub(p.t1name, '');
+isNormalized = false;
+
+if (~ischar(p.t1name)) %we use p.t1name = -1 to signify skipping T1
+    t1name = [];
+else
+    if isempty(t1name)
+        t1name = spm_select(1,'image','Select T1 image volume');
+        isNormalized = isNormalizedExists(t1name);
+    end
+    t1name = findImgSub(p.t1name, '');
+    isNormalized = isNormalizedExists(t1name);
+end;
 p.fmriname = findImgSub(p.fmriname, p.t1name);
 p.phase =  findImgSub(p.phase, p.t1name);
 p.magn = findImgSub(p.magn, p.t1name);
 fmriname = p.fmriname;
-t1name = p.t1name;
 TRsec = p.TRsec;
 slice_order = p.slice_order;
 phase = p.phase;
@@ -399,9 +440,6 @@ if (nVol < 12)
 end
 if (nSessions > 5)
     error('Too many sessions: provide the FIRST volume from each 4D image');
-end
-if ~exist('t1name','var')  || isempty(t1name)
-  t1name = spm_select(1,'image','Select T1 image volume');
 end
 %determine TR for fMRI data (in secounds)
 TRfmri = getTRSub(deblank (fmriname(1,:)));
@@ -424,7 +462,6 @@ if (slice_order ==0)
     answer = inputdlg('slice order (1=[1234],2=[4321],3=[1324],4=[4231], 5=[2413],6=[3142])', 'Input required',1,{'1'});
     slice_order = str2double(answer{1});
 end
-isNormalized = isNormalizedExists(t1name);
 %end validateInputsSub()
 
 function isNormalized = isNormalizedExists(t1name)

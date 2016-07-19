@@ -669,12 +669,30 @@ for vol = 2 : nvol
 end;
 %end getsesvolsSub()
 
+% function namBet = betSub(nam)
+% %apply brain extraction tool on an image
+% hdr = spm_vol(nam);
+% if numel(hdr) > 1, hdr = hdr(1); error('betSub is slow with 4D images - are you sure?'); end;
+% pm_brain_mask(hdr);
+% bimg = spm_read_vols(spm_vol(prefixSub('bmask', nam)));
+% hdr = spm_vol(nam);
+% img = spm_read_vols(hdr);
+% thresh = max(bimg(:))/2;
+% img(bimg < thresh) = min(img(:));
+% namBet = prefixSub('b', nam);
+% hdr.fname = namBet;
+% spm_write_vol(hdr,img);
+% %end betSub()
+
 function namBet = betSub(nam)
 %apply brain extraction tool on an image
+normIntensitySub(nam);
 hdr = spm_vol(nam);
 if numel(hdr) > 1, hdr = hdr(1); error('betSub is slow with 4D images - are you sure?'); end;
 pm_brain_mask(hdr);
-bimg = spm_read_vols(spm_vol(prefixSub('bmask', nam)));
+bnam = prefixSub('bmask', nam);
+bimg = spm_read_vols(spm_vol(bnam));
+if (min(bimg(:)) == max(bimg(:)) ), error('No variability in %s', bnam); end;
 hdr = spm_vol(nam);
 img = spm_read_vols(hdr);
 thresh = max(bimg(:))/2;
@@ -683,6 +701,18 @@ namBet = prefixSub('b', nam);
 hdr.fname = namBet;
 spm_write_vol(hdr,img);
 %end betSub()
+
+function normIntensitySub(nam)
+%adjust NIfTI image so brightness ranges from 0..1
+% the wild intensity of some Philips scans disrupts pm_brain_mask()
+hdr = spm_vol(nam);
+img = spm_read_vols(hdr);
+if max(img(:)) == min(img(:)), return; end;
+img = img-min(img(:)); %translate to 0..max
+img = img/max(img(:)); %scale to 0..1
+hdr.pinfo = [0; 0; 352];
+spm_write_vol(hdr,img);
+%end normIntensitySub()
 
 function [longname] = addpth(shortname)
 %adds path if not specified

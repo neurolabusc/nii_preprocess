@@ -95,7 +95,10 @@ cd(prevPath);
 %end checkForUpdate()
 
 function tStart = timeSub(tStart, timeComment)
-fprintf('Stage %s required\t%g\tseconds\n', timeComment, toc(tStart));
+elapsed =  toc(tStart);
+if elapsed > 1.0
+    fprintf('Stage %s required\t%g\tseconds\n', timeComment, elapsed);
+end
 tStart = tic;
 %timeSub
 
