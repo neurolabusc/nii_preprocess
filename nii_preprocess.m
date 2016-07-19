@@ -1,4 +1,4 @@
-function matName = nii_lime(imgs, matName)
+function matName = nii_preprocess(imgs, matName)
 %preprocess data from multiple modalities3
 % imgs.T1: filename of T1 scan - ONLY REQUIRED INPUT: ALL OTHERS OPTIONAL
 % imgs.T2: filename used to draw lesion, if absent lesion drawn on T1
@@ -10,12 +10,13 @@ function matName = nii_lime(imgs, matName)
 % fMRI : fMRI scan
 %Examples
 % imgs.T1 = 'T1.nii'; imgs.ASL = 'ASL.nii';
-% nii_lime(imgs);
+% nii_preprocess(imgs);
 %check dependencies
 
-fprintf('%s version 15Feb2015\n', mfilename);
-if nargin < 1, error('Please use nii_lime_gui to select images'); end;
-if isempty(which('nii_nii2mat')), error('NiiStat required'); end;
+fprintf('%s version 19July2016\n', mfilename);
+checkForUpdate(fileparts(mfilename('fullpath')));
+if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
+if isempty(which('NiiStat')), error('NiiStat required'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 %set structures
@@ -69,8 +70,29 @@ printSub(imgs, pdfName); %show results - except DTI
 pdfName = '                                                        ';
 printDTISub(imgs, pdfName); %show results - DTI
 diary off
-%
-%nii_multimodal()
+%nii_preprocess()
+
+function checkForUpdate(repoPath)
+prevPath = pwd;
+cd(repoPath);
+if exist('.git','dir') %only check for updates if program was installed with "git clone"
+    [s, r] = system('git fetch origin','-echo');
+    if strfind(r,'fatal')
+        warning('Unabe to check for updates. Network issue?');
+        return;
+    end
+    [~, r] = system('git status','-echo');
+    if strfind(r,'behind')
+        if askToUpdate
+            [~, r] = system('git pull','-echo');
+            showRestartMsg
+        end
+    end
+else %do nothing for now
+    warning(sprintf('To enable updates run "!git clone git@github.com:neurolabusc/%s.git"',mfilename));
+end
+cd(prevPath);
+%end checkForUpdate()
 
 function tStart = timeSub(tStart, timeComment)
 fprintf('Stage %s required\t%g\tseconds\n', timeComment, toc(tStart));
