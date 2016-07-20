@@ -41,7 +41,7 @@ if true
     imgs = doT1Sub(imgs, matName); %normalize T1
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
-    imgs = doRestSub(imgs, matName, 1.85, 2); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study 
+    imgs = doRestSub(imgs, matName, 0, 0); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study 
     tStart = timeSub(tStart,'REST');
     imgs = doAslSub(imgs, matName);
     tStart = timeSub(tStart,'ASL');

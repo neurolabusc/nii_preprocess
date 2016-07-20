@@ -1,4 +1,4 @@
-function nii_batch12 (p)
+function [prefix, TRsec, slice_order] = nii_batch12 (p)
 %preprocess and analyze fMRI data using standard settings
 % p
 %   structure for preprocessing
@@ -21,6 +21,8 @@ function nii_batch12 (p)
 
 resliceMM = 2; %resolution for reslicing data
 [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized] = validatePreprocSub(p);
+if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
+spm_jobman('initcfg'); % useful in SPM8 only
 %0.) set origin
     if (~isNormalized) && isfield(p,'setOrigin') && (p.setOrigin == true)
         if isempty(t1name)
@@ -30,7 +32,11 @@ resliceMM = 2; %resolution for reslicing data
         end
     end
 %1.) motion correct, used fieldmap if specifiedclass
-[meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn);
+if isfield(p,'SE') && isfield(p,'SErev') && ~isempty(p.SE) && ~isempty(p.SErev)
+    error('Spin echo undistortion not yet integrated!');
+else
+    [meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn);
+end;
 %2.) brain extact mean (for better coregistration)
 if ~isNormalized %bet can fail with patient scans
     meanname = betSub(meanname); %brain extract mean image for better coreg
@@ -66,7 +72,7 @@ meanname = prefixSub(['mean', prefix], fmriname);
 %end mocoFMSub()
 
 function FieldMapMocoSub(fmriname,phase)
-spm('Defaults','fMRI');
+%spm('Defaults','fMRI');
 %spm_jobman('initcfg');
 %clear matlabbatch
 fprintf('Motion correction and fieldmap unwarping\n');
@@ -119,7 +125,7 @@ function FieldMapSub(fmriname, phase, magnitude)
 %Examples
 % nii_fieldmap(strvcat('fMRIrun1.nii','fMRIrun2.nii'),'phase.nii','mag.nii')
 % nii_fieldmap('fMRI.nii','phase.nii','mag.nii');
-spm('Defaults','fMRI');
+%spm('Defaults','fMRI');
 %spm_jobman('initcfg');
 %clear matlabbatch
 %typical settings to change:
@@ -410,10 +416,11 @@ if ~isfield(p,'phase'), p.phase = ''; end;
 if ~isfield(p,'magn'), p.magn = ''; end;
 isNormalized = false;
 
+
 if (~ischar(p.t1name)) %we use p.t1name = -1 to signify skipping T1
     t1name = [];
 else
-    if isempty(t1name)
+    if isempty(p.t1name)
         t1name = spm_select(1,'image','Select T1 image volume');
         isNormalized = isNormalizedExists(t1name);
     end
@@ -445,6 +452,9 @@ end
 TRfmri = getTRSub(deblank (fmriname(1,:)));
 if ~exist('TRsec','var')  || isempty(TRsec) || (TRsec == 0)
     TRsec = TRfmri;
+    if (TRsec ==0)
+       fprintf('Auto-detected slice order as %gsec\n', TRfmri); 
+    end
 else
     if (TRfmri > 0) && (abs(TRsec - TRfmri) > 0.001)
        warning('Please check TR, header reports %g (not %g)\n', TRfmri, TRsec);
@@ -599,6 +609,8 @@ if nslices <= 1 %automatically detect TR
 end;
 if (slice_order == kNIFTI_SLICE_ALT_INC2) || (slice_order == kNIFTI_SLICE_ALT_DEC2) %sequential
     isSiemens = true;
+else
+    isSiemens = false;
 end;
 if (slice_order == kNIFTI_SLICE_SEQ_INC) || (slice_order == kNIFTI_SLICE_SEQ_DEC) %sequential
 	so = 1:1:nslices;
@@ -736,8 +748,8 @@ if nSessions ~= size(basefmriname,1)
 end
 %prepare SPM
 if exist('spm','file')~=2; fprintf('%s requires SPM\n',which(mfilename)); return; end;
-spm('Defaults','fMRI');
-spm_jobman('initcfg'); % useful in SPM8 only
+%spm('Defaults','fMRI');
+%spm_jobman('initcfg'); % useful in SPM8 only
 clear matlabbatch
 %get files if not specified....
 if ~exist('kTR','var') || (kTR <= 0)
