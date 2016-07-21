@@ -13,7 +13,7 @@ function matName = nii_preprocess(imgs, matName)
 % nii_preprocess(imgs);
 %check dependencies
 
-fprintf('%s version 19July2016\n', mfilename);
+fprintf('%s version 21July2016\n', mfilename);
 checkForUpdate(fileparts(mfilename('fullpath')));
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(which('NiiStat')), error('NiiStat required'); end;
