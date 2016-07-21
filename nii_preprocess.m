@@ -1109,14 +1109,14 @@ if exist(oldfnm, 'file') %if a script is re-run, return the corrected name
     movefile(oldfnm, fnm);
 end;
 %Taylor Hanayik added for .bvec and .bval 'un'dotting
-if isDTI
+%if isDTI
     if exist(fullfile(p,[n, '.bvec']), 'file')
         movefile(fullfile(p,[n, '.bvec']), fullfile(p,[nn, '.bvec']));
     end
     if exist(fullfile(p,[n, '.bval']), 'file')
         movefile(fullfile(p,[n, '.bval']), fullfile(p,[nn, '.bval']));
     end
-end
+%end
 %end removeDotSub
 
 function fnm = unGzSub (fnm)
