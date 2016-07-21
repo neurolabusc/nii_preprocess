@@ -703,7 +703,7 @@ if ~exist(MD,'file') fprintf('Unable to find image: %s\n',MD); return; end; %req
 FA = unGzSub (FA);
 MD = unGzSub (MD);
 nFA = rescaleSub(FA);
-atlasImg = fullfile(fileparts(which('nii_stat')), 'roi' , [atlas '.nii']);
+atlasImg = fullfile(fileparts(which('NiiStat')), 'roi' , [atlas '.nii']);
 if ~exist(atlasImg,'file')
     error('Unable to find template %s', atlasImg);
 end

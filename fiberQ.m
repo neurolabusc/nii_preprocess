@@ -62,7 +62,7 @@ if exist(matName,'file')
             old = rmfield(old,'rest_aal');
             old = rmfield(old,'rest_aalcat');
             old = rmfield(old,'rest_bro');
-            old = rmfield(old,'rest_cat');		
+            old = rmfield(old,'rest_cat');
             old = rmfield(old,'rest_fox');
             old = rmfield(old,'rest_jhu');
         end
@@ -72,9 +72,9 @@ end
 save(matName, '-struct', 'stat');
 %end mergeSub()
 
-function label = jhuLabelSub 
-pth = which('nii_stat');
-[pth] = fileparts (pth);
+function label = jhuLabelSub
+pth = fileparts(which('NiiStat'));
+if isempty(pth), error('Unable to find NiiStat'); end;
 pth = [pth filesep 'roi' filesep 'jhu.txt'];
 if ~exist(pth,'file'), error('Unable to find %s\n',pth); end;
 fid = fopen(pth);  % Open file
@@ -85,7 +85,7 @@ while ischar(tline)
     label=strvcat(label,tline); %#ok<REMFF1>
     tline = fgetl(fid);
 end
-fclose(fid); 
+fclose(fid);
 %end labelSub()
 
 function nameFolds=subFolderSub(pathFolder)
@@ -103,7 +103,7 @@ knROI = 189; %number of regions of interest
 density_mat = eye(knROI);
 fiber_count_mat = eye(knROI);
 OK = false;
-for i = 1:(knROI-1)  
+for i = 1:(knROI-1)
     [hdri,imgi, voxi] = imgSub(maskDir, i);
     if ~isempty(hdri)
         [hdrip,imgip] = imgSubP(probDir, i);
@@ -119,16 +119,16 @@ for i = 1:(knROI-1)
                         OK = true;
                         ij_mean = fslstatsKSub (imgip, imgj);
                         ji_mean = fslstatsKSub (imgjp, imgi);
-                        
+
 
 
 
                         ij_sum= ij_mean * voxj;
                         ji_sum= ji_mean * voxi;
-                        fiber_count = ij_sum + ji_sum;  
+                        fiber_count = ij_sum + ji_sum;
                         normalizing_factor = (voxi + voxj ) * ( num_samples + 1 );
                         density = fiber_count/normalizing_factor;
-                        
+
                        %fprintf('%gx%g\n',fiber_count,density); error('11123');
                         %fprintf('i %d j %d iVox %d, jVox %d ji_mean %g ij_mean %g norm %g density %g\n', i, j, voxi, voxj, ji_mean, ij_mean, normalizing_factor, density);
                         density_mat(i,j) = density;
@@ -166,7 +166,7 @@ if ~exist(inam,'file')
         %fprintf('Unable to find %s\n', inam);
         return
     end
-    %error('Unable to find %s', inam); 
+    %error('Unable to find %s', inam);
 end;
 [hdri, imgi] = readNiftiSub(inam);
 imgi = imgi(:);
@@ -182,7 +182,7 @@ mn = mean(i);
 
 function [hdr, img] = readNiftiSub(filename, open4D)
 %function [hdr, img] = readNifti(filename)
-%load NIfTI (.nii, .nii.gz, .hdr/.img) image and header 
+%load NIfTI (.nii, .nii.gz, .hdr/.img) image and header
 % filename: image to open
 %To do:
 %  endian: rare, currently detected and reported but not handled
@@ -228,7 +228,7 @@ if ~open4D
     hdr.dim = hdr.dim(1:3); %no non-spatial dimensions
     Hdr.private.dime(5:8) = 1; %no non-spatial dimensions
     Hdr.private.dime(1) = 3; %3D file
-    
+
 end
 if nargout < 2, return; end; %only read image if requested
 if strcmpi(fext,'.hdr') || strcmpi(fext,'.img') %analyze style .hdr and .img pairs
@@ -256,12 +256,12 @@ switch hdr.dt(1)
       bitpix = 32; myprecision = 'single';%'float32';
    case  64,
       bitpix = 64; myprecision = 'double';%'float64';
-   case 512 
+   case 512
       bitpix = 16; myprecision = 'uint16';
-   case 768 
+   case 768
       bitpix = 32; myprecision = 'uint32';
    otherwise
-      error('This datatype is not supported'); 
+      error('This datatype is not supported');
 end
 if numel(hdr.dim) > 3
     nVol = prod(hdr.dim(4:end));
@@ -338,7 +338,7 @@ machine = 'ieee-le';
 %read header key
 hk.sizeof_hdr = typecast(data(1:4),'int32');
 if swapbytes(hk.sizeof_hdr) == 348
-   error('%s error: NIfTI image has foreign endian (solution: convert with dcm2nii)',mfilename); 
+   error('%s error: NIfTI image has foreign endian (solution: convert with dcm2nii)',mfilename);
 end
 if hk.sizeof_hdr ~= 348
     error('%s error: first byte of NIfTI image should be 348',mfilename);

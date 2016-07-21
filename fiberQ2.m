@@ -13,7 +13,7 @@ for s = 1:size(subjDirs,1)% :-1: 1 %for each participant
     subj = deblank(subjDirs{s});
     nii_fiber_quantify([subj '.mat'], [baseDir,filesep, subj]);
 %     probDir = [baseDir,filesep, subj, filesep 'probtrackx' ]; %no filesep
-%     maskDir = [baseDir,filesep, subj, filesep 'masks']; %no filesep 
+%     maskDir = [baseDir,filesep, subj, filesep 'masks']; %no filesep
 %     if exist(probDir,'file') && exist(baseDir, 'file')
 %        matName = [subj '.mat']; %666
 %        if   ~isFieldSub(matName, 'dti_jhu')
@@ -63,7 +63,7 @@ if exist(matName,'file')
             old = rmfield(old,'rest_aal');
             old = rmfield(old,'rest_aalcat');
             old = rmfield(old,'rest_bro');
-            old = rmfield(old,'rest_cat');		
+            old = rmfield(old,'rest_cat');
             old = rmfield(old,'rest_fox');
             old = rmfield(old,'rest_jhu');
         end
@@ -73,9 +73,9 @@ end
 save(matName, '-struct', 'stat');
 %end mergeSub()
 
-function label = jhuLabelSub 
-pth = which('nii_stat');
-[pth] = fileparts (pth);
+function label = jhuLabelSub
+pth = fileparts(which('NiiStat'));
+if isempty(pth), error('Unable to find NiiStat'); end;
 pth = [pth filesep 'roi' filesep 'jhu.txt'];
 if ~exist(pth,'file'), error('Unable to find %s\n',pth); end;
 fid = fopen(pth);  % Open file
@@ -86,7 +86,7 @@ while ischar(tline)
     label=strvcat(label,tline); %#ok<DSTRVCT,REMFF1>
     tline = fgetl(fid);
 end
-fclose(fid); 
+fclose(fid);
 %end labelSub()
 
 function nameFolds=subFolderSub(pathFolder)
@@ -104,7 +104,7 @@ knROI = 189; %number of regions of interest
 density_mat = eye(knROI);
 fiber_count_mat = eye(knROI);
 nvox = nan;
-for i = 1:(knROI)  
+for i = 1:(knROI)
     [im, vx] = imgSub(maskDir, i);
     if ~isnan(vx)
         nvox = numel(im);
@@ -112,7 +112,7 @@ for i = 1:(knROI)
     end
 end;
 if isnan(nvox)
-   error('No regions!'); 
+   error('No regions!');
 end
 
 OK = false;
@@ -122,7 +122,7 @@ vxp = zeros(knROI, 1);
 img = zeros(knROI,nvox);
 imgp = zeros(knROI,nvox);
 
-for i = 1:(knROI)  
+for i = 1:(knROI)
     [im, vx(i)] = imgSub(maskDir, i);
     if ~isempty(im), img(i,:) = im; end;
     [im, vxp(i)] = imgSubP(probDir, i); %#ok<AGROW,NASGU>
@@ -131,7 +131,7 @@ end;
 
 
 %fprintf('images loaded\n');
-for i = 1:(knROI-1)  
+for i = 1:(knROI-1)
     if ~isnan(vx(i)) && ~isnan(vxp (i))
         %if mod(i,10) == 0, fprintf('Row %d\n', i); end;
         for j = i+1 : knROI
@@ -143,7 +143,7 @@ for i = 1:(knROI-1)
                 %fprintf('%gx%g\n',ij_mean, ji_mean); error('mean check');
                 ij_sum= ij_mean * vx(j);
                 ji_sum= ji_mean * vx(i);
-                fiber_count = ij_sum + ji_sum;  
+                fiber_count = ij_sum + ji_sum;
                 normalizing_factor = (vx(i) + vx(j) ) * ( num_samples + 1 );
                 density = fiber_count/normalizing_factor;
                 %fprintf('i %d j %d iVox %d, jVox %d ji_mean %g ij_mean %g norm %g density %g\n', i, j, voxi, voxj, ji_mean, ij_mean, normalizing_factor, density);
@@ -181,7 +181,7 @@ if ~exist(inam,'file')
         %fprintf('Unable to find %s\n', inam);
         return
     end
-    %error('Unable to find %s', inam); 
+    %error('Unable to find %s', inam);
 end;
 [~, imgi] = readNiftiSub(inam);
 imgi = imgi(:);
@@ -193,7 +193,7 @@ voxi = sum(imgi > 0);
 %this next line is required for -M, but has big speed influence...
 %mask(img == 0) = 0; %-M = mean for non-zero voxels, -m for mean
 %mn = mean(img(mask > 0));
-%end fslstatsKSub() 
+%end fslstatsKSub()
 
 %function mn = fslstatsKSub (img, mask) %368sec
 %emulates fslstats img -k mask -M
@@ -217,7 +217,7 @@ mn = mean(i(i ~= 0));
 
 function [hdr, img] = readNiftiSub(filename, open4D)
 %function [hdr, img] = readNifti(filename)
-%load NIfTI (.nii, .nii.gz, .hdr/.img) image and header 
+%load NIfTI (.nii, .nii.gz, .hdr/.img) image and header
 % filename: image to open
 %To do:
 %  endian: rare, currently detected and reported but not handled
@@ -263,7 +263,7 @@ if ~open4D
     hdr.dim = hdr.dim(1:3); %no non-spatial dimensions
     Hdr.private.dime(5:8) = 1; %no non-spatial dimensions
     Hdr.private.dime(1) = 3; %3D file
-    
+
 end
 if nargout < 2, return; end; %only read image if requested
 if strcmpi(fext,'.hdr') || strcmpi(fext,'.img') %analyze style .hdr and .img pairs
@@ -291,12 +291,12 @@ switch hdr.dt(1)
       bitpix = 32; myprecision = 'single';%'float32';
    case  64,
       bitpix = 64; myprecision = 'double';%'float64';
-   case 512 
+   case 512
       bitpix = 16; myprecision = 'uint16';
-   case 768 
+   case 768
       bitpix = 32; myprecision = 'uint32';
    otherwise
-      error('This datatype is not supported'); 
+      error('This datatype is not supported');
 end
 if numel(hdr.dim) > 3
     nVol = prod(hdr.dim(4:end));
@@ -373,7 +373,7 @@ machine = 'ieee-le';
 %read header key
 hk.sizeof_hdr = typecast(data(1:4),'int32');
 if swapbytes(hk.sizeof_hdr) == 348
-   error('%s error: NIfTI image has foreign endian (solution: convert with dcm2nii)',mfilename); 
+   error('%s error: NIfTI image has foreign endian (solution: convert with dcm2nii)',mfilename);
 end
 if hk.sizeof_hdr ~= 348
     error('%s error: first byte of NIfTI image should be 348',mfilename);
