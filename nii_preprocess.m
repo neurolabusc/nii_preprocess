@@ -20,7 +20,7 @@ if isempty(which('NiiStat')), error('NiiStat required'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 %set structures
-if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end; 
+if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end;
 if ~isfield(imgs,'T2'), imgs.T2 = []; end;
 if ~isfield(imgs,'Lesion'), imgs.Lesion = []; end;
 if ~isfield(imgs,'ASL'), imgs.ASL = []; end;
@@ -41,7 +41,7 @@ if true
     imgs = doT1Sub(imgs, matName); %normalize T1
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
-    imgs = doRestSub(imgs, matName, 0, 0); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study 
+    imgs = doRestSub(imgs, matName, 0, 0); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
     tStart = timeSub(tStart,'REST');
     imgs = doAslSub(imgs, matName);
     tStart = timeSub(tStart,'ASL');
@@ -57,7 +57,7 @@ if true
         %doDtiTractSub(imgs, matName, dtiDir, 'AICHA')
         %-->compute scalar DTI metrics
         doFaMdSub(imgs, matName);
-        doTractographySub(imgs); 
+        doTractographySub(imgs);
         doDkiSub(imgs, matName);
         tStart = timeSub(tStart,'DTI');
     end
@@ -94,6 +94,25 @@ end
 cd(prevPath);
 %end checkForUpdate()
 
+function a = askToUpdate
+% Construct a questdlg
+choice = questdlg(sprintf('An update for %s is available. Would you like to update?',mfilename), ...
+    'Auto update', ...
+    'Yes','No','Yes');
+% Handle response
+switch choice
+    case 'Yes'
+        a = true;
+    case 'No'
+        a = false;
+end
+%end askToUpdate()
+
+function showRestartMsg
+uiwait(msgbox('The program must be restarted for changes to take effect. Click "OK" to quit the program. You will need to restart it just as you normally would','Restart Program'))
+exit;
+%end showRestartMsg()
+
 function tStart = timeSub(tStart, timeComment)
 elapsed =  toc(tStart);
 if elapsed > 1.0
@@ -122,11 +141,11 @@ ax  = axes('Position',[0.1 0.5 0.35 0.3],'Visible','off','Parent',fig);
 text(0.0,-1.4, sprintf('normalized %s',nam),'Parent',ax, 'FontSize',24, 'fontn','Arial');
 spm_orthviews('Image',T1,[0.51 0.01 .4 .49]);
 fMRI = prefixSub('sw', imgs.fMRI);
-orthSub(fMRI,[0.01 0.32 .4 .49]); 
+orthSub(fMRI,[0.01 0.32 .4 .49]);
 i3m = prefixSub('zw',imgs.T1); %warped brain extracted image
-orthSub(i3m,[0.51 0.32 .4 .49]); 
+orthSub(i3m,[0.51 0.32 .4 .49]);
 Rest = prefixSub('alf_dwa',imgs.Rest); %warped brain extracted image
-orthSub(Rest,[0.01 0.64 .4 .49]); 
+orthSub(Rest,[0.01 0.64 .4 .49]);
 ASL = prepostfixSub('mskwmeanCBF_0_src','M0CSF',imgs.ASL); %warped brain extracted image
 orthSub(ASL,[0.51 0.64 .4 .49]);
 if ~isempty(LS)
@@ -137,7 +156,7 @@ end;
 spm_print(matName);
 %end printSub()
 
-function printDTISub(imgs, matName) 
+function printDTISub(imgs, matName)
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 if  isempty(imgs.DTI) , return; end; %required
 spm_clf;
@@ -201,11 +220,11 @@ if ischar(vols), vols = cellstr(vols); end;
 [pth,nam,ext, ~] = spm_fileparts(deblank(vols{1}));
 fname = fullfile(pth,[nam ext]); %strip volume label
 %report if filename does not exist...
-if (exist(fname, 'file') ~= 2) 
+if (exist(fname, 'file') ~= 2)
     fprintf('%s error: unable to find image %s.\n',mfilename,fname);
-    return;  
+    return;
 end;
-hdr = spm_vol([fname,',1']); %load header 
+hdr = spm_vol([fname,',1']); %load header
 img = spm_read_vols(hdr); %load image data
 img = img - min(img(:));
 img(isnan(img)) = 0;
@@ -235,7 +254,7 @@ if isempty(PathConvExe), fprintf('Tractography skipped: unable to find %s', Conv
 TrakExe = 'SingleTensorFT';
 PathTrakExe = findExeSub(TrakExe);
 if isempty(PathTrakExe), fprintf('Tractography skipped: unable to find %s', TrakExe); return; end;
-cmd = sprintf('%s -basename "%s" -out %s -type FSL',ConvExe,basename, imgCnv); 
+cmd = sprintf('%s -basename "%s" -out %s -type FSL',ConvExe,basename, imgCnv);
 [status, fullnam]  = system(cmd,'-echo');
 %e.g. TVFromEigenSystem -basename 199_99_AP_7 -type FSL
 cmd = sprintf('%s -in "%s" -seed "%s" -out "%s"',TrakExe, imgCnv, Mask, vtkname );
@@ -255,15 +274,15 @@ function nam = prepostfixSub (pre, post, nam)
 if isempty(nam), return; end;
 [p, n, x] = filepartsSub(nam);
 nam = fullfile(p, [pre, n, post, x]);
-if ~exist(nam, 'file') && strcmpi(x,'.nii') 
+if ~exist(nam, 'file') && strcmpi(x,'.nii')
    nam = fullfile(p, [pre, n, post, '.nii.gz']);
-   if ~exist(nam, 'file') 
+   if ~exist(nam, 'file')
         nam = fullfile(p, [pre, n, post, x]);
    end
 end
-if ~exist(nam, 'file') && strcmpi(x,'.nii.gz') 
+if ~exist(nam, 'file') && strcmpi(x,'.nii.gz')
    nam = fullfile(p, [pre, n, post, '.nii']);
-   if ~exist(nam, 'file') 
+   if ~exist(nam, 'file')
         nam = fullfile(p, [pre, n, post, x]);
    end
 end
@@ -279,7 +298,7 @@ img = img/max(img(:)); %scale from 0..1
 [pth, nm, ext] = spm_fileparts(fname);
 img = power(img, 0.5);
 fname = fullfile(pth, ['n' nm ext]);
-hdr.fname = fname;  
+hdr.fname = fname;
 spm_write_vol(hdr,img);
 %end rescaleSub()
 
@@ -393,7 +412,7 @@ else
         nr = bvalCountSub(imgs.DTIrev);
         if (nr ~= n)
             fprintf('WARNING: BVECS/BVALS DO NOT MATCH %s %s\n', imgs.DTI, imgs.DTIrev);
-            %return    
+            %return
         end
         command=sprintf('%s "%s" "%s"',command, imgs.DTI, imgs.DTIrev);
     end
@@ -404,7 +423,7 @@ doDtiBedpostSub(imgs.DTI);
 %end doDtiSub()
 
 function isEddyCuda = isEddyCuda7Sub
-%eddy_cuda7.0 is a beta version supplied by Jesper Andersson that supports the GTX970 and has new features 
+%eddy_cuda7.0 is a beta version supplied by Jesper Andersson that supports the GTX970 and has new features
 isEddyCuda = false;
 if ~isGpuInstalledSub(), return; end;
 eddyName = '/usr/local/fsl/bin/eddy_cuda7.0';
@@ -418,7 +437,7 @@ if isempty(imgs.DTI), return; end;
 p = fileparts( imgs.DTI );
 pDir = fullfile(p,'probtrackx');
 if exist(pDir, 'file')
-    done = true; 
+    done = true;
 end;
 %end isDtiDone()
 
@@ -506,7 +525,7 @@ dti_faThr=prepostfixSub('', '_FA_thr', dti);
 dti_x=fullfile(bed_dir, 'nodif_brain_mask.nii.gz');
 copyfile(dti_faThr, dti_x);
 if isGpuInstalledSub
-    command=sprintf('bedpostx_gpu "%s" ', bed_dir);    
+    command=sprintf('bedpostx_gpu "%s" ', bed_dir);
 else
     command=sprintf('bedpostx "%s" ', bed_dir);
 end
@@ -541,12 +560,12 @@ bed_dir=fullfile(pth, 'bedpost');
 bed_dirX=fullfile(pth, 'bedpost.bedpostX');
 bed_merged=fullfile(bed_dirX, 'merged');
 bed_mask=fullfile(bed_dirX, 'nodif_brain_mask');
-if ~exist(bed_dir,'file') || ~exist(bed_dirX,'file')  
+if ~exist(bed_dir,'file') || ~exist(bed_dirX,'file')
     fprintf('Please run bedpost to create files %s %s\n',bed_dir, bed_dirX);
     return;
 end
 dti_u=prepostfixSub('', 'u', dti);
-if ~exist(dti_u,'file') 
+if ~exist(dti_u,'file')
     fprintf('Can not find undistorted DTI %s\n',dti_u);
     return;
 end
@@ -554,7 +573,7 @@ template_roiW=prepostfixSub('', '_roi', dti);
 if exist(template_roiW,'file') && strcmpi(atlas,'jhu')
     atlasext = '';
 else
-   atlasext = ['_' atlas]; 
+   atlasext = ['_' atlas];
 end
 template_roiW=prepostfixSub('', ['_roi', atlasext], dti);
 dti_faThr=prepostfixSub('', '_FA_thr', dti);
@@ -579,7 +598,7 @@ nPerm = 5000; %666
 t_start=tic;
 commands = [];
 [hdr,img] = loadSub(template_roiWThr);
-hdr.dt = [2 0]; 
+hdr.dt = [2 0];
 hdr.pinfo = [1; 0; 0];
 for i = 1: nROI
     %maski=fullfile(mask_dir, [num2str(i),'.nii.gz']);
@@ -591,7 +610,7 @@ for i = 1: nROI
     maski=fullfile(mask_dir, [num2str(i),'.nii']);
     hdr.fname = maski;
     spm_write_vol(hdr,imgi);
-    
+
     %command=sprintf('fslstats "%s" -M',  maski);
     %[~,cmdout] = doFslCmd (command, i == 1); %only show text for 1st region
     %if str2num(cmdout) < 1.0  %#ok<ST2NM>
@@ -601,7 +620,7 @@ for i = 1: nROI
         if exist(prob_diri, 'file'), rmdir(prob_diri, 's'); end;
         mkdir(prob_diri);
         if isGpuInstalledSub()
-            exeName=sprintf('probtrackx2_gpu');    
+            exeName=sprintf('probtrackx2_gpu');
         else
             exeName=sprintf('probtrackx2');
         end
@@ -611,10 +630,10 @@ for i = 1: nROI
     %end %if voxels survive
 end %for each region
 if numel(commands) < 1
-   fprintf('No regions survive thresholding with FA (poor normalization?) %s', dti); 
+   fprintf('No regions survive thresholding with FA (poor normalization?) %s', dti);
    return;
 end
-fprintf ('computing probtrackx for %d regions (this may take a while)\n',numel(commands) );   
+fprintf ('computing probtrackx for %d regions (this may take a while)\n',numel(commands) );
 doThreads(commands, prob_dir);
 fprintf ('probtrackx2 took %f seconds to run.\n', toc(t_start) ); %t_start=tic;
 nii_fiber_quantify(matName, dtiDir, atlas);
@@ -622,7 +641,7 @@ nii_fiber_quantify(matName, dtiDir, atlas);
 
 function [hd,im] = loadSub(fnm);
 [p,n,x] = spm_fileparts(fnm);
-if (length(x)==3)  && min((x=='.gz')==1) 
+if (length(x)==3)  && min((x=='.gz')==1)
     fnm = char(gunzip(fnm));
     delnam = fnm;
     [p,n,x] = spm_fileparts(char(fnm));
@@ -649,12 +668,12 @@ log_dir=fullfile(out_dir, 'logs');
 if exist(log_dir, 'file'), rmdir(log_dir, 's'); end;
 mkdir(log_dir);
 fid = fopen(command_file, 'wt');
-for i = 1 : numel(commands)   
+for i = 1 : numel(commands)
     fprintf(fid,'%s\n',commands{i});
 end
 fclose(fid);
 command=sprintf('fsl_sub -l %s -N probtrackx -T 1 -t %s', log_dir, command_file );
-doFslCmd (command, false);  
+doFslCmd (command, false);
 %end doThreads
 
 function fslParallelSub (maxThreads)
@@ -673,7 +692,7 @@ if ~exist('atlas','var'), atlas = 'jhu'; end;
 if strcmpi(atlas,'jhu')
     atlasext = '_roi';
 else
-   atlasext = ['_roi_' atlas]; 
+   atlasext = ['_roi_' atlas];
 end
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 FA = prepostfixSub('', '_FA', imgs.DTI);
@@ -742,7 +761,7 @@ matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 16;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = reg;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
-matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [nan nan nan; nan nan nan];%[-78 -112 -70; 78 76 85]; 
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [nan nan nan; nan nan nan];%[-78 -112 -70; 78 76 85];
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [nan nan nan];%[1 1 1];
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = interp;
 matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
@@ -793,7 +812,7 @@ command = [cmd command '"'];
 %fslCmdSub
 
 function [status,cmdout]  = doFslCmd (command, verbose)
-if ~exist('verbose', 'var'), 
+if ~exist('verbose', 'var'),
     verbose = true;
 end;
 fslEnvSub;
@@ -802,12 +821,12 @@ if verbose
     fprintf('Running \n %s\n', cmd);
     [status,cmdout]  = system(cmd,'-echo');
 else
-  [status,cmdout]  = system(cmd);  
+  [status,cmdout]  = system(cmd);
 end
 %end doFslCmd()
 
 % function [status,cmdout]  = doFslCmd (command, verbose)
-% if ~exist('verbose', 'var'), 
+% if ~exist('verbose', 'var'),
 %     verbose = true;
 % end;
 % fsldir= '/usr/local/fsl/';
@@ -878,8 +897,8 @@ if isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n
 if (mod(mx,2) == 0) && ( (nSlices ~= 17) && (nSlices ~= 16))
 	fprintf('Error: nii_pasl12 only designed for pCASL sequences with 17 or 16 slices not %d: %s\n', nSlices);
 	return;
-end 
-if mx < 60, 
+end
+if mx < 60,
     fprintf('not enough ASL volumes (only %d volumes with %d slices) for %s\n', nV, nSlices, imgs.ASL);
     imgs.ASL =[];
     return;
@@ -1007,7 +1026,7 @@ spm_jobman('run',matlabbatch);
 bt1 = extractSub(0.005, t1, prefixSub('c1', t1), prefixSub('c2', t1));
 %end normSub();
 
-function t1Bet = extractSub(thresh, t1, c1, c2, c3)   
+function t1Bet = extractSub(thresh, t1, c1, c2, c3)
 %subroutine to extract brain from surrounding scalp
 % t1: anatomical scan to be extracted
 % c1: gray matter map
@@ -1026,7 +1045,7 @@ w = spm_read_vols(wi);
 if nargin > 4 && ~isempty(c3)
    ci = spm_vol(c3);%CSF map
    c = spm_read_vols(ci);
-   w = c+w; 
+   w = c+w;
 end;
 w = g+w;
 if thresh <= 0
@@ -1080,7 +1099,7 @@ imgs.DTIrev = removeDotSub(imgs.DTIrev); %fsl is fine with gz
 
 function fnm = removeDotSub (fnm)
 %topup will make 'my.img.nii.gz -> my.topup and my.img.topup.nii.gz
-if isempty(fnm), return; end; %CR210116 - e.g. if DTI exists but DTIrev is empty 
+if isempty(fnm), return; end; %CR210116 - e.g. if DTI exists but DTIrev is empty
 [p,n, x] = filepartsSub(fnm);
 if isempty(strfind(n,'.')), return; end;
 nn = strrep(n, '.', '_');
@@ -1124,11 +1143,11 @@ if strcmpi(ext,'.nii') %.nii.gz
 end
 fnmN = [fnm, '.nii'];
 if exist(fnmN,'file')
-  delete(fnmN);  
+  delete(fnmN);
 end
 fnmZ = [fnm, '.nii.gz'];
 if exist(fnmZ,'file')
-  delete(fnmZ);  
+  delete(fnmZ);
 end
 %
 function [fnm, isGz] = unGzCSub (fnm)
@@ -1140,7 +1159,7 @@ if strcmpi(ext,'.nii') % fsl can not handle .nii coexisting with .nii.gz
     fnmz = fullfile(pth, [nam ext '.gz']);
     if exist(fnmz, 'file') && exist(fnm, 'file')
         delete(fnmz); %remove .nii.gz if .nii exists
-    elseif exist(fnmz, 'file') %img.nii.gz exists but img.nii does not! 
+    elseif exist(fnmz, 'file') %img.nii.gz exists but img.nii does not!
         fnm = fnmz;
         [pth,nam,ext] = spm_fileparts(fnm);
     end
@@ -1158,12 +1177,12 @@ if strcmpi(ext,'.gz') %.nii.gz
     end
     isGz = true;
     delete(ofnm);
-elseif strcmpi(ext,'.voi') %.voi -> 
+elseif strcmpi(ext,'.voi') %.voi ->
     onam = char(gunzip(fnm));
     fnm = fullfile(pth, [nam '.nii']);
     movefile(onam,fnm);
     isGz = true;
-end;  
+end;
 %end unGzSub()
 
 
@@ -1190,7 +1209,7 @@ for i=1:size(nameFiles,1)
     pos = isStringInKey (nameFiles(i), imgKey);
     if pos == 1 && isImgSub(char(nameFiles(i)))
         imgName = strvcat(imgName, [inDir, filesep, char(nameFiles(i))]);
-        
+
     end; %do not worry about bvec/bval
 end
 if isempty(imgName), fprintf('WARNING: unable to find any "%s" images in folder %s\n',deblank(imgKey(1,:)), inDir); end;
@@ -1206,13 +1225,13 @@ for k = 1 : size(imgKey,1)
 end
 isKey = false;
 %isStringInKey()
-    
+
 % function imgName = imgfindSub (imgName, imgKey, inDir, imgKey2)
 % %look for a filename that includes imgKey in folder inDir or subfolders
 % % for example if imgKey is 'T1' then T1 must be in both folder and image name myFolder\T1\T1.nii
 % if ~exist('imgKey2','var'), imgKey2 = imgKey; end;
 % if ~isempty(imgName), return; end;
-% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder 
+% [pth, nam] = fileparts(inDir); %#ok<ASGLU> %e.g. 'T1folder' for /test/T1folder
 % if isempty(strfind(lower(char(nam)), lower(imgKey))), return; end;
 % if exist([inDir,filesep, 'Native'],'file')
 %     inDir = [inDir,filesep, 'Native'];
@@ -1251,7 +1270,7 @@ function isImg = isImgSub (fnm)
 isImg = false;
 if strcmpi(ext,'.gz') || strcmpi(ext,'.voi') || strcmpi(ext,'.hdr') || strcmpi(ext,'.nii')
     isImg = true;
-end;  
+end;
 %end isImgSub()
 
 function [pth,nam,ext,num] = filepartsSub(fname)
