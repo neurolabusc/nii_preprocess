@@ -25,7 +25,7 @@ if ischar(vols), vols = cellstr(vols); end
 fname = fullfile(pth,[nam ext]); %strip volume label
 hdr = spm_vol([fname,',1']); %read header of 1st volume
 if ~mod(hdr.dim(1),2) && ~mod(hdr.dim(2),2) && (~mod(hdr.dim(3),2) || ~checkSlices)
-    fprintf('%s :No need to crop image (even numer of rows and columns)\n', mfilename);
+    fprintf('%s: No need to crop image (even dimensions %dx%dx%d): %s\n', mfilename, hdr.dim(1), hdr.dim(2), hdr.dim(3), deblank(vols{1}));
     return;
 end;
 for i = 1:3
