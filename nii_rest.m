@@ -22,8 +22,9 @@ if ~exist('imgs','var') %no input: select imgs[s]
 end
 clear matlabbatch
 tic; %start timer
-%p.t1name = imgs.T1; %'t1.nii'
-p.t1name = -1; %'t1.nii'
+p.setOrigin = true;
+p.t1name = imgs.T1; %'t1.nii'
+%p.t1name = -1; %'t1.nii'
 
 p.TRsec = 0; %repeat time off 10 seconds
 p.slice_order = 0;
@@ -35,6 +36,7 @@ for ses = 1 : length(imgs.Rest(:,1));
     prefix
     TRsec
     slice_order
+    
 end; %for each session
 fprintf('Done processing sessions in %0.3fsec\n', toc);
 %end nii_rest()

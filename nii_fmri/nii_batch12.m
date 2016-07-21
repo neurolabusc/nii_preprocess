@@ -38,9 +38,9 @@ else
     [meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn);
 end;
 %2.) brain extact mean (for better coregistration)
-if ~isNormalized %bet can fail with patient scans
+%if ~isNormalized %bet can fail with patient scans
     meanname = betSub(meanname); %brain extract mean image for better coreg
-end
+%end
 %3.) slice-time correction
 prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order); %slice-time correct
 %4.) estimate normalization, coregister and reslice fMRI
@@ -453,7 +453,7 @@ TRfmri = getTRSub(deblank (fmriname(1,:)));
 if ~exist('TRsec','var')  || isempty(TRsec) || (TRsec == 0)
     TRsec = TRfmri;
     if (TRsec ==0)
-       fprintf('Auto-detected slice order as %gsec\n', TRfmri); 
+       fprintf('Auto-detected repetition time (TR) as %gsec\n', TRfmri); 
     end
 else
     if (TRfmri > 0) && (abs(TRsec - TRfmri) > 0.001)
@@ -783,6 +783,10 @@ if (min([s.duration{:}]) > 2) && (max([s.duration{:}]) < 32);
         fprintf('Block design : using %.1fs high pass filter with no temporal derivative.\n',hpf);
     end
 	temporalderiv = false;
+    if (isfield(s,'forceTemporalDeriv')) && (s.forceTemporalDeriv == true)
+        temporalderiv = true;
+        warning('Using temporal derivatives');
+    end
 else
     temporalderiv = true;
 
@@ -862,6 +866,10 @@ if nCond > 1
         end %for j
     end %for i
 end % > 1 conditions
+fprintf('Contrasts:\n');
+for c = 1: nContrast
+    fprintf(' %d\t%s\n', c, matlabbatch{3}.spm.stats.con.consess{c}.tcon.name); 
+end
 if temporalderiv %zero pad temporal derivations
     for c = 1 : nContrast
         for cond = 1 : nCond
