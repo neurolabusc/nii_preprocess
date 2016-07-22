@@ -23,14 +23,14 @@ resliceMM = 2; %resolution for reslicing data
 [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized] = validatePreprocSub(p);
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 spm_jobman('initcfg'); % useful in SPM8 only
-%0.) set origin
-    if (~isNormalized) && isfield(p,'setOrigin') && (p.setOrigin == true)
-        if isempty(t1name)
-           setOriginSub(strvcat(fmriname, phase, magn), 3);  %#ok<REMFF1> align images to MNI space 
-        else
-            setOriginSub(strvcat(t1name, fmriname, phase, magn), 1);  %#ok<REMFF1> align images to MNI space
-        end
-    end
+%0.) set origin fMRI
+if isfield(p,'setOrigin') && (p.setOrigin == true)
+    setOriginSub(strvcat(fmriname, phase, magn), 3);  %#ok<REMFF1> align images to MNI space 
+end
+%0.) set origin T1
+if ~isempty(t1name) && (~isNormalized) && isfield(p,'setOrigin') && (p.setOrigin == true)
+       setOriginSub(t1name, 1);  %#ok<REMFF1> align images to MNI space
+end
 %1.) motion correct, used fieldmap if specifiedclass
 if isfield(p,'SE') && isfield(p,'SErev') && ~isempty(p.SE) && ~isempty(p.SErev)
     error('Spin echo undistortion not yet integrated!');
@@ -39,7 +39,9 @@ else
 end;
 %2.) brain extact mean (for better coregistration)
 %if ~isNormalized %bet can fail with patient scans
+if ~isempty(t1name) %if we have a T1, coregister BET fMRI to BET T1, if we do not have T1 we will keep the scalp (it is in TPM.nii)
     meanname = betSub(meanname); %brain extract mean image for better coreg
+end
 %end
 %3.) slice-time correction
 prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order); %slice-time correct
@@ -210,6 +212,7 @@ function prefix = normSub( meanname, prefix, fmriname, resliceMM)
 mbatch{1}.spm.spatial.normalise.estwrite.subj.vol = {meanname};
 warpses = getsesvolsSubFlat(prefix, fmriname);
 warpses = [warpses; {meanname}];
+fprintf('Normalizing %s\n', meanname);
 mbatch{1}.spm.spatial.normalise.estwrite.subj.resample = warpses;
 mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
 mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
@@ -225,6 +228,7 @@ mbatch{1}.spm.spatial.normalise.estwrite.eoptions.samp = 3;
 mbatch{1}.spm.spatial.normalise.estwrite.woptions.bb = [-78 -112 -70; 78 76 85];
 mbatch{1}.spm.spatial.normalise.estwrite.woptions.vox = [resliceMM resliceMM resliceMM];
 mbatch{1}.spm.spatial.normalise.estwrite.woptions.interp = 4;
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.prefix = 'w';
 spm_jobman('run',mbatch);
 prefix = ['w' prefix];
 %end normSub()
@@ -415,8 +419,6 @@ if ~isfield(p,'slice_order'), p.slice_order = 0; end;
 if ~isfield(p,'phase'), p.phase = ''; end;
 if ~isfield(p,'magn'), p.magn = ''; end;
 isNormalized = false;
-
-
 if (~ischar(p.t1name)) %we use p.t1name = -1 to signify skipping T1
     t1name = [];
 else
@@ -431,7 +433,6 @@ p.fmriname = findImgSub(p.fmriname, p.t1name);
 p.phase =  findImgSub(p.phase, p.t1name);
 p.magn = findImgSub(p.magn, p.t1name);
 fmriname = p.fmriname;
-TRsec = p.TRsec;
 slice_order = p.slice_order;
 phase = p.phase;
 magn = p.magn;
@@ -450,20 +451,22 @@ if (nSessions > 5)
 end
 %determine TR for fMRI data (in secounds)
 TRfmri = getTRSub(deblank (fmriname(1,:)));
-if ~exist('TRsec','var')  || isempty(TRsec) || (TRsec == 0)
-    TRsec = TRfmri;
-    if (TRsec ==0)
-       fprintf('Auto-detected repetition time (TR) as %gsec\n', TRfmri); 
+TRsec = p.TRsec;
+if  (TRsec == 0)
+    if (TRfmri ==0)
+        answer = inputdlg('TR (sec)', 'Input required',1,{'2'});
+        TRfmri = str2double(answer{1});
+    else
+        fprintf('Auto-detected repetition time (TR) as %gsec\n', TRfmri); 
     end
+    TRsec = TRfmri;
+    
 else
     if (TRfmri > 0) && (abs(TRsec - TRfmri) > 0.001)
        warning('Please check TR, header reports %g (not %g)\n', TRfmri, TRsec);
     end
 end
-if (TRsec ==0)
-    answer = inputdlg('TR (sec)', 'Input required',1,{'2'});
-    TRsec = str2double(answer{1});
-end
+
 %determine slice order
 if ~exist('slice_order','var')  || isempty(slice_order) || (slice_order == 0)
     slice_order = getSliceOrderSub(deblank (fmriname(1,:)));
