@@ -22,6 +22,7 @@ if ~exist('imgs','var') %no input: select imgs[s]
  imgs.T1 = spm_select(1,'image','(Optional) Select T1 anatomical scan');
  imgs.SE = spm_select(1,'image','(Optional) select spin-echo scan for undistortion');
  imgs.SE = spm_select(1,'image','(Optional) select reversed-phase spin-echo scan for undistortion');
+ imgs.T2 = spm_select(1,'image','(Optional) Select T2 pathological scan');
 end
 if ~exist('TRsec','var') %no input: select imgs[s]
     TRsec = 0;
@@ -31,12 +32,21 @@ if ~exist('SliceOrder','var') %no input: select imgs[s]
     SliceOrder = 0;
     fprintf('Will attempt to detect Slice Order from image file.\n');
 end
+
+if ~isfield(imgs, 'T1'), error('T1 scan required'); end;
+if ~isfield(imgs, 'Rest'), error('Rest scan required'); end;
+    
+p.t1name = imgs.T1; %'t1.nii'
+if isfield(imgs, 'T2')
+    p.t2name = imgs.T2;
+else
+    p.t2name = [];
+end
+%p.t1name = -1; %'t1.nii'
+
 clear matlabbatch
 tic; %start timer
 p.setOrigin = true;
-p.t1name = imgs.T1; %'t1.nii'
-%p.t1name = -1; %'t1.nii'
-
 p.TRsec = TRsec; %repeat time off 10 seconds
 p.slice_order = SliceOrder;
 p.slice_order = -1;

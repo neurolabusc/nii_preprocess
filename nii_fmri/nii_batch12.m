@@ -20,7 +20,7 @@ function [prefix, TRsec, slice_order] = nii_batch12 (p)
 % TO DO
 
 resliceMM = 2; %resolution for reslicing data
-[fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized] = validatePreprocSub(p);
+[fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name] = validatePreprocSub(p);
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 spm_jobman('initcfg'); % useful in SPM8 only
 %0.) set origin fMRI
@@ -47,7 +47,11 @@ end
 prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order); %slice-time correct
 %4.) estimate normalization, coregister and reslice fMRI
 if isNormalized %if the image was previously normalized use existing paramters
-    prefix = normWriteSub(t1name, meanname, prefix, fmriname, resliceMM);
+    if isempty(t2name)
+        prefix = normWriteSub(t1name, meanname, prefix, fmriname, resliceMM);
+    else
+        prefix = normT2Sub(t1name, t2name, meanname, prefix, fmriname, resliceMM);
+    end
 else
     prefix = normNewSegSub(t1name, meanname, prefix, fmriname, resliceMM);
 end
@@ -61,6 +65,64 @@ stat_1st_levelSub (prefix, fmriname, TRsec, p);
 %end nii_batch()
 
 %---------- LOCAL FUNCTIONS FOLLOW
+
+function prefix = normT2Sub(t1, t2, meanname, prefix, fmriname, resliceMM)
+t2 = maskSub(t2,  t1);
+newSegWriteSub(t1, t2, '', resliceMM);
+t2 = prefixSub('w', t2); %we will match fMRI scan to normalized T2
+coregEstSub(t2, meanname, prefix, fmriname); %make sure fMRI is aligned with T2
+prefix = oldNormSub(t2, meanname, fmriname, prefix);
+%end normT2Sub()
+
+function mskfnm = maskSub(fnm, t1)
+%zero voxels in fnm that are zero in fnmMask
+pad = 'e'; %enatiomorphic
+efnm = prefixSub(['c1', pad], t1);
+if ~exist(efnm, 'file')
+   pad = ''; %no enantiomorphic
+   fnm = prefixSub(['c1', pad], t1);
+   if ~exist(fnm, 'file')
+    error('Unable to find gray matter estimate "%s" or "%s"\n', fnm, efnm);
+   end
+end
+hdr = spm_vol(prefixSub(['c1', pad], t1)); %GM
+imgM = spm_read_vols(hdr);
+hdr = spm_vol(prefixSub(['c2', pad], t1)); %WM
+imgM = imgM + spm_read_vols(hdr);
+hdr = spm_vol(prefixSub(['c3', pad], t1)); %CSF
+imgM = imgM + spm_read_vols(hdr);
+img(imgM < 0.05) = 0; %zero voxels that are less than 5% GM+WM+CSF
+hdr = spm_vol(deblank(fnm));
+img = spm_read_vols(hdr);
+img(imgM == 0) = 0;
+mskfnm = prefixSub('b', fnm);
+hdr.fname = mskfnm;  
+spm_write_vol(hdr,img);
+%end maskSub()
+
+function prefix = oldNormSub(template, meanfmri, fmri, prefix)
+warpses = getsesvolsSubFlat(prefix, fmri);
+mbatch{1}.spm.tools.oldnorm.estwrite.subj.source = {meanfmri};
+mbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
+%mbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = {meanfmri};
+mbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = [{meanfmri}; warpses];
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.template = {template};
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 8;
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smoref = 0;
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'mni';
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25;
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 16;
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = 1;
+mbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
+mbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [NaN NaN NaN; NaN NaN NaN];
+mbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [NaN NaN NaN];
+mbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = 1;
+mbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
+mbatch{1}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
+spm_jobman('run',mbatch);
+prefix = ['w' prefix];
+%end oldNormSub()
 
 function [meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn) %motion correct with field map
 if isempty(phase) || isempty(magn)
@@ -404,10 +466,9 @@ matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep = [4 2];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol = [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
 spm_jobman('run',matlabbatch);
-
 %end coregEstSub()
 
-function [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized] = validatePreprocSub(p)
+function [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name] = validatePreprocSub(p)
 %check all inputs
 if exist('spm','file')~=2; fprintf('%s requires SPM\n',which(mfilename)); return; end;
 isSPM12orNewerSub; %check recent SPM
@@ -418,6 +479,19 @@ if ~isfield(p,'TRsec'), p.TRsec = 0; end;
 if ~isfield(p,'slice_order'), p.slice_order = 0; end;
 if ~isfield(p,'phase'), p.phase = ''; end;
 if ~isfield(p,'magn'), p.magn = ''; end;
+if ~isfield(p,'t2name'), 
+    t2name = [];
+else
+    t2name = findImgSub(p.t2name, '');
+    [pth, nm, ext] = fileparts(t2name);
+    t2name = fullfile(pth, ['r', nm, ext]);
+    if ~exist(t2name, 'file')
+        fprintf('T2 will not be used for fMRI normalization (unable to find registered %s\n', t2name);
+        t2name = '';
+    end;
+end;
+
+
 isNormalized = false;
 if (~ischar(p.t1name)) %we use p.t1name = -1 to signify skipping T1
     t1name = [];
@@ -539,15 +613,28 @@ end
 img =  spm_select(1,'image',['Please find image ' nam]);
 %end findImg1Sub()
 
-function tr =  getTRSub(fmriname)
+function [tr, dims] =  getTRSub(fmriname)
 %returns Repeat Time in seconds for volume fMRIname
 % n.b. for original images from dcm2nii - SPM will strip this information
 hdr = spm_vol(fmriname);
+hdr = hdr(1);
 if (sum(ismember(fieldnames(hdr(1,1).private),'timing')) > 0)  && isfield(hdr(1,1).private.timing,'tspace')
   tr = hdr(1,1).private.timing.tspace;
-else
-  fprintf('%s error: unable to determine TR for image %s (perhaps SPM stripped this information)\n',mfilename,fmriname);
+else %unable to auto-detect TR
   tr = 0;
+  if (hdr.dim(1) == 90) && (hdr.dim(2) == 90) && (hdr.dim(3) == 50)
+    tr = 1.65;
+  end;
+  if (hdr.dim(1) == 64) && (hdr.dim(2) == 64) && (hdr.dim(3) == 34)
+    tr = 1.85;
+  end;
+  if tr == 0
+    fprintf('%s error: unable to determine TR for image %s (perhaps SPM stripped this information)\n',mfilename,fmriname);
+      
+  else
+    fprintf('%s warning: guessing TR (%g) based on image dimensions %s\n',mfilename, tr, fmriname);
+  end
+  fprintf(' Please uncomment "try, N.timing = V.private.timing; end" from spm_create_vol.m\n');
 end
 %end getTRSub()
 
