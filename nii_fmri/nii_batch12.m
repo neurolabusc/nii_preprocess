@@ -1,4 +1,4 @@
-function [prefix, TRsec, slice_order] = nii_batch12 (p)
+function [prefix, TRsec, slice_order, meanname] = nii_batch12 (p)
 %preprocess and analyze fMRI data using standard settings
 % p
 %   structure for preprocessing
@@ -54,7 +54,10 @@ if isNormalized %if the image was previously normalized use existing paramters
     end
 else
     prefix = normNewSegSub(t1name, meanname, prefix, fmriname, resliceMM);
+    
 end
+normWriteWhiteMatterSub(t1name, resliceMM); %we want a wc2* white matter prob map for detrending
+meanname = prefixSub('w', meanname);
 %5.) blur data
 prefix = smoothSub(8, prefix, fmriname); %smooth images
 %-- get rid of images we don't need
@@ -348,6 +351,22 @@ mi.dt(1) = 4; %16-bit precision more than sufficient uint8=2; int16=4; int32=8; 
 spm_write_vol(mi,m);
 t1Bet = mi.fname;
 %end extractSub()
+
+function normWriteWhiteMatterSub(t1name, resliceMM) %we want a wc2* white matter prob map for detrending
+if isempty(t1name), return; end;
+eChar = 'e';
+[pth,nam,ext, vol] = spm_fileparts(t1name);
+c2name = fullfile(pth, ['c2', eChar, nam, ext]);
+if ~exist(c2name, 'file')
+	eChar = '';
+	c2name = fullfile(pth, ['c2', eChar, nam, ext]);
+    if ~exist(c2name, 'file')
+        fprintf('Unable to find white matter tissue map %s\n', c2name);
+        return;
+    end
+end 
+newSegWriteSub(t1name, c2name, '', resliceMM)
+%end normWriteWhiteMatterSub()
 
 function  prefix = newSegWriteSub(t1name, warpname, prefix, resliceMM, bb)
 %reslice img using pre-existing new-segmentation deformation field
