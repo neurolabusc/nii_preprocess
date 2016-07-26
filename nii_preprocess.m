@@ -66,8 +66,8 @@ if true
 end
 %print output
 pdfName = 'MasterNormalized';
-printSub(imgs, pdfName); %show results - except DTI
-pdfName = '                                                        ';
+nii_mat2ortho(matName, pdfName); %show results - except DTI
+pdfName = 'MasterDTI';
 printDTISub(imgs, pdfName); %show results - DTI
 diary off
 %nii_preprocess()
@@ -121,41 +121,6 @@ end
 tStart = tic;
 %timeSub
 
-function printSub(imgs, matName)
-if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
-if isempty(imgs.T1), return; end; %required
-T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
-if isempty(imgs.Lesion)
-    LS = [];
-else
-    LS = prefixSub('wsr', imgs.Lesion);
-    if ~exist(LS,'file'), fprintf('Unable to find %s\n', LS); return; end; %required
-end;
-if ~exist(T1,'file'), return; end; %required
-spm_clf;
-spm_figure('Clear', 'Graphics');
-spm_orthviews('Reset');
-fig = spm_figure('FindWin','Graphics');
-ax  = axes('Position',[0.1 0.5 0.35 0.3],'Visible','off','Parent',fig);
-[~, nam] = fileparts(T1);
-text(0.0,-1.4, sprintf('normalized %s',nam),'Parent',ax, 'FontSize',24, 'fontn','Arial');
-spm_orthviews('Image',T1,[0.51 0.01 .4 .49]);
-fMRI = prefixSub('sw', imgs.fMRI);
-orthSub(fMRI,[0.01 0.32 .4 .49]);
-i3m = prefixSub('zw',imgs.T1); %warped brain extracted image
-orthSub(i3m,[0.51 0.32 .4 .49]);
-Rest = prefixSub('alf_dwa',imgs.Rest); %warped brain extracted image
-orthSub(Rest,[0.01 0.64 .4 .49]);
-ASL = prepostfixSub('mskwmeanCBF_0_src','M0CSF',imgs.ASL); %warped brain extracted image
-orthSub(ASL,[0.51 0.64 .4 .49]);
-if ~isempty(LS)
-    spm_orthviews('Image',LS,[0.01 0.01 .4 .49]);
-    XYZmm = getCenterOfIntensitySub(LS);
-    spm_orthviews('setcoords',XYZmm);
-end;
-spm_print(matName);
-%end printSub()
-
 function printDTISub(imgs, matName)
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 if  isempty(imgs.DTI) , return; end; %required
@@ -196,7 +161,8 @@ imgs.fMRI = removeDotSub (imgs.fMRI);
 [p] = fileparts(imgs.fMRI);
 cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
-if exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
+if isempty(ForcefMRI) && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
 if ~exist('nii_fmri60.m','file')
     fnm = fullfile(fileparts(which(mfilename)), 'nii_fmri');
     if ~exist(fnm,'file')
@@ -875,11 +841,24 @@ fclose(fileID);
 function imgs = doRestSub(imgs, matName, TRsec, SliceOrder)
 if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
-if isFieldSub(matName, 'rest'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
-if isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
-nii_rest(imgs, TRsec, SliceOrder);
-nii_nii2mat (prefixSub('fdwa',imgs.Rest), 'rest', matName)
-nii_nii2mat (prefixSub('alf_dwa',imgs.Rest), 'alf', matName)
+global ForceRest; %e.g. user can call "global ForceRest;  ForceRest = true;"
+if isempty(ForceRest) && isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
+nii_rest(imgs);%, TRsec, SliceOrder);
+%7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
+prefix = 'a'; %assume slice time 'a'ligned
+restName = prefixSub(['dsw', prefix ],imgs.Rest);
+if ~exist(restName,'file'), 
+    prefix = ''; %unaligned: multi-band
+    restName = prefixSub(['dsw', prefix ],imgs.Rest);
+    if ~exist(restName,'file')
+        error('Catastrophic unspecified resting state error %s', restName);
+    end
+    
+end; %required
+nii_nii2mat (prefixSub(['fdsw', prefix ],imgs.Rest), 'rest', matName)
+nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended 
+nii_nii2mat (prefixSub(['palf_sw', prefix ],imgs.Rest), 'palf', matName) %conventional linear trends only
+vox2mat(prefixSub(['wbmean', prefix ],imgs.Rest), 'RestAve', matName);
 %end doRestSub()
 
 function idx = roiIndexSub(roiName)
@@ -954,22 +933,7 @@ end;
 nii_enat_norm(imgs.T1,imgs.Lesion,imgs.T2);
 if ~isFieldSub(matName, 'T1')
     bT1 = prefixSub('wb',imgs.T1);
-    if exist(bT1, 'file')
-        Voxfield = 'T1';
-        hdr = spm_vol(bT1);
-        img = spm_read_vols(hdr);
-        stat = [];
-        if ndims(img) == 3
-            stat.(Voxfield).hdr = hdr;
-            stat.(Voxfield).dat = img;
-            if exist(matName,'file')
-                old = load(matName);
-                stat = nii_mergestruct(stat,old); %#ok<NASGU>
-            end
-            save(matName,'-struct', 'stat');
-            fprintf('Saving %s in %s\n', Voxfield, matName);
-        end
-    end
+    vox2mat(bT1,'T1',matName);
     %nii_nii2mat(bT1,'T1',matName);
 end
 if isempty(imgs.Lesion), return; end;
@@ -980,6 +944,26 @@ if ~exist(wr,'file'), wr = prefixSub('wsr',imgs.Lesion); end; %T1 and T2, smooth
 if ~exist(wr,'file'), error('Unable to find %s', wr); end;
 nii_nii2mat(wr, 'lesion', matName); %1
 %end doT1Sub()
+
+function vox2mat(imgName, fieldName, matName)
+%save voxelwise data as field 'fieldName' in the .mat file matName
+%  similar to nii_nii2mat, but does not compute ROI values
+%Example
+% vox2mat('wbT1.nii', 'T1', 'M2012.mat');
+if ~exist(imgName, 'file'), fprintf('Unable to find %s\n', imgName); return; end;
+hdr = spm_vol(imgName);
+img = spm_read_vols(hdr);
+if ndims(img) ~= 3, fprintf('Not a 3D volume %s\n', imgName); return; end;
+stat = [];
+stat.(fieldName).hdr = hdr;
+stat.(fieldName).dat = img;
+if exist(matName,'file')
+    old = load(matName);
+    stat = nii_mergestruct(stat,old); %#ok<NASGU>
+end
+save(matName,'-struct', 'stat');
+fprintf('Saving %s in %s\n', fieldName, matName);
+%end vox2mat()
 
 function bt1 = normSub(t1)
 template = fullfile(spm('Dir'),'tpm','TPM.nii');

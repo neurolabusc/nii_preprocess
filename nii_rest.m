@@ -1,4 +1,4 @@
-function nii_rest (imgs, TRsec, SliceOrder)
+function prefix = nii_rest (imgs, TRsec, SliceOrder)
 %preprocesses resting state data using SPM
 %  imgs : structure of image names (imgs.T1, imgs.Rest)
 %  TRsec      : Time between volumes in seconds
@@ -53,6 +53,7 @@ p.t1name = imgs.T1; %'t1.nii'
 p.TRsec = TRsec; %repeat time off 10 seconds
 p.slice_order = SliceOrder;
 p.slice_order = -1;
+p.FWHM = 6;
 for ses = 1 : length(imgs.Rest(:,1));
     p.fmriname = deblank(imgs.Rest(ses,:));
     [pth,nam,ext] = spm_fileparts(p.fmriname);
@@ -70,7 +71,9 @@ for ses = 1 : length(imgs.Rest(:,1));
     mocoTxt = fullfile(pth,['rp_', nam, '.txt']);
     if ~exist(mocoTxt, 'file'), fprintf('Unable to find motion parameters %s\n', mocoTxt); continue; end;
     %Nonlinear detrend
-    prefix = [nii_detrend(fullfile(pth,[prefix, nam, ext]),maskName,wc2name,mocoTxt,3,0.8,6), prefix]; %#ok<AGROW>
+    % prefix = [nii_detrend(fullfile(pth,[prefix, nam, ext]),maskName,wc2name,mocoTxt,3,0.8,6), prefix]; %#ok<AGROW>
+    %we now smooth in the pre-processing step
+    prefix = [nii_detrend(fullfile(pth,[prefix, nam, ext]),maskName,wc2name,mocoTxt,3,0.8,0), prefix]; %#ok<AGROW>
     %ALFF - after complex detrending
     alffSub(fullfile(pth,[prefix, nam, ext]), TRsec, maskName, '', true);
     %remove frequencies that are too high or low to be resting state

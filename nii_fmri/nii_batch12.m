@@ -14,13 +14,15 @@ function [prefix, TRsec, slice_order, meanname] = nii_batch12 (p)
 %  p.onset : condition onset times
 %  p.duration : duration of events (either a single value or array matching p.onset)
 %  p.mocoRegress : true or false: should motion parameters be modeled?
+%  p.t2name   : name of anatomical scan (typically not provided)
+%  p.FWHM : full-idth half maximum for smoothing (defaults to 6mm)
+%  p.resliceMM : resampled resolution (defaults to 2mm)
 %Versions
 %   7/7/2016 added "normIntensitySub" to deal with Philips data
 %Examples
 % TO DO
 
-resliceMM = 2; %resolution for reslicing data
-[fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name] = validatePreprocSub(p);
+[fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name, FWHM, resliceMM] = validatePreprocSub(p);
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 spm_jobman('initcfg'); % useful in SPM8 only
 %0.) set origin fMRI
@@ -59,7 +61,7 @@ end
 normWriteWhiteMatterSub(t1name, resliceMM); %we want a wc2* white matter prob map for detrending
 meanname = prefixSub('w', meanname);
 %5.) blur data
-prefix = smoothSub(8, prefix, fmriname); %smooth images
+prefix = smoothSub(FWHM, prefix, fmriname); %smooth images
 %-- get rid of images we don't need
 deleteImagesSub(prefix, fmriname); %delete intermediate images
 %6.) compute statistics
@@ -462,6 +464,7 @@ end;
 
 function prefix = smoothSub(FWHMmm, prefix, fmriname)
 %blur images
+if FWHMmm <= 0, return; end;
 fprintf('Smoothing with a %gmm FWHM Gaussian kernel\n',FWHMmm);
 matlabbatch{1}.spm.spatial.smooth.data = getsesvolsSubFlat(prefix, fmriname);
 matlabbatch{1}.spm.spatial.smooth.fwhm = [FWHMmm FWHMmm FWHMmm];
@@ -487,7 +490,7 @@ matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
 spm_jobman('run',matlabbatch);
 %end coregEstSub()
 
-function [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name] = validatePreprocSub(p)
+function [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name, FWHM, resliceMM] = validatePreprocSub(p)
 %check all inputs
 if exist('spm','file')~=2; fprintf('%s requires SPM\n',which(mfilename)); return; end;
 isSPM12orNewerSub; %check recent SPM
@@ -498,6 +501,17 @@ if ~isfield(p,'TRsec'), p.TRsec = 0; end;
 if ~isfield(p,'slice_order'), p.slice_order = 0; end;
 if ~isfield(p,'phase'), p.phase = ''; end;
 if ~isfield(p,'magn'), p.magn = ''; end;
+if isfield(p,'resliceMM') && isnumeric(p.resliceMM)
+    resliceMM = p.resliceMM;
+else
+    resliceMM = 2; %resolution for reslicing data
+end;
+if isfield(p,'FWHM') && isnumeric(p.FWHM)
+    FWHM = p.FWHM;
+else
+    FWHM = 6; 
+
+end;
 if ~isfield(p,'t2name'), 
     t2name = [];
 else
@@ -559,7 +573,6 @@ else
        warning('Please check TR, header reports %g (not %g)\n', TRfmri, TRsec);
     end
 end
-
 %determine slice order
 if ~exist('slice_order','var')  || isempty(slice_order) || (slice_order == 0)
     slice_order = getSliceOrderSub(deblank (fmriname(1,:)));
@@ -595,10 +608,24 @@ fid = fopen(fMRIname1);
 fseek(fid,122,'bof');
 slice_order = fread(fid,1,'uint8');
 fclose(fid);
+hdr = spm_vol(fMRIname1);
+if (hdr.dim(1) == 90) && (hdr.dim(2) == 90) && (hdr.dim(3) == 50)
+    slice_order = -1; %skip: multiband!
+    return;
+end
+
 if (slice_order > 0) && (slice_order <= 7)
     fprintf('Auto-detected slice order as %d\n',slice_order);
 else
-	fprintf('Unable to detect slice order. Please manually specify slice order.\n');
+    if (hdr.dim(1) == 64) && (hdr.dim(2) == 64) && (hdr.dim(3) == 34)
+        kNIFTI_SLICE_SEQ_DEC = 2; %4,3,2,1
+        slice_order = kNIFTI_SLICE_SEQ_DEC;
+        fprintf('Assuming descending slice order');
+    else
+        fprintf('Unable to detect slice order. Please manually specify slice order.\n');
+    end;
+
+    
 end;
 %end getSliceOrderSub()
 
@@ -680,7 +707,7 @@ meanname = fullfile(pth,['mean', nam, ext]); %moco creates mean image, used for 
 %end mocoSub()
 
 function prefix = slicetimeSub(prefix, fmriname, TRsec, slice_order)
-if slice_order < 0, return; end; %skip slice order
+if slice_order < 1, return; end; %skip time correction
 %slice time correct data
 kNIFTI_SLICE_SEQ_INC = 1; %1,2,3,4
 kNIFTI_SLICE_SEQ_DEC = 2; %4,3,2,1
@@ -690,34 +717,14 @@ kNIFTI_SLICE_ALT_INC2 = 5; %2,4,1,3 Siemens interleaved with even number of slic
 kNIFTI_SLICE_ALT_DEC2 = 6; %3,1,4,2 Siemens interleaved descending with even number of
 [pth,nam,ext,vol] = spm_fileparts( deblank(fmriname(1,:)));
 fMRIname1 = fullfile(pth,[ nam, ext]); %'img.nii,1' -> 'img.nii'
-if slice_order == 0 %attempt to autodetect slice order
-    fid = fopen(fMRIname1);
-    fseek(fid,122,'bof');
-    slice_order = fread(fid,1,'uint8');
-    fclose(fid);
-    if (slice_order > kNIFTI_SLICE_UNKNOWN) && (slice_order <= kNIFTI_SLICE_ALT_DEC2)
-        fprintf('Auto-detected slice order as %d\n',slice_order);
-    else
-        error('Error: unable to auto-detect slice order. Please manually specify slice order or use recent versions of dcm2nii.\n');
-    end;
-end
 hdr = spm_vol([fMRIname1 ',1']);
-if TRsec == 0
-    TRsec = hdr.private.timing.tspace;
-    if TRsec == 0
-        error('%s error: unable to auto-detect slice timing. Please manually specify slice order or use recent versions of dcm2nii.\n');
-    end;
-else
-    if (sum(ismember(fieldnames(hdr.private),'timing')) > 0) && isfield(hdr.private.timing,'tspace') && (abs(TRsec - hdr.private.timing.tspace) > 0.001)
-       warning('Please check TR, header reports %g (not %g)\n', hdr.private.timing.tspace, TRsec);
-    end
-end
 nslices = hdr.dim(3);
 if nslices <= 1 %automatically detect TR
     error('Fatal Error: image %s does not have multiple slices per volume - slice time correction inappropriate. Please edit m-file named %s\n',fMRIname,which(mfilename));
 end;
 if (slice_order == kNIFTI_SLICE_ALT_INC2) || (slice_order == kNIFTI_SLICE_ALT_DEC2) %sequential
     isSiemens = true;
+    if mod(nslices,2) ~= 0, warning('Potential error: Siemens only acquires ALT interleaves with an even number of slice (perhaps multiband you do not want to slice time correct)'); end;
 else
     isSiemens = false;
 end;
