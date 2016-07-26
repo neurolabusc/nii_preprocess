@@ -811,7 +811,15 @@ function namBet = betSub(nam)
 normIntensitySub(nam);
 hdr = spm_vol(nam);
 if numel(hdr) > 1, hdr = hdr(1); error('betSub is slow with 4D images - are you sure?'); end;
-pm_brain_mask(hdr);
+   %flags.template=fullfile(spm('Dir'),'toolbox','FieldMap','T1.nii');
+   flags.template=fullfile(spm('Dir'),'toolbox','OldNorm','EPI.nii');
+   flags.fwhm=5;
+   flags.nerode=2;
+   flags.ndilate=4;
+   flags.thresh=0.5;
+   flags.reg = 0.02;
+   flags.graphics=0;
+pm_brain_mask(hdr, flags);
 bnam = prefixSub('bmask', nam);
 bimg = spm_read_vols(spm_vol(bnam));
 if (min(bimg(:)) == max(bimg(:)) ), error('No variability in %s', bnam); end;

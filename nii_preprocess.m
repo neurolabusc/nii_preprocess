@@ -129,6 +129,7 @@ if  isempty(imgs.DTI) , return; end; %required
 spm_clf;
 spm_figure('Clear', 'Graphics');
 spm_orthviews('Reset');
+f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
 FA = prepostfixSub('n', '_FA', imgs.DTI);
 ROI = prepostfixSub('', '_roi', imgs.DTI);
 if ~exist(FA,'file') || ~exist(ROI,'file') , return; end; %required
