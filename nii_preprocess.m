@@ -19,6 +19,8 @@ if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(which('NiiStat')), error('NiiStat required'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
+f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
+
 %set structures
 if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end;
 if ~isfield(imgs,'T2'), imgs.T2 = []; end;
@@ -65,10 +67,10 @@ if true
     tStart = timeSub(tStart,'DKI');
 end
 %print output
-pdfName = 'MasterNormalized';
-nii_mat2ortho(matName, pdfName); %show results - except DTI
-pdfName = 'MasterDTI';
-printDTISub(imgs, pdfName); %show results - DTI
+pth = '/home/crlab/Desktop';
+if ~exist(pth,'file'), pth = ''; end;
+nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %show results - except DTI
+printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
 diary off
 %nii_preprocess()
 
@@ -163,6 +165,11 @@ cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
 global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
 if isempty(ForcefMRI) && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+if ~isempty(ForcefMRI)
+    d = fullfile(p,n);
+    if exist(d), rmdir(fullfile(p,n),'s'); end; %delete statistics directory
+    delete(prefixSub('sw',imgs.Rest)); %delete last attempt
+end
 if ~exist('nii_fmri60.m','file')
     fnm = fullfile(fileparts(which(mfilename)), 'nii_fmri');
     if ~exist(fnm,'file')
@@ -178,6 +185,7 @@ end
 if isFieldSub(matName, 'fmri'), return; end; %stats already exist
 nii_nii2mat(cstat, 'fmri' , matName); %12
 nii_nii2mat(bstat, 'fmrib', matName); %13
+vox2mat(prefixSub('wbmean',imgs.Rest), 'fMRIave', matName);
 %end dofMRISub()
 
 function XYZmm = getCenterOfIntensitySub(vols)
@@ -853,7 +861,6 @@ if ~exist(restName,'file'),
     if ~exist(restName,'file')
         error('Catastrophic unspecified resting state error %s', restName);
     end
-    
 end; %required
 nii_nii2mat (prefixSub(['fdsw', prefix ],imgs.Rest), 'rest', matName)
 nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended 

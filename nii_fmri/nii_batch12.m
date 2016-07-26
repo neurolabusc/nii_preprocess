@@ -557,8 +557,8 @@ if (nSessions > 5)
     error('Too many sessions: provide the FIRST volume from each 4D image');
 end
 %determine TR for fMRI data (in secounds)
-TRfmri = getTRSub(deblank (fmriname(1,:)));
 TRsec = p.TRsec;
+TRfmri = getTRSub(deblank (fmriname(1,:)), TRsec);
 if  (TRsec == 0)
     if (TRfmri ==0)
         answer = inputdlg('TR (sec)', 'Input required',1,{'2'});
@@ -659,7 +659,7 @@ end
 img =  spm_select(1,'image',['Please find image ' nam]);
 %end findImg1Sub()
 
-function [tr, dims] =  getTRSub(fmriname)
+function [tr, dims] =  getTRSub(fmriname, trInput)
 %returns Repeat Time in seconds for volume fMRIname
 % n.b. for original images from dcm2nii - SPM will strip this information
 hdr = spm_vol(fmriname);
@@ -675,8 +675,11 @@ else %unable to auto-detect TR
     tr = 1.85;
   end;
   if tr == 0
-    fprintf('%s error: unable to determine TR for image %s (perhaps SPM stripped this information)\n',mfilename,fmriname);
-      
+    if exist('trInput','var')
+        fprintf('%s error: unable to determine TR for image %s (assuming %gs, perhaps SPM stripped this information)\n',mfilename, fmriname, trInput);
+    else
+        fprintf('%s error: unable to determine TR for image %s (perhaps SPM stripped this information)\n',mfilename,fmriname);
+    end
   else
     fprintf('%s warning: guessing TR (%g) based on image dimensions %s\n',mfilename, tr, fmriname);
   end
