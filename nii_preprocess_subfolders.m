@@ -13,7 +13,7 @@ global ForceRest;  ForceRest = true;
 
 t = tic;
 n = 0;
-f = {'M2127'};
+%f = {'M2127'};
 for i = 1: numel(f)
    cpth = fullfile(pth,f(i)); %childpath
    mfile = dir(char(fullfile(cpth,'*limegui.mat')));
