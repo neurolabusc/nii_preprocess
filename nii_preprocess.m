@@ -70,7 +70,7 @@ end
 pth = '/home/crlab/Desktop';
 if ~exist(pth,'file'), pth = ''; end;
 nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %show results - except DTI
-printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
+%printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
 diary off
 %nii_preprocess()
 
@@ -875,7 +875,6 @@ function idx = roiIndexSub(roiName)
 [~, ~, idx] = nii_roi_list(roiName);
 if idx < 1, error('Invalid roi name %s', roiName); end;
 %end roiIndexSub()
-
 
 function imgs = doAslSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end; %we need these images
