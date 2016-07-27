@@ -1,14 +1,22 @@
-function nii_fmri60(fmriname)
+function nii_fmri60(fmriname, t1name, t2name)
 %analyze data in a naming task
 % t1name   : filename for T1 scan
 % fmriname : filename for fMRI scan
 
-p.t1name = -1;% t1name;
+
 %if ~exist('t1name','var')
 %	t1name = spm_select(1,'image','Select T1 scan'); 
 %end
 if ~exist('fmriname','var')
 	fmriname = spm_select(1,'image','Select fMRI scan'); 
+end
+if ~exist('t1name','var') || isempty(t1name)
+	p.t1name = -1;% t1name; 
+else
+    p.t1name = t1name;
+end
+if exist('t2name','var') && ~isempty(t2name)
+	p.t2name = t2name; 
 end
 p.fmriname = fmriname;
 p.setOrigin = true;

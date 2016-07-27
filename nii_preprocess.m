@@ -13,7 +13,7 @@ function matName = nii_preprocess(imgs, matName)
 % nii_preprocess(imgs);
 %check dependencies
 
-fprintf('%s version 21July2016\n', mfilename);
+fprintf('%s version 27July2016\n', mfilename);
 checkForUpdate(fileparts(mfilename('fullpath')));
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(which('NiiStat')), error('NiiStat required'); end;
@@ -179,7 +179,7 @@ if ~exist('nii_fmri60.m','file')
     end
     addpath(fnm);
 end
-nii_fmri60(imgs.fMRI); %use fMRI for normalization
+nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2); %use fMRI for normalization
 if ~exist(cstat, 'file') || ~exist(bstat,'file')
     error('fMRI analysis failed : %s\n  %s', bstat, cstat);
 end
