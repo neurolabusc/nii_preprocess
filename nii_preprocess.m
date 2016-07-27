@@ -19,7 +19,7 @@ if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(which('NiiStat')), error('NiiStat required'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
-f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
+%f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
 
 %set structures
 if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end;
