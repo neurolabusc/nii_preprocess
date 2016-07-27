@@ -10,8 +10,8 @@ if ~exist('pth','var'), pth = pwd; end;
 f = subFolderSub(pth);
 if isempty(f), error('No folders in parent folder %s', pdth); end;
 
-global ForcefMRI;  ForcefMRI = true; warning('FORCED fMRI REPROCESSING');
-global ForceRest;  ForceRest = true; warning('FORCED REST REPROCESSING');
+global ForcefMRI;  ForcefMRI = true; warning('FORCED fMRI REPROCESSING'); %comment line for auto-processing
+global ForceRest;  ForceRest = true; warning('FORCED REST REPROCESSING'); %comment line for auto-processing
 
 t = tic;
 n = 0;
