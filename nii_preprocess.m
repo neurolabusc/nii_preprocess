@@ -169,8 +169,8 @@ if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && 
 %if ~isempty(ForcefMRI)
     d = fullfile(p,n);
     if exist(d,'file'), rmdir(d,'s'); end; %delete statistics directory
-    delImgs('sw', imgs.Rest);
-    %delImgs('swa', imgs.Rest); %we never slice-time correct sparse data!
+    delImgs('sw', imgs.fMRI);
+    %delImgs('swa', imgs.fMRI); %we never slice-time correct sparse data!
 %end
 if ~exist('nii_fmri60.m','file')
     fnm = fullfile(fileparts(which(mfilename)), 'nii_fmri');
