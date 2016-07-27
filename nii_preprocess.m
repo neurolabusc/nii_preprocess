@@ -165,6 +165,10 @@ imgs.fMRI = removeDotSub (imgs.fMRI);
 cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
 global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
+vox2mat(prefixSub('wmean',imgs.fMRI), 'fMRIave', matName);
+vox2mat(prefixSub('wbmean',imgs.fMRI), 'fMRIave', matName);
+return
+
 if isempty(ForcefMRI) && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
 if ~isempty(ForcefMRI)
     d = fullfile(p,n);
@@ -849,6 +853,7 @@ fclose(fileID);
 %end bvalCountSub()
 
 function imgs = doRestSub(imgs, matName, TRsec, SliceOrder)
+return; %666
 if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
 global ForceRest; %e.g. user can call "global ForceRest;  ForceRest = true;"
