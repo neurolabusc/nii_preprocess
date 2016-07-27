@@ -165,12 +165,13 @@ imgs.fMRI = removeDotSub (imgs.fMRI);
 cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
 global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
-if isempty(ForcefMRI) && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
-if ~isempty(ForcefMRI)
+if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+%if ~isempty(ForcefMRI)
     d = fullfile(p,n);
-    if exist(d), rmdir(fullfile(p,n),'s'); end; %delete statistics directory
-    delete(prefixSub('sw',imgs.Rest)); %delete last attempt
-end
+    if exist(d,'file'), rmdir(d,'s'); end; %delete statistics directory
+    d = prefixSub('sw',imgs.fMRI);
+    if exist(d,'file'), delete(d); end; %delete last attempt
+%end
 if ~exist('nii_fmri60.m','file')
     fnm = fullfile(fileparts(which(mfilename)), 'nii_fmri');
     if ~exist(fnm,'file')
@@ -179,15 +180,15 @@ if ~exist('nii_fmri60.m','file')
     addpath(fnm);
 end
 nii_fmri60(imgs.fMRI); %use fMRI for normalization
-
 if ~exist(cstat, 'file') || ~exist(bstat,'file')
     error('fMRI analysis failed : %s\n  %s', bstat, cstat);
 end
-if isFieldSub(matName, 'fmri'), return; end; %stats already exist
 nii_nii2mat(cstat, 'fmri' , matName); %12
 nii_nii2mat(bstat, 'fmrib', matName); %13
 vox2mat(prefixSub('wmean',imgs.fMRI), 'fMRIave', matName);
 vox2mat(prefixSub('wbmean',imgs.fMRI), 'fMRIave', matName);
+prefixSub('wmean',imgs.fMRI)
+prefixSub('wbmean',imgs.fMRI)
 %end dofMRISub()
 
 function XYZmm = getCenterOfIntensitySub(vols)
@@ -959,7 +960,7 @@ function vox2mat(imgName, fieldName, matName)
 %  similar to nii_nii2mat, but does not compute ROI values
 %Example
 % vox2mat('wbT1.nii', 'T1', 'M2012.mat');
-if ~exist(imgName, 'file'), fprintf('Unable to find %s\n', imgName); return; end;
+if ~exist(imgName, 'file'), warning('vox2mat Unable to find %s\n', imgName); return; end;
 hdr = spm_vol(imgName);
 img = spm_read_vols(hdr);
 if ndims(img) ~= 3, fprintf('Not a 3D volume %s\n', imgName); return; end;

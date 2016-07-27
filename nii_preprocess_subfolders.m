@@ -9,13 +9,12 @@ function nii_preprocess_subfolders(pth)
 if ~exist('pth','var'), pth = pwd; end;
 f = subFolderSub(pth);
 if isempty(f), error('No folders in parent folder %s', pdth); end;
-
 global ForcefMRI;  ForcefMRI = true; warning('FORCED fMRI REPROCESSING'); %comment line for auto-processing
 global ForceRest;  ForceRest = true; warning('FORCED REST REPROCESSING'); %comment line for auto-processing
 
 t = tic;
 n = 0;
-%f = {'M2136'}; %for a single folder
+f = {'M2001'}; %for a single folder
 for i = 1: numel(f)
    cpth = char(f(i)); %local child path
    if ~isempty(strfind(cpth,'_'))

@@ -299,7 +299,7 @@ function prefix = normSub( meanname, prefix, fmriname, resliceMM)
 mbatch{1}.spm.spatial.normalise.estwrite.subj.vol = {meanname};
 warpses = getsesvolsSubFlat(prefix, fmriname);
 warpses = [warpses; {meanname}];
-fprintf('Normalizing %s\n', meanname);
+fprintf('Normalizing %s to match TPM\n', meanname);
 mbatch{1}.spm.spatial.normalise.estwrite.subj.resample = warpses;
 mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasreg = 0.0001;
 mbatch{1}.spm.spatial.normalise.estwrite.eoptions.biasfwhm = 60;
@@ -315,7 +315,7 @@ mbatch{1}.spm.spatial.normalise.estwrite.eoptions.samp = 3;
 mbatch{1}.spm.spatial.normalise.estwrite.woptions.bb = [-78 -112 -70; 78 76 85];
 mbatch{1}.spm.spatial.normalise.estwrite.woptions.vox = [resliceMM resliceMM resliceMM];
 mbatch{1}.spm.spatial.normalise.estwrite.woptions.interp = 4;
-mbatch{1}.spm.spatial.normalise.estwrite.woptions.prefix = 'w';
+mbatch{1}.spm.spatial.normalise.estwrite.woptions.prefix = 'w'; %use spm_update if you get an error regarding woptions prefix
 spm_jobman('run',mbatch);
 prefix = ['w' prefix];
 %end normSub()
