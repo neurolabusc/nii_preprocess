@@ -15,7 +15,7 @@ global ForceRest;  ForceRest = true; warning('FORCED REST REPROCESSING'); %comme
 t = tic;
 n = 0;
 %f = {'M2001'}; %for a single folder
-for i = 1: numel(f)
+for i = numel(f):-1:1 %1: numel(f)
    cpth = char(f(i)); %local child path
    if ~isempty(strfind(cpth,'_'))
       fprintf('Warning: "_" in folder name: skipping %s\n', char(cpth) );

@@ -27,11 +27,11 @@ if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it i
 spm_jobman('initcfg'); % useful in SPM8 only
 %0.) set origin fMRI
 if isfield(p,'setOrigin') && (p.setOrigin == true)
-    setOriginSub(strvcat(fmriname, phase, magn), 3);  %#ok<REMFF1> align images to MNI space 
+    setOriginSub(strvcat(fmriname, phase, magn), 3);   %#ok<DSTRVCT> %align images to MNI space 
 end
 %0.) set origin T1
 if ~isempty(t1name) && (~isNormalized) && isfield(p,'setOrigin') && (p.setOrigin == true)
-       setOriginSub(t1name, 1);  %#ok<REMFF1> align images to MNI space
+       setOriginSub(t1name, 1); % align images to MNI space
 end
 %1.) motion correct, used fieldmap if specifiedclass
 if isfield(p,'SE') && isfield(p,'SErev') && ~isempty(p.SE) && ~isempty(p.SErev)
@@ -377,7 +377,7 @@ t1Bet = mi.fname;
 function normWriteWhiteMatterSub(t1name, resliceMM) %we want a wc2* white matter prob map for detrending
 if isempty(t1name), return; end;
 eChar = 'e';
-[pth,nam,ext, vol] = spm_fileparts(t1name);
+[pth,nam,ext] = spm_fileparts(t1name);
 c2name = fullfile(pth, ['c2', eChar, nam, ext]);
 if ~exist(c2name, 'file')
 	eChar = '';
@@ -387,13 +387,13 @@ if ~exist(c2name, 'file')
         return;
     end
 end 
-newSegWriteSub(t1name, c2name, '', resliceMM)
+newSegWriteSub(t1name, c2name, '', resliceMM);
 %end normWriteWhiteMatterSub()
 
 function  prefix = newSegWriteSub(t1name, warpname, prefix, resliceMM, bb)
 %reslice img using pre-existing new-segmentation deformation field
 if isempty(warpname) || isempty(t1name), return; end;
-[pth,nam,ext, vol] = spm_fileparts(t1name);
+[pth,nam,ext] = spm_fileparts(t1name);
 defname = fullfile(pth,['y_' nam ext]);
 if ~exist(defname,'file')
     defname = fullfile(pth,['y_e' nam ext]);
@@ -472,7 +472,7 @@ function deleteImagesSub(prefix, fmriname)
 if length(prefix) < 2, return; end;
 for s = 1 : length(fmriname(:,1))
     for i = 2 : length(prefix)
-        [pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:)));
+        [pth,nam,ext] = spm_fileparts( deblank (fmriname(s,:)));
         nam = fullfile(pth,[prefix(i:length(prefix)), nam, ext]);
         if exist(nam, 'file')
             fprintf('Deleting  %s\n',nam );
@@ -606,7 +606,7 @@ end
 function isNormalized = isNormalizedExists(t1name)
 %has the T1 scan been already normalized?
 % returns true if brain-extracted T1 ('b' prefix) and T1 deformation exists
-[pth,nam,ext, vol] = spm_fileparts(t1name);
+[pth,nam,ext] = spm_fileparts(t1name);
 defname = fullfile(pth,['y_' nam ext]); %y_ deformation file
 if ~exist(defname,'file')
     defname = fullfile(pth,['y_e' nam ext]); %y_e deformation for enantiomorphic normalization
@@ -622,7 +622,7 @@ end
 
 function slice_order =  getSliceOrderSub(fmriname)
 %detect whether slices were acquired ascending, descending, interleaved
-[pth,nam,ext,vol] = spm_fileparts( deblank(fmriname(1,:)));
+[pth,nam,ext] = spm_fileparts( deblank(fmriname(1,:)));
 fMRIname1 = fullfile(pth,[ nam, ext]); %'img.nii,1' -> 'img.nii'
 fid = fopen(fMRIname1);
 fseek(fid,122,'bof');
@@ -654,7 +654,7 @@ function fimg = findImgSub(img, guess)
 fimg = [];
 for i = 1: size(img,1)
    img1 = deblank(img(i,:));
-   fimg = strvcat(fimg, findImg1Sub(img1, guess));  %#ok<REMFF1>
+   fimg = strvcat(fimg, findImg1Sub(img1, guess)); %#ok<DSTRVCT>
 end
 %end findImgSub()
 
@@ -679,7 +679,7 @@ end
 img =  spm_select(1,'image',['Please find image ' nam]);
 %end findImg1Sub()
 
-function [tr, dims] =  getTRSub(fmriname, trInput)
+function [tr] =  getTRSub(fmriname, trInput)
 %returns Repeat Time in seconds for volume fMRIname
 % n.b. for original images from dcm2nii - SPM will strip this information
 hdr = spm_vol(fmriname);
@@ -738,7 +738,7 @@ kNIFTI_SLICE_SEQ_DEC = 2; %4,3,2,1
 %kNIFTI_SLICE_ALT_DEC = 4; %4,2,3,1 descending interleaved
 kNIFTI_SLICE_ALT_INC2 = 5; %2,4,1,3 Siemens interleaved with even number of slices
 kNIFTI_SLICE_ALT_DEC2 = 6; %3,1,4,2 Siemens interleaved descending with even number of
-[pth,nam,ext,vol] = spm_fileparts( deblank(fmriname(1,:)));
+[pth,nam,ext] = spm_fileparts( deblank(fmriname(1,:)));
 fMRIname1 = fullfile(pth,[ nam, ext]); %'img.nii,1' -> 'img.nii'
 hdr = spm_vol([fMRIname1 ',1']);
 nslices = hdr.dim(3);
@@ -795,7 +795,7 @@ function [fMRIses] = getsesvolsSubHier(prefix, fmriname)
 nsessions = length(fmriname(:,1));
 fMRIses = cell(nsessions,1);
 for s = 1 : nsessions
-	[pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:)));
+	[pth,nam,ext] = spm_fileparts( deblank (fmriname(s,:)));
 	sesname = fullfile(pth,[prefix, nam, ext]);
     fMRIses(s,1) = {getsesvolsSub(sesname)};
 end;
@@ -806,7 +806,7 @@ function [fMRIses] = getsesvolsSubFlat(prefix, fmriname)
 nsessions = length(fmriname(:,1));
 fMRIses = '';
 for s = 1 : nsessions
-	[pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(s,:)));
+	[pth,nam,ext] = spm_fileparts( deblank (fmriname(s,:)));
 	sesname = fullfile(pth,[prefix, nam, ext]);
     fMRIses = [fMRIses; getsesvolsSub(sesname)]; %#ok<AGROW>
 end;
@@ -815,7 +815,7 @@ end;
 function [sesvols] = getsesvolsSub(sesvol1)
 % input: single volume from 4D volume, output: volume list
 %  example 4D file with 3 volumes input= 'img.nii', output= {'img.nii,1';'img.nii,2';'img.nii,3'}
-[pth,nam,ext,vol] = spm_fileparts( deblank (sesvol1));
+[pth,nam,ext] = spm_fileparts( deblank (sesvol1));
 sesname = fullfile(pth,[nam, ext]);
 hdr = spm_vol(sesname);
 nvol = length(hdr);
@@ -909,7 +909,7 @@ for ses = 1:nSessions
     if isempty(pth)
         pth = pwd;
     end;
-    fmriname = strvcat(fmriname, fullfile(pth, [nam ext])); %#ok<REMFF1>
+    fmriname = strvcat(fmriname, fullfile(pth, [nam ext]));  %#ok<DSTRVCT>
 end
 %next - generate output folder
 if ~exist('statdirname','var') %no input: select fMRI file[s]
@@ -1047,7 +1047,7 @@ cd(predir); %return to starting directory...
 
 function [sesvols] = getsesvolsSubSingle(prefix, fmriname, session)
 %* Load all fMRI images from single sessions
-[pth,nam,ext,vol] = spm_fileparts( deblank (fmriname(session,:))); %#ok<*NASGU>
+[pth,nam,ext] = spm_fileparts( deblank (fmriname(session,:))); %#ok<*NASGU>
 sesname = fullfile(pth,[prefix, nam, ext]);
 hdr = spm_vol(sesname);
 nvol = length(hdr);

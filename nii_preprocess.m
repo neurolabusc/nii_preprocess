@@ -70,7 +70,7 @@ end
 pth = '/home/crlab/Desktop';
 if ~exist(pth,'file'), pth = ''; end;
 nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %show results - except DTI
-%printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
+printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
 diary off
 %nii_preprocess()
 
@@ -169,8 +169,8 @@ if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && 
 %if ~isempty(ForcefMRI)
     d = fullfile(p,n);
     if exist(d,'file'), rmdir(d,'s'); end; %delete statistics directory
-    d = prefixSub('sw',imgs.fMRI);
-    if exist(d,'file'), delete(d); end; %delete last attempt
+    delImgs('sw', imgs.Rest);
+    %delImgs('swa', imgs.Rest); %we never slice-time correct sparse data!
 %end
 if ~exist('nii_fmri60.m','file')
     fnm = fullfile(fileparts(which(mfilename)), 'nii_fmri');
@@ -854,6 +854,8 @@ if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
 global ForceRest; %e.g. user can call "global ForceRest;  ForceRest = true;"
 if isempty(ForceRest) && isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
+delImgs('fdsw', imgs.Rest);
+delImgs('fdswa', imgs.Rest);
 nii_rest(imgs);
 %7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
 prefix = 'a'; %assume slice time 'a'ligned
@@ -871,6 +873,15 @@ nii_nii2mat (prefixSub(['palf_sw', prefix ],imgs.Rest), 'palf', matName) %conven
 vox2mat(prefixSub(['wmean', prefix ],imgs.Rest), 'RestAve', matName);
 vox2mat(prefixSub(['wbmean', prefix ],imgs.Rest), 'RestAve', matName);
 %end doRestSub()
+
+function delImgs(prefix, fnm) 
+%e.g. delImgs('sw', 'X.nii') would delete wX.nii and swX.nii 
+for i = 1: numel(prefix), 
+    p = prefix(end-i+1:end); 
+    d = prefixSub(p, fnm);
+    if exist(d,'file'), delete(d); end; %delete last attempt
+end;
+%end delImgs() 
 
 function idx = roiIndexSub(roiName)
 [~, ~, idx] = nii_roi_list(roiName);
@@ -960,7 +971,7 @@ function vox2mat(imgName, fieldName, matName)
 %  similar to nii_nii2mat, but does not compute ROI values
 %Example
 % vox2mat('wbT1.nii', 'T1', 'M2012.mat');
-if ~exist(imgName, 'file'), warning('vox2mat Unable to find %s\n', imgName); return; end;
+if ~exist(imgName, 'file'), fprintf('vox2mat Unable to find %s\n', imgName); return; end;
 hdr = spm_vol(imgName);
 img = spm_read_vols(hdr);
 if ndims(img) ~= 3, fprintf('Not a 3D volume %s\n', imgName); return; end;
