@@ -9,9 +9,28 @@ function imgs = nii_preprocess_gui(loadprev, ignoreImgPaths)
 % nii_preprocess_gui %use gui
 % nii_preprocess_gui(1) %use gui to select previous mat file
 % nii_preprocess_gui('T1_M2094_limegui.mat') %specify previous mat file
+% nii_preprocess_gui(pwd) %open mat file if it exists or auto-create new one
 
 
 if nargin > 0
+    if isdir(loadprev) %if user passes folder, than either process limegui file or auto-generate and process limegui file
+        mfile = dir(char(fullfile(loadprev,'*limegui.mat')));
+        if isempty(mfile) %limegui does not exist: create one
+            img = getfiles_x (loadprev);
+            if isempty(img.T1)
+               warning('Unable to find T1 scan in folder %s\n', loadprev);
+               return;
+            end
+            [p,n] = fileparts(img.T1);
+            loadprev = fullfile(loadprev, [n, '_limegui.mat']);
+            save(loadprev,'-struct', 'img');
+        else
+            loadprev = char(fullfile(loadprev, mfile(1).name));
+            if numel(mfile) >1
+                fprintf('Warning: multiple limegui files in folder. Assume you wanted %s\n', loadprev);
+            end
+        end
+    end %isdir
     if ischar(loadprev) && exist(loadprev, 'file')
         [p, n, x] = fileparts(loadprev);
         f = [n, x];
@@ -60,17 +79,22 @@ for i = 1: numel(imgs)
 end
 end %nii_preprocess_gui()
 
-function [img, go, Xpressed] = getfiles_x
+function [img, go, Xpressed] = getfiles_x (autoLoadDir)
+%if autoLoadDir is a folder, then files automatically filled
 go = false;
 Xpressed = false;
 alreadyWarned = false;
 modalities = {'T1', 'T2', 'ASL', 'fMRI', 'Rest', 'DTI', 'DTIrev', 'Lesion'};
 modalitiesVerbose = {'T1', 'T2', 'ASL', 'fMRI', 'Resting State', 'DTI', 'DTI (reversed phase)', 'Lesion'};
 modalitiesDTI = [false, false, false, false, false, true, true, false];
-btns = zeros(numel(modalities),1);
 for i = 1: numel(modalities)
 	img.(char(modalities(i))) = [];
 end;
+if exist('autoLoadDir','var') && isdir(autoLoadDir)
+    autoload(autoLoadDir)
+    return;
+end
+btns = zeros(numel(modalities),1);
 renameCheck = 0;
 btnID = 0;
 d = nestedfx;
@@ -121,10 +145,7 @@ uiwait(d);
         go = true;
         delete(gcf);
     end
-    function auto_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
-        title = 'Select folder images (T1_*.nii, ASL_*.nii, etc)\n';
-        fprintf(title);
-        imgDir = uigetdir(pwd, title);
+    function autoload(imgDir)
         fnms = dir(fullfile(imgDir,'*.nii'));
         if numel(fnms) < 1, disp('Unable to find .nii images'); return; end;
 
@@ -137,6 +158,16 @@ uiwait(d);
                     img.(m) = fullfile(imgDir, fnms(f).name);
                 end
             end
+        end
+        
+    end %autoload()
+    function auto_callback(~, ~, ~) %filename_callback(obj,callbackdata,myField)
+        title = 'Select folder images (T1_*.nii, ASL_*.nii, etc)\n';
+        fprintf(title);
+        imgDir = uigetdir(pwd, title);
+        autoload(imgDir);
+        for i = 1: numel(modalities)
+            m = char(modalities(i));
             if isempty(img.(m))
                 set(btns(i),'string', char(modalitiesVerbose(i)));
             else

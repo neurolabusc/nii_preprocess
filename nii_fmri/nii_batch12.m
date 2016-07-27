@@ -112,7 +112,11 @@ mbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
 %mbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = {meanfmri};
 mbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = [{meanfmri}; warpses];
 mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.template = {template};
-mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
+%mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = ''; %TODO: CHECK THIS HELPS
+%mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = {fullfile(spm('Dir'),'toolbox','FieldMap','brainmask.nii')};
+btemplate = extract2Sub(template);
+mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = {btemplate}; 
+
 mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 4;
 mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smoref = 4; %blur the template, too!
 mbatch{1}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'mni';
@@ -128,6 +132,22 @@ mbatch{1}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
 spm_jobman('run',mbatch);
 prefix = ['w' prefix];
 %end oldNormSub()
+
+function fnm = extract2Sub(fnm)
+%subroutine to extract brain from surrounding scalp
+
+fprintf('Brain extraction of %s\n', fnm);
+[pth,nam,ext] = spm_fileparts(fnm);
+%load headers
+hdr = spm_vol(fnm);%bias corrected T1
+img = spm_read_vols(hdr);
+img(img ~= 0) = 1;
+fnm = fullfile(pth,['b',  nam, ext]);
+hdr.fname = fnm;
+hdr.pinfo = [0; 0; 352];
+hdr.dt(2) = 2; %16-bit precision more than sufficient uint8=2; int16=4; int32=8; float32=16; float64=64
+spm_write_vol(hdr,img);
+%end extractSub()
 
 function [meanname, prefix] = mocoFMSub(prefix, fmriname, phase, magn) %motion correct with field map
 if isempty(phase) || isempty(magn)

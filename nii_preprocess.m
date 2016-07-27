@@ -186,7 +186,8 @@ end
 if isFieldSub(matName, 'fmri'), return; end; %stats already exist
 nii_nii2mat(cstat, 'fmri' , matName); %12
 nii_nii2mat(bstat, 'fmrib', matName); %13
-vox2mat(prefixSub('wbmean',imgs.Rest), 'fMRIave', matName);
+vox2mat(prefixSub('wmean',imgs.fMRI), 'fMRIave', matName);
+vox2mat(prefixSub('wbmean',imgs.fMRI), 'fMRIave', matName);
 %end dofMRISub()
 
 function XYZmm = getCenterOfIntensitySub(vols)
@@ -866,6 +867,7 @@ end; %required
 nii_nii2mat (prefixSub(['fdsw', prefix ],imgs.Rest), 'rest', matName)
 nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended 
 nii_nii2mat (prefixSub(['palf_sw', prefix ],imgs.Rest), 'palf', matName) %conventional linear trends only
+vox2mat(prefixSub(['wmean', prefix ],imgs.Rest), 'RestAve', matName);
 vox2mat(prefixSub(['wbmean', prefix ],imgs.Rest), 'RestAve', matName);
 %end doRestSub()
 

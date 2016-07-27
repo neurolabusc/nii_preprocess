@@ -4,26 +4,29 @@ function nii_preprocess_subfolders(pth)
 %Examples
 % nii_preprocess_subfolders('~/a'); %would process ~/a/b/1_limegui.mat.mat, ~/a/c/2_limegui.mat
 % nii_preprocess_subfolders; % search from current working directory
+%Notes: will skip folders with "_" in name, e.g. will skip M2002:
+% pth/M2000 pth/M2001 pth/M2002_dementia pth/M2003
 if ~exist('pth','var'), pth = pwd; end;
 f = subFolderSub(pth);
 if isempty(f), error('No folders in parent folder %s', pdth); end;
 
-global ForcefMRI;  ForcefMRI = true;
-global ForceRest;  ForceRest = true;
+global ForcefMRI;  ForcefMRI = true; warning('FORCED fMRI REPROCESSING');
+global ForceRest;  ForceRest = true; warning('FORCED REST REPROCESSING');
 
 t = tic;
 n = 0;
 %f = {'M2127'};
 for i = 1: numel(f)
-   cpth = fullfile(pth,f(i)); %childpath
-   mfile = dir(char(fullfile(cpth,'*limegui.mat')));
-   if isempty(mfile), continue; end;
-   mfile = char(fullfile(cpth, mfile(1).name));
-   
-   nii_preprocess_gui(mfile);
+   cpth = char(f(i)); %local child path
+   if ~isempty(strfind(cpth,'_'))
+      fprintf('Warning: "_" in folder name: skipping %s\n', char(cpth) );
+      continue
+   end
+   cpth = char(fullfile(pth,f(i))); %full child path
+   nii_preprocess_gui(cpth);
    n = n + 1;
 end
-fprintf('Processed %n *limegui.mat file in %gs\n', n, toc(t))
+fprintf('Processed %d *limegui.mat file in %gs\n', n, toc(t))
 
 function nameFolds=subFolderSub(pathFolder)
 d = dir(pathFolder);
