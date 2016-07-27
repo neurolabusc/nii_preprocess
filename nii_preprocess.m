@@ -69,8 +69,8 @@ end
 %print output
 pth = '/home/crlab/Desktop';
 if ~exist(pth,'file'), pth = ''; end;
-nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %show results - except DTI
 printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
+nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (spm_clf) show results - except DTI
 diary off
 %nii_preprocess()
 
@@ -187,8 +187,6 @@ nii_nii2mat(cstat, 'fmri' , matName); %12
 nii_nii2mat(bstat, 'fmrib', matName); %13
 vox2mat(prefixSub('wmean',imgs.fMRI), 'fMRIave', matName);
 vox2mat(prefixSub('wbmean',imgs.fMRI), 'fMRIave', matName);
-prefixSub('wmean',imgs.fMRI)
-prefixSub('wbmean',imgs.fMRI)
 %end dofMRISub()
 
 function XYZmm = getCenterOfIntensitySub(vols)
