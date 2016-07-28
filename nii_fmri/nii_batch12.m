@@ -42,7 +42,7 @@ end;
 %2.) brain extact mean (for better coregistration)
 %if ~isNormalized %bet can fail with patient scans
 if ~isempty(t1name) %if we have a T1, coregister BET fMRI to BET T1, if we do not have T1 we will keep the scalp (it is in TPM.nii)
-    meanname = betSub(meanname); %brain extract mean image for better coreg
+   meanname = betSub(meanname); %brain extract mean image for better coreg
 end
 %end
 %3.) slice-time correction
@@ -498,6 +498,7 @@ prefix = ['s' prefix];
 function coregEstSub(t1, meanfmri, prefix, fmriname)
 %coregister fmri data to match T1 image
 fprintf('Coregistering %s to match %s\n',meanfmri,t1);
+
 %fMRIses = getsesvolsSubHier(prefix, fmriname);
 fMRIses = getsesvolsSubFlat(prefix, fmriname);
 matlabbatch{1}.spm.spatial.coreg.estimate.ref = {t1};
@@ -508,6 +509,7 @@ matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.sep = [4 2];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol = [0.02 0.02 0.02 0.001 0.001 0.001 0.01 0.01 0.01 0.001 0.001 0.001];
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
 spm_jobman('run',matlabbatch);
+%save('coreg.mat', 'matlabbatch')
 %end coregEstSub()
 
 function [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name, FWHM, resliceMM] = validatePreprocSub(p)

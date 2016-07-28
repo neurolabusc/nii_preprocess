@@ -171,6 +171,7 @@ if ~exist(imgs.fMRI,'file'), warning('Unable to find %s', imgs.fMRI); return; en
     d = fullfile(p,n);
     if exist(d,'file'), rmdir(d,'s'); end; %delete statistics directory
     delImgs('sw', imgs.fMRI);
+    delMat(imgs.fMRI)
     %delImgs('swa', imgs.fMRI); %we never slice-time correct sparse data!
 %end
 if ~exist('nii_fmri60.m','file')
@@ -857,7 +858,7 @@ delImgs('fdsw', imgs.Rest);
 delImgs('fdswa', imgs.Rest);
 delImgs('fdw', imgs.Rest); %old routines combine 's'mooth and 'd'etrend
 delImgs('fdwa', imgs.Rest);
-warning('SKIPPING REST'); return;
+delMat(imgs.Rest);
 nii_rest(imgs);
 %7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
 prefix = 'a'; %assume slice time 'a'ligned
@@ -878,12 +879,22 @@ vox2mat(prefixSub(['wbmean' ],imgs.Rest), 'RestAve', matName);
 
 function delImgs(prefix, fnm) 
 %e.g. delImgs('sw', 'X.nii') would delete wX.nii and swX.nii 
+[pth,nam] = spm_fileparts(fnm);
+fnmMat = fullfile(pth,[nam,'.mat']);
 for i = 1: numel(prefix), 
     p = prefix(end-i+1:end); 
     d = prefixSub(p, fnm);
-    if exist(d,'file'), delete(d); end; %delete last attempt
+    if exist(d,'file'), delete(d); end; %delete image    
+    d = prefixSub(p, fnmMat);
+    if exist(d,'file'), delete(d); end; %delete lmat
 end;
-%end delImgs() 
+%end delImgs()
+
+function delMat(fnm)
+[pth,nam] = spm_fileparts(fnm);
+fnmMat = fullfile(pth,[nam,'.mat']);
+if exist(fnmMat,'file'), delete(fnmMat); end; %delete lmat
+%end delMat()
 
 function idx = roiIndexSub(roiName)
 [~, ~, idx] = nii_roi_list(roiName);
@@ -893,10 +904,10 @@ if idx < 1, error('Invalid roi name %s', roiName); end;
 function imgs = doAslSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end; %we need these images
 imgs.ASL = removeDotSub (imgs.ASL);
-warning('SKIPPING ASL'); return;
 global ForceASL; %e.g. user can call "global ForceASL;  ForceASL = true;"
 if isempty(ForceASL) && isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
 delImgs('src', imgs.ASL); %remove previously preprocessed data
+delMat(imgs.ASL);
 [nV, nSlices] = nVolSub (imgs.ASL) ;
 [mx, ind] = max(nV);
 if (mod(mx,2) == 0) && ( (nSlices ~= 17) && (nSlices ~= 16))
