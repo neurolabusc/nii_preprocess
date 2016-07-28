@@ -166,6 +166,7 @@ cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
 global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
 if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+if ~exist(imgs.fMRI,'file'), warning('Unable to find %s', imgs.fMRI); return; end;
 %if ~isempty(ForcefMRI)
     d = fullfile(p,n);
     if exist(d,'file'), rmdir(d,'s'); end; %delete statistics directory

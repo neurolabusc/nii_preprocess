@@ -10,12 +10,14 @@ if ~exist('pth','var'), pth = pwd; end;
 f = subFolderSub(pth);
 if isempty(f), error('No folders in parent folder %s', pdth); end;
 global ForcefMRI;  ForcefMRI = true; warning('FORCED fMRI REPROCESSING'); %comment line for auto-processing
-global ForceRest;  ForceRest = true; warning('FORCED REST REPROCESSING'); %comment line for auto-processing
+global ForceRest;  ForceRest =  warning('FORCED REST REPROCESSING'); %comment line for auto-processing
 
 t = tic;
 n = 0;
-%f = {'M2001'}; %for a single folder
-for i = numel(f):-1:1 %1: numel(f)
+%f = {'M2082'}; %for a single folder
+for i = 1: numel(f) %change 1 to larger number to restart after failure
+   fprintf('===\t%s participant %d\t===\n', mfilename, i);
+   if ~isempty(strfind(char(f(i)),'M2082')), error('all done'); end; %to stop at specific point
    cpth = char(f(i)); %local child path
    if ~isempty(strfind(cpth,'_'))
       fprintf('Warning: "_" in folder name: skipping %s\n', char(cpth) );
@@ -26,6 +28,10 @@ for i = numel(f):-1:1 %1: numel(f)
    n = n + 1;
 end
 fprintf('Processed %d *limegui.mat file in %gs\n', n, toc(t))
+%end nii_preprocess_subfolders()
+
+
+
 
 function nameFolds=subFolderSub(pathFolder)
 d = dir(pathFolder);
