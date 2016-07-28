@@ -855,6 +855,9 @@ global ForceRest; %e.g. user can call "global ForceRest;  ForceRest = true;"
 if isempty(ForceRest) && isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
 delImgs('fdsw', imgs.Rest);
 delImgs('fdswa', imgs.Rest);
+delImgs('fdw', imgs.Rest); %old routines combine 's'mooth and 'd'etrend
+delImgs('fdwa', imgs.Rest);
+warning('SKIPPING REST'); return;
 nii_rest(imgs);
 %7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
 prefix = 'a'; %assume slice time 'a'ligned
@@ -869,8 +872,8 @@ end; %required
 nii_nii2mat (prefixSub(['fdsw', prefix ],imgs.Rest), 'rest', matName)
 nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended 
 nii_nii2mat (prefixSub(['palf_sw', prefix ],imgs.Rest), 'palf', matName) %conventional linear trends only
-vox2mat(prefixSub(['wmean', prefix ],imgs.Rest), 'RestAve', matName);
-vox2mat(prefixSub(['wbmean', prefix ],imgs.Rest), 'RestAve', matName);
+vox2mat(prefixSub(['wmean' ],imgs.Rest), 'RestAve', matName); %no prefix: prior to slice time
+vox2mat(prefixSub(['wbmean' ],imgs.Rest), 'RestAve', matName);
 %end doRestSub()
 
 function delImgs(prefix, fnm) 
@@ -890,7 +893,10 @@ if idx < 1, error('Invalid roi name %s', roiName); end;
 function imgs = doAslSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end; %we need these images
 imgs.ASL = removeDotSub (imgs.ASL);
-if isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
+warning('SKIPPING ASL'); return;
+global ForceASL; %e.g. user can call "global ForceASL;  ForceASL = true;"
+if isempty(ForceASL) && isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
+delImgs('src', imgs.ASL); %remove previously preprocessed data
 [nV, nSlices] = nVolSub (imgs.ASL) ;
 [mx, ind] = max(nV);
 if (mod(mx,2) == 0) && ( (nSlices ~= 17) && (nSlices ~= 16))

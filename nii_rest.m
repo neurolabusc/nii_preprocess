@@ -52,7 +52,6 @@ p.setOrigin = true;
 p.t1name = imgs.T1; %'t1.nii'
 p.TRsec = TRsec; %repeat time off 10 seconds
 p.slice_order = SliceOrder;
-p.slice_order = -1;
 p.FWHM = 6;
 for ses = 1 : length(imgs.Rest(:,1));
     p.fmriname = deblank(imgs.Rest(ses,:));

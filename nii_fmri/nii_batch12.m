@@ -628,6 +628,7 @@ fid = fopen(fMRIname1);
 fseek(fid,122,'bof');
 slice_order = fread(fid,1,'uint8');
 fclose(fid);
+fMRIname1 = fullfile(pth,[ nam, ext, ',1']); %'img.nii' -> 'img.nii,1'
 hdr = spm_vol(fMRIname1);
 if (hdr.dim(1) == 90) && (hdr.dim(2) == 90) && (hdr.dim(3) == 50)
     slice_order = -1; %skip: multiband!

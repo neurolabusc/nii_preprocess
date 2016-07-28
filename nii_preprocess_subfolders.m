@@ -11,19 +11,20 @@ f = subFolderSub(pth);
 if isempty(f), error('No folders in parent folder %s', pdth); end;
 global ForcefMRI;  ForcefMRI = true; warning('FORCED fMRI REPROCESSING'); %comment line for auto-processing
 global ForceRest;  ForceRest =  warning('FORCED REST REPROCESSING'); %comment line for auto-processing
+%global ForceASL;  ForceASL = true; warning('FORCED ASL REPROCESSING'); %comment line for auto-processing
 
 t = tic;
 n = 0;
 %f = {'M2082'}; %for a single folder
 for i = 1: numel(f) %change 1 to larger number to restart after failure
-   fprintf('===\t%s participant %d\t===\n', mfilename, i);
-   if ~isempty(strfind(char(f(i)),'M2082')), error('all done'); end; %to stop at specific point
-   cpth = char(f(i)); %local child path
+   cpth = deblank(f(i)); %local child path 
+   fprintf('===\t%s participant %d : %s\t===\n', mfilename, i, cpth);
+   if ~isempty(strfind(cpth,'M2082')), error('all done'); end; %to stop at specific point
    if ~isempty(strfind(cpth,'_'))
       fprintf('Warning: "_" in folder name: skipping %s\n', char(cpth) );
       continue
    end
-   cpth = char(fullfile(pth,f(i))); %full child path
+   cpth = char(fullfile(pth,cpth); %full child path
    nii_preprocess_gui(cpth);
    n = n + 1;
 end
