@@ -1,7 +1,7 @@
-function nii_famask(fnm)
+function nii_famask(fnm, isSaveCopy)
 %remove bright voxels on the rim of the cortex (e.g. clean up FA maps)
 %  fnm : filename of image to correct
-%
+%  isSaveCopy : (optional) if true then original is saved
 %Examples
 % nii_famask; %use gui
 % nii_famask(DTI_M2001_R01_FA.nii)
@@ -17,6 +17,12 @@ if ~isempty(strfind(hdr.descrip, maskKey))
     return;
 end
 img = spm_read_vols(hdr);
+if exist('isSaveCopy','var') && isSaveCopy
+    [pth, nm, ext] = spm_fileparts(fnm);
+    hdro = hdr;
+    hdro.fname = fullfile(pth, [ nm, '_premask', ext]);  
+    spm_write_vol(hdro,img);
+end
 img(isnan(img)) = 0;%max(img(:)); % use ~isfinite instead of isnan to replace +/-inf with zero
 imgErode = dilateErodeSub(img, false); %1st erosion
 imgErode = dilateErodeSub(imgErode, false); %2nd erosion
@@ -30,8 +36,8 @@ fprintf('%s masked %d voxels from %s\n', mfilename, sum(imgDiff(:) > 0), fnm);
 %save image
 hdr.descrip = [maskKey,' ', hdr.descrip]; %mark this image as masked
 %uncomment next lines if you do not want to overwrite image
-% [pth nm ext] = spm_fileparts(fnm);
-% hdr.fname = fullfile(pth, ['q' nm ext]);  
+% [pth, nm, ext] = spm_fileparts(fnm);
+% hdr.fname = fullfile(pth, ['q', nm, ext]);  
 spm_write_vol(hdr,img);
 %end nii_fingemask()
 

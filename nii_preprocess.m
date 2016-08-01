@@ -65,14 +65,29 @@ if true
     end
     doDkiSub(imgs, matName, true);
     tStart = timeSub(tStart,'DKI');
+    addLimeVersionSub(matName); %update versioning
 end
 %print output
 pth = '/home/crlab/Desktop';
 if ~exist(pth,'file'), pth = ''; end;
-printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
+%printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
 nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (spm_clf) show results - except DTI
 diary off
 %nii_preprocess()
+
+function addLimeVersionSub(matName)
+%add 'timestamp' to file allowing user to autodetect if there mat files are current
+% e.g. after running 
+%  m = load(matName);
+%  fprintf('LIME version (YYYY.MMDD): %.4f\n', m.T1.lime);
+v = nii_matver;
+stat.T1.lime = v.lime;
+if exist(matName,'file')
+    old = load(matName);
+    stat = nii_mergestruct(stat,old); %#ok<NASGU>
+end
+save(matName,'-struct', 'stat');
+%end addLimeVersionSub()
 
 function checkForUpdate(repoPath)
 prevPath = pwd;
@@ -340,19 +355,21 @@ if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 FA = prepostfixSub('', '_FA', imgs.DTI);
 MD = prepostfixSub('', '_MD', imgs.DTI);
-if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file') , return; end; %required
+if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file'), return; end; %required
+%if isFieldSub(matName, 'fa') , return; end; %skip: previously computed
 FA = unGzSub (FA);
+nii_famask(FA, true); %8/2016: remove speckles at rim of cortex
 MD = unGzSub (MD);
 wFA = prepostfixSub('w', '', FA);
 wMD = prepostfixSub('w', '', MD);
-if ~exist(wFA,'file') || ~exist(wMD,'file')
+if true %666 ~exist(wFA,'file') || ~exist(wMD,'file')
     nFA = rescaleSub(FA);
     %nii_setOrigin12({nFA, FA, MD}, 1,false); %rFA looks like T1
     oldNormSub( {nFA, FA,MD}, T1, 8, 10 );
 end
-if isFieldSub(matName, 'fa'), return; end; %stats already exist
+
 nii_nii2mat(wFA, 'fa', matName); %6
-nii_nii2mat(wMD, 'md', matName); %8
+%666 nii_nii2mat(wMD, 'md', matName); %8
 %end doFaMdSub()
 
 function doDtiSub(imgs)
@@ -482,12 +499,12 @@ function doDtiBedpostSub(dti) %warp atlas to DTI
 t_start=tic;
 pth = fileparts(dti);
 bed_dirX=fullfile(pth, 'bedpost.bedpostX');
-%if exist(bed_dirX, 'file'), rmdir(bed_dirX, 's'); end; %666
+%if exist(bed_dirX, 'file'), rmdir(bed_dirX, 's'); end; %666 ForceBedpost
 bed_done=fullfile(bed_dirX, 'xfms', 'eye.mat');
 if exist(bed_done,'file'), fprintf('Skipping bedpost (already done)\n'), return, end;
 if ~exist(bed_dirX, 'file'), mkdir(bed_dirX); end;
 bed_dir=fullfile(pth, 'bedpost');
-%if exist(bed_dir, 'file'), rmdir(bed_dir, 's'); end; %666
+%if exist(bed_dir, 'file'), rmdir(bed_dir, 's'); end; %666 ForceBedpost
 if ~exist(bed_dir, 'file'), mkdir(bed_dir); end;
 dti_u=prepostfixSub('', 'u', dti);
 dti_x=fullfile(bed_dir, 'data.nii.gz');
@@ -571,7 +588,7 @@ nROI = nRoiSub(template_roiWThr);
 %now run probtrackx
 prob_dir=fullfile(pth, ['probtrackx' atlasext]);
 if ~exist(prob_dir, 'file'), mkdir(prob_dir); end;
-nPerm = 5000; %666
+nPerm = 5000; % <- arbitrary: choose your number
 t_start=tic;
 commands = [];
 [hdr,img] = loadSub(template_roiWThr);
