@@ -356,20 +356,19 @@ T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 FA = prepostfixSub('', '_FA', imgs.DTI);
 MD = prepostfixSub('', '_MD', imgs.DTI);
 if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file'), return; end; %required
-%if isFieldSub(matName, 'fa') , return; end; %skip: previously computed
+if isFieldSub(matName, 'fa') , return; end; %skip: previously computed
 FA = unGzSub (FA);
 nii_famask(FA, true); %8/2016: remove speckles at rim of cortex
 MD = unGzSub (MD);
 wFA = prepostfixSub('w', '', FA);
 wMD = prepostfixSub('w', '', MD);
-if true %666 ~exist(wFA,'file') || ~exist(wMD,'file')
+if ~exist(wFA,'file') || ~exist(wMD,'file')
     nFA = rescaleSub(FA);
     %nii_setOrigin12({nFA, FA, MD}, 1,false); %rFA looks like T1
     oldNormSub( {nFA, FA,MD}, T1, 8, 10 );
 end
-
 nii_nii2mat(wFA, 'fa', matName); %6
-%666 nii_nii2mat(wMD, 'md', matName); %8
+nii_nii2mat(wMD, 'md', matName); %8
 %end doFaMdSub()
 
 function doDtiSub(imgs)
@@ -871,12 +870,14 @@ if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
 global ForceRest; %e.g. user can call "global ForceRest;  ForceRest = true;"
 if isempty(ForceRest) && isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
+if false
 delImgs('fdsw', imgs.Rest);
 delImgs('fdswa', imgs.Rest);
 delImgs('fdw', imgs.Rest); %old routines combine 's'mooth and 'd'etrend
 delImgs('fdwa', imgs.Rest);
 delMat(imgs.Rest);
 nii_rest(imgs);
+end
 %7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
 prefix = 'a'; %assume slice time 'a'ligned
 restName = prefixSub(['dsw', prefix ],imgs.Rest);

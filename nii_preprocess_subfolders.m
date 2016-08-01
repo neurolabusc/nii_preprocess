@@ -19,7 +19,6 @@ global ForceASL;  ForceASL = []; %comment line for auto-processing
 isPreprocess = false; %process data
 isCopymat = true;
 
-
 %f = {'M2002'}; %for a single folder
 if isPreprocess
     t = tic;
@@ -81,7 +80,6 @@ if isCopymat
     nii_modality_table(outpth)
 end %if isCopymat
 %end nii_preprocess_subfolders()
-
 
 function nameFolds=subFolderSub(pathFolder)
 d = dir(pathFolder);
