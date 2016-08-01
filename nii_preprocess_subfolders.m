@@ -16,12 +16,12 @@ if isempty(f), error('No folders in parent folder %s', pdth); end;
 global ForcefMRI;  ForcefMRI = []; %comment line for auto-processing
 global ForceRest;  ForceRest = [];   %comment line for auto-processing
 global ForceASL;  ForceASL = []; %comment line for auto-processing
-preprocess = false; %process data
-copymat = true;
+isPreprocess = false; %process data
+isCopymat = true;
 
 
-f = {'M2002'}; %for a single folder
-if preprocess
+%f = {'M2002'}; %for a single folder
+if isPreprocess
     t = tic;
     n = 0;
     for i = 1: numel(f) %change 1 to larger number to restart after failure
@@ -37,13 +37,18 @@ if preprocess
        n = n + 1;
     end
     fprintf('Processed %d *limegui.mat file in %gs\n', n, toc(t))
-end %if preprocess
+end %if isPreprocess
 
-if copymat
+if isCopymat
     vers = nii_matver;
     vers = sprintf('%.4f', vers.lime);
-    outpth = fullfile(pth, vers);
+    outpth = fullfile(pth, ['M.', vers]);
     mkdir(outpth);
+    MasterID = {'M2025', 'M2071', 'M2005', 'M2036', 'M2006', 'M2002', 'M2069', 'M2007', 'M2020', 'M2141', 'M2142', 'M2046', 'M2014', 'M2074', 'M2061', 'M2078', 'M2143', 'M2072', 'M2144', 'M2145', 'M2146', 'M2075', 'M2059', 'M2040', 'M2076', 'M2016', 'M2147', 'M2148', 'M2082', 'M2079', 'M2070', 'M2149', 'M2150', 'M2151', 'M2152', 'M2085', 'M2153', 'M2086', 'M4138', 'M2154', 'M4148', 'M2088', 'M2044', 'M2087', 'M2155', 'M2084', 'M2030', 'M2156', 'M2157', 'M2158', 'M2159', 'M2160', 'M2094', 'M2161', 'M2162', 'M2031', 'M2017', 'M2163', 'M2103', 'M4180', 'M2164', 'M2106', 'M2165', 'M2110', 'M2109', 'M2114', 'M2166', 'M2112', 'M2111', 'M2029'};
+    LimeID = {'LM1001', 'LM1002', 'LM1003', 'LM1004', 'LM1005', 'LM1006', 'LM1007', 'LM1008', 'LM1009', 'LM1010', 'LM1011', 'LM1014', 'LM1015', 'LM1016', 'LM1017', 'LM1018', 'LM1019', 'LM1020', 'LM1021', 'LM1022', 'LM1023', 'LM1024', 'LM1025', 'LM1026', 'LM1027', 'LM1028', 'LM1029', 'LM1030', 'LM1031', 'LM1032', 'LM1033', 'LM1034', 'LM1035', 'LM1036', 'LM1037', 'LM1038', 'LM1039', 'LM1040', 'LM1041', 'LM1042', 'LM1043', 'LM1044', 'LM1045', 'LM1046', 'LM1047', 'LM1048', 'LM1049', 'LM1050', 'LM1051', 'LM1052', 'LM1053', 'LM1054', 'LM1055', 'LM1056', 'LM1057', 'LM1058', 'LM1059', 'LM1060', 'LM1061', 'LM1062', 'LM1063', 'LM1064', 'LM1065', 'LM1066', 'LM1067', 'LM1068', 'LM1069', 'LM1070', 'LM1071', 'LM1072'};
+
+    limepth = fullfile(pth, ['LIME.', vers]);
+    mkdir(limepth);
     n = 0;
     for i = 1: numel(f) %change 1 to larger number to restart after failure
        cpth = char(deblank(f(i))); %local child path 
@@ -60,17 +65,22 @@ if copymat
        if numel(mfile) > 1, warning('Multiple lime.mat files in %s', inpth); end;
        outname = fullfile(outpth, [cpth, '.mat']);
        inname = fullfile(inpth, mfile(1).name);
+       fprintf('%s -> %s\n', inname, outname);
        copyfile(inname,outname);
        %nii_preprocess_gui(cpth);
        n = n + 1;
+       i = find(strncmp(MasterID,cpth,numel(cpth)));
+       if isempty(i), continue; end;
+       %fprintf('%s\n', LimeID{i(1)} );
+       limename = fullfile(limepth,[LimeID{i(1)},'.mat']);
+       fprintf('%s -> %s\n', inname, limename);
+       copyfile(inname, limename,'f');
+       
     end
     fprintf('Copied %d *lime.mat files to %s\n', n, outpth)
-end %if preprocess
-
-
+    nii_modality_table(outpth)
+end %if isCopymat
 %end nii_preprocess_subfolders()
-
-
 
 
 function nameFolds=subFolderSub(pathFolder)
