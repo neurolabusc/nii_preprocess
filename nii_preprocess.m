@@ -14,7 +14,8 @@ function matName = nii_preprocess(imgs, matName)
 %check dependencies
 
 fprintf('%s version 1Aug2016\n', mfilename);
-checkForUpdate(fileparts(mfilename('fullpath')));
+warning('Not checking for updates 6666');
+%checkForUpdate(fileparts(mfilename('fullpath')));
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(which('NiiStat')), error('NiiStat required'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
@@ -49,26 +50,31 @@ if true
     tStart = timeSub(tStart,'ASL');
     imgs = dofMRISub(imgs, matName);
     tStart = timeSub(tStart,'fMRI');
-    if ~isempty(imgs.DTI)
-        imgs = removeDotDtiSub(imgs);
-        dtiDir = fileparts(imgs.DTI);
-        doDtiSub(imgs);
-        %-->(un)comment next line for JHU tractography
-        doDtiTractSub(imgs, matName, dtiDir, 'jhu');
-        %-->(un)comment next line for AICHA tractography
-        %doDtiTractSub(imgs, matName, dtiDir, 'AICHA')
-        %-->compute scalar DTI metrics
-        doFaMdSub(imgs, matName);
-        doTractographySub(imgs);
-        doDkiSub(imgs, matName);
-        tStart = timeSub(tStart,'DTI');
+    %warning('Skipping DTI');
+    if true
+        if ~isempty(imgs.DTI)
+            if ~nii_check_dims({imgs.DTI; imgs.DTIrev}), error('Fix DTI'); end;
+            imgs = removeDotDtiSub(imgs);
+            dtiDir = fileparts(imgs.DTI);
+            doDtiSub(imgs);
+            %-->(un)comment next line for JHU tractography
+            doDtiTractSub(imgs, matName, dtiDir, 'jhu');
+            %-->(un)comment next line for AICHA tractography
+            %doDtiTractSub(imgs, matName, dtiDir, 'AICHA')
+            %-->compute scalar DTI metrics
+            doFaMdSub(imgs, matName);
+            doTractographySub(imgs);
+            doDkiSub(imgs, matName);
+
+            tStart = timeSub(tStart,'DTI');
+        end
+        doDkiSub(imgs, matName, true);
     end
-    doDkiSub(imgs, matName, true);
     tStart = timeSub(tStart,'DKI');
     addLimeVersionSub(matName); %update versioning
 end
 %print output
-pth = '/home/crlab/Desktop';
+pth = '~/Desktop';
 if ~exist(pth,'file'), pth = ''; end;
 %printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
 nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (spm_clf) show results - except DTI
@@ -853,7 +859,7 @@ end
 % %end dtiSub()
 
 function n = bvalCountSub(fnm)
-[pth,nam] = filepartsSub(fnm);
+[pth,nam, ext] = filepartsSub(fnm);
 bnm = fullfile(pth, [nam, '.bval']);
 vnm = fullfile(pth, [nam, '.bvec']);
 if ~exist(bnm, 'file') || ~exist(vnm, 'file')
@@ -863,6 +869,12 @@ end
 fileID = fopen(bnm,'r');
 [A, n] = fscanf(fileID,'%g'); %#ok<ASGLU>
 fclose(fileID);
+%check that number of elements in bval matches nifti! 
+if n < 2, return; end;
+if strcmpi(ext,'.nii')
+   h = spm_vol(fnm);
+   if numel(h) ~= n, error('Number of volumes does not match "%s" "%s"', fnm, bnm); end;
+end
 %end bvalCountSub()
 
 function imgs = doRestSub(imgs, matName)
@@ -870,14 +882,12 @@ if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
 global ForceRest; %e.g. user can call "global ForceRest;  ForceRest = true;"
 if isempty(ForceRest) && isFieldSub(matName, 'alf'), fprintf('Skipping Rest (already computed) %s\n', imgs.Rest); return; end;
-if false
 delImgs('fdsw', imgs.Rest);
 delImgs('fdswa', imgs.Rest);
 delImgs('fdw', imgs.Rest); %old routines combine 's'mooth and 'd'etrend
 delImgs('fdwa', imgs.Rest);
 delMat(imgs.Rest);
 nii_rest(imgs);
-end
 %7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
 prefix = 'a'; %assume slice time 'a'ligned
 restName = prefixSub(['dsw', prefix ],imgs.Rest);

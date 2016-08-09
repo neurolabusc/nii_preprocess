@@ -233,7 +233,7 @@ uiwait(d);
         end
         if exist('isDti','var') && isDti
             [A,Apth] = uigetfile({'*.bvec';'*.*'},['Select ', myField, ' vectors']);
-            if isnumeric(A), return; end;
+            if isnumeric(A), return; end; %user pressed cancel
             [Apth,A,ext] = fileparts(fullfile(Apth,A));
             imgName = fullfile(Apth,[A '.nii']);
             if exist(imgName, 'file'),
@@ -289,6 +289,8 @@ uiwait(d);
         else
             cd(Apth); %change directory for next search
         end
+        if ~nii_check_dims({imgs.DTI; imgs.DTIrev}), warning('Fix DTI'); end;
+        
     end %end filename_callback()
 end %end nestedfx()
 

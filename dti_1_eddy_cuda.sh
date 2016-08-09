@@ -51,9 +51,9 @@ else
 	dti_bvecm=${dti}both.bvec
 	dti_bvalm=${dti}both.bval
 fi
-
-minBval=$(awk '{m=$1;for(i=1;i<=NF;i++)if($i<m)m=$i;print m}' $dti_bval)
-minBvalIdx=$(awk '{m=$1; idx=1;for(i=1;i<=NF;i++){if($i<m){m=$i;idx=i}}print idx}' $dti_bval)
+echo $dti_bval
+minBval=$(awk '{m=$1;for(i=1;i<=NF;i++)if($i>=0 && $i<m)m=$i;print m}' $dti_bval)
+minBvalIdx=$(awk '{m=$1; idx=1;for(i=1;i<=NF;i++){if($i>=0 && $i<m){m=$i;idx=i}}print idx}' $dti_bval)
 #FSL indices volumes from 0
 minBvalIdx0=`expr $minBvalIdx - 1`
 echo "minimum BValue is $minBval (volume $minBvalIdx)"
@@ -94,13 +94,13 @@ else #dual DTI: run topup
 	fslroi $dti $dti_b0 $minBvalIdx0 $minBvalIdx
 	#fslroi $dtir $dtir_b0 0 1
 	dtir_bval=${dtir}.bval
-	minBval=$(awk '{m=$1;for(i=1;i<=NF;i++)if($i<m)m=$i;print m}' $dtir_bval)
+	minBval=$(awk '{m=$1;for(i=1;i<=NF;i++)if($i>=0 && $i<m)m=$i;print m}' $dtir_bval)
 	if [ $minBval -gt 10 ] #undistortion assumes first volume has b-value of zero
 	then
 		echo "Error: reversed polarity scan has no B=0 volumes"
 		exit 1
 	fi
-	minBvalIdx=$(awk '{m=$1; idx=1;for(i=1;i<=NF;i++){if($i<m){m=$i;idx=i}}print idx}' $dtir_bval)
+	minBvalIdx=$(awk '{m=$1; idx=1;for(i=1;i<=NF;i++){if($i>=0 && $i<m){m=$i;idx=i}}print idx}' $dtir_bval)
 	minBvalIdx0=`expr $minBvalIdx - 1`
 	fslroi $dtir $dtir_b0 $minBvalIdx0 $minBvalIdx
 	fslmerge -t $both_b0 $dti_b0 $dtir_b0
@@ -128,7 +128,7 @@ else #dual DTI: run topup
 	paste ${dti}.bval ${dtir}.bval > $dti_bvalm
 	dti_merge=${dti}both #merged
 	fslmerge -t $dti_merge $dti $dtir
-##eddy_cuda7.0 instead of eddy_openmp
+	##For GPU eddy_cuda7.0 instead of eddy_openmp
 	echo eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
 	##eddy takes about 11 minutes for LIME data
 	time eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u

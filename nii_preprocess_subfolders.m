@@ -16,14 +16,16 @@ if isempty(f), error('No folders in parent folder %s', pth); end;
 global ForcefMRI;  ForcefMRI = []; %comment line for auto-processing
 global ForceRest;  ForceRest = [];   %comment line for auto-processing
 global ForceASL;  ForceASL = []; %comment line for auto-processing
-isPreprocess = false; %process data
-isCopymat = true;
+isPreprocess = true; %process data
+isCopymat = false;
 
-%f = {'M2044'}; %for a single folder
+f = {'M2103';}; %for a single folder
+%f = {'M2121';'M2122';'M2123';'M2124';'M2125';'M2126';'M4191';'M4209';'M4211';'M2042';'M2096';'M2103'};%
 if isPreprocess
     t = tic;
     n = 0;
-    for i = 1: numel(f) %change 1 to larger number to restart after failure
+    %for i = 1: numel(f) %change 1 to larger number to restart after failure
+    for i = numel(f): -1 : 1 %change 1 to larger number to restart after failure    
        cpth = char(deblank(f(i))); %local child path 
        fprintf('===\t%s participant %d/%d : %s\t===\n', mfilename, i, numel(f), cpth);
        %if ~isempty(strfind(cpth,'M2082')), error('all done'); end; %to stop at specific point

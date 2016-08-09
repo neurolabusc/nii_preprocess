@@ -24,7 +24,7 @@ for i = 1: numel(modalityKeys)
 end;
 %1st: acquire data
 nSubj = 0;
-%subjDirs = []; subjDirs{1} = 'M2154';% _DONOTUSE
+subjDirs = []; subjDirs{1} = 'M2109';% _DONOTUSE
 for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
     subjName = deblank(subjDirs{s});
     if subjName(1) == '.', continue; end;
@@ -43,6 +43,7 @@ for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
         %fprintf('%s\n', xDir);
         imgs(nSubj) = findImgsSub(imgs(nSubj), xDir, xLabel, modalityKeysVerbose);
         %imgs(nSubj) = findImgsSub(imgs(nSubj), xDir, xLabel);
+        
     end
 
 end
