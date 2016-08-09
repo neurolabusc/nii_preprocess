@@ -14,8 +14,8 @@ function matName = nii_preprocess(imgs, matName)
 %check dependencies
 
 fprintf('%s version 1Aug2016\n', mfilename);
-warning('Not checking for updates 6666');
-%checkForUpdate(fileparts(mfilename('fullpath')));
+%warning('Not checking for updates 6666');
+checkForUpdate(fileparts(mfilename('fullpath')));
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(which('NiiStat')), error('NiiStat required'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
