@@ -25,8 +25,8 @@ if isPreprocess
     t = tic;
     n = 0;
     %for i = 1: numel(f) %change 1 to larger number to restart after failure
-    for i = numel(f): -1 : 1 %change 1 to larger number to restart after failure    
-       cpth = char(deblank(f(i))); %local child path 
+    for i = numel(f): -1 : 1 %change 1 to larger number to restart after failure
+       cpth = char(deblank(f(i))); %local child path
        fprintf('===\t%s participant %d/%d : %s\t===\n', mfilename, i, numel(f), cpth);
        %if ~isempty(strfind(cpth,'M2082')), error('all done'); end; %to stop at specific point
        if ~isempty(strfind(cpth,'_'))
@@ -53,8 +53,9 @@ if isCopymat
     limepth = fullfile(pth, ['LIME.', vers]);
     mkdir(limepth);
     n = 0;
+    nLime = 0;
     for i = 1: numel(f) %change 1 to larger number to restart after failure
-       cpth = char(deblank(f(i))); %local child path 
+       cpth = char(deblank(f(i))); %local child path
        %fprintf('===\t%s participant %d/%d : %s\t===\n', mfilename, i, numel(f), cpth);
        %if ~isempty(strfind(cpth,'M2082')), error('all done'); end; %to stop at specific point
        if ~isempty(strfind(cpth,'_'))
@@ -78,10 +79,13 @@ if isCopymat
        limename = fullfile(limepth,[LimeID{i(1)},'.mat']);
        fprintf('%s -> %s\n', inname, limename);
        copyfile(inname, limename,'f');
-       
+       nLime = nLime + 1;
     end
-    fprintf('Copied %d *lime.mat files to %s\n', n, outpth)
-    nii_modality_table(outpth)
+    fprintf('Copied %d *lime.mat files to %s\n', n, outpth);
+    fprintf('Copied %d *lime.mat files to %s\n', nLime, limepth);
+    if numel(f) < 2, return; end; %just touching up a single person
+    nii_modality_table(outpth);
+    nii_modality_table(limepth);
 end %if isCopymat
 %end nii_preprocess_subfolders()
 
