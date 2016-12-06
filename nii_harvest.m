@@ -15,7 +15,7 @@ end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 modalityKeysVerbose = {'T1', 'T2', 'Lesion', 'ASL', 'DTIrev','DTI_', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
-modalityKeysVerbose = {'T1', 'T2', 'Lesion', 'Rest_'}; % temporary, for testing only!!! -- GY
+%modalityKeysVerbose = {'T1', 'T2', 'Lesion', 'Rest_'}; % temporary, for testing only!!! -- GY
 
 modalityKeys = strrep(modalityKeysVerbose,'_','');
 xperimentKeys = {'POLAR','SE', 'LIME', 'CT', 'R01'}; %order specifies priority: 1st item checked first!
@@ -64,7 +64,7 @@ fprintf('%s\n', str);
 for s = 1: nSubj
     str = imgs(s).subjName;
     for i = 1: numel(f)
-        x = '';
+        x = '-';
         if ~isempty(imgs(s).nii.(f{i}))
            x = imgs(s).nii.(f{i}).x;
         end

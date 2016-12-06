@@ -161,7 +161,10 @@ else % Low pass, such as freq < 0.08 Hz
 end
 data4D=reshape(data4D,[],nDimTimePoints)';
 data4D = 2*abs(fft(data4D))/sampleLength;
-fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:(paddedLength/2 + 1),:));
+%CR: prior to 6Dec2016 this was
+% fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:(paddedLength/2 + 1),:));
+%floor added to avoid "Warning: Integer operands are required for colon operator when used as index: 
+fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:floor(paddedLength/2 + 1),:)); 
 fALFF_2D(~isfinite(fALFF_2D))=0;
 fALFFBrain = reshape(fALFF_2D,nDim1, nDim2, nDim3);
 %mask data
