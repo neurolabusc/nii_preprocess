@@ -23,6 +23,8 @@ function [prefix, TRsec, slice_order, meanname] = nii_batch12 (p)
 % TO DO
 
 [fmriname, t1name, TRsec, slice_order, phase, magn, prefix, isNormalized, t2name, FWHM, resliceMM] = validatePreprocSub(p);
+deleteImagesSub('swa', fmriname, true); %delete previous images & mat files
+deleteImagesSub('wbmean', fmriname, true); %delete previous images & mat files
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 spm_jobman('initcfg'); % useful in SPM8 only
 %0.) set origin fMRI
@@ -59,6 +61,8 @@ else
     
 end
 normWriteWhiteMatterSub(t1name, resliceMM); %we want a wc2* white matter prob map for detrending
+normWriteCsfSub(t1name, resliceMM); %GY: we want a wc3* CSF prob map for detrending
+
 meanname = prefixSub('w', meanname);
 %5.) blur data
 prefix = smoothSub(FWHM, prefix, fmriname); %smooth images
@@ -390,6 +394,23 @@ end
 newSegWriteSub(t1name, c2name, '', resliceMM);
 %end normWriteWhiteMatterSub()
 
+function normWriteCsfSub(t1name, resliceMM) %GY: we also want a wc3* CSF prob map for detrending
+if isempty(t1name), return; end;
+eChar = 'e';
+[pth,nam,ext] = spm_fileparts(t1name);
+c3name = fullfile(pth, ['c3', eChar, nam, ext]);
+if ~exist(c3name, 'file')
+	eChar = '';
+	c3name = fullfile(pth, ['c3', eChar, nam, ext]);
+    if ~exist(c3name, 'file')
+        fprintf('Unable to find CSF tissue map %s\n', c3name);
+        return;
+    end
+end 
+newSegWriteSub(t1name, c3name, '', resliceMM);
+%end normWriteWhiteMatterSub()
+
+
 function  prefix = newSegWriteSub(t1name, warpname, prefix, resliceMM, bb)
 %reslice img using pre-existing new-segmentation deformation field
 if isempty(warpname) || isempty(t1name), return; end;
@@ -467,7 +488,7 @@ matlabbatch{1}.spm.spatial.preproc.warp.write = [1 1];
 spm_jobman('run',matlabbatch);
 %end newSegSub()
 
-function deleteImagesSub(prefix, fmriname)
+function deleteImagesSub(prefix, fmriname, isDeleteMat)
 %delete intermediate images, e.g. if prefix is 'swa' then delete 'wa' and 'a' images
 if length(prefix) < 2, return; end;
 for s = 1 : length(fmriname(:,1))
@@ -478,6 +499,18 @@ for s = 1 : length(fmriname(:,1))
             fprintf('Deleting  %s\n',nam );
             delete(nam);
         end;
+        if exist('isDeleteMat','var') && isDeleteMat
+            nam = fullfile(pth,['rp_', prefix(i:length(prefix)), nam, '.txt']);
+            if exist(nam, 'file')
+                fprintf('Deleting  %s\n',nam );
+                delete(nam);
+            end;
+            nam = fullfile(pth,[prefix(i:length(prefix)), nam, '.mat']);
+            if exist(nam, 'file')
+                fprintf('Deleting  %s\n',nam );
+                delete(nam);
+            end;
+        end
     end;
 end;
 %end deleteImagesSub()

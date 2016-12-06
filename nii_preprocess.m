@@ -58,9 +58,9 @@ if true
             dtiDir = fileparts(imgs.DTI);
             doDtiSub(imgs);
             %-->(un)comment next line for JHU tractography
-            doDtiTractSub(imgs, matName, dtiDir, 'jhu');
+            % doDtiTractSub(imgs, matName, dtiDir, 'jhu');
             %-->(un)comment next line for AICHA tractography
-            %doDtiTractSub(imgs, matName, dtiDir, 'AICHA')
+            doDtiTractSub(imgs, matName, dtiDir, 'AICHA'); % uncommented by GY, Aug10_2016
             %-->compute scalar DTI metrics
             doFaMdSub(imgs, matName);
             doTractographySub(imgs);
@@ -551,7 +551,11 @@ if ~exist(bvec,'file') || ~exist(bval,'file'), error('Can not find files %s %s',
 
 function doDtiTractSub(imgs, matName, dtiDir, atlas)
 dti = imgs.DTI;
-if ~exist('atlas','var'), atlas = 'jhu'; end;
+if ~exist('atlas','var'), 
+    atlas = 'jhu'; 
+    if isFieldSub(matName, 'dti'), fprintf('Skipping tractography (JHU DTI already computed) %s\n', imgs.ASL); return; end;
+
+end;
 if isFieldSub(matName, ['dti_' atlas]), fprintf('Skipping tractography (DTI already computed) %s\n', imgs.ASL); return; end;
 doDtiWarpSub(imgs, atlas); %warp atlas to DTI
 pth = fileparts(dti);

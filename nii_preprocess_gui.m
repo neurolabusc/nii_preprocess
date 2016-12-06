@@ -289,7 +289,7 @@ uiwait(d);
         else
             cd(Apth); %change directory for next search
         end
-        if ~nii_check_dims({imgs.DTI; imgs.DTIrev}), warning('Fix DTI'); end;
+        if ~nii_check_dims({img.DTI; img.DTIrev}), warning('Fix DTI'); end;
         
     end %end filename_callback()
 end %end nestedfx()

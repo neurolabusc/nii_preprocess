@@ -56,15 +56,20 @@ p.FWHM = 6;
 for ses = 1 : length(imgs.Rest(:,1));
     p.fmriname = deblank(imgs.Rest(ses,:));
     [pth,nam,ext] = spm_fileparts(p.fmriname);
-    [prefix, TRsec, so, maskName] = nii_batch12(p);
+    [prefix, TRsec, ~, maskName] = nii_batch12(p);
     % warning('demo code: skipping preprocessing'); 
     % prefix = 'sw';
     % TRsec = 1.65;
     % maskName = 'wbmeanRest.nii';
     %ALFF - simple detrending only
     alffSub(fullfile(pth,[prefix, nam, ext]), TRsec, maskName, '', true);
-    %we need white matter tissue map for advanced detrending
-    wc2name = wc2(p.t1name);
+    %we need white matter or CSF tissue map for advanced detrending
+    if true
+        wc2name = wc2(p.t1name); % use WM for detrending
+    else
+        disp ('using CSF for detrending...');
+        wc2name = wc3(p.t1name); % use CSF for detrending %%% GY
+    end
     if isempty(wc2name), continue; end; 
     % we need motion parameters for detrending
     mocoTxt = fullfile(pth,['rp_', nam, '.txt']);
@@ -89,8 +94,18 @@ wc2name = prefixSub ('wc2e', t1name);
 if exist(wc2name, 'file'), return; end;
 wc2name = prefixSub ('wc2', t1name);
 if exist(wc2name, 'file'), return; end;
-error('Unable to find white matter tissue map %s\n', c2name);
+error('Unable to find white matter tissue map %s\n', wc2name);
 %end wc2()
+
+function wc2name = wc3(t1name)
+wc2name = [];
+if isempty(t1name), fprintf('Skipping resting state analyses: no T1'); return; end;
+wc2name = prefixSub ('wc3e', t1name);
+if exist(wc2name, 'file'), return; end;
+wc2name = prefixSub ('wc3', t1name);
+if exist(wc2name, 'file'), return; end;
+error('Unable to find CSF map %s\n', wc2name);
+%end wc3()
 
 function outName = alffSub(name4D, kTRsec, maskName,namePrefix, isDetrend, divideByMask)
 %Identify low frequency flutuations 

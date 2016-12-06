@@ -7,15 +7,18 @@ function nii_harvest (baseDir)
 % /Root/subj2/study2/ASL.nii
 
 outDir = '/home/crlab/Desktop/pp';
-%baseDir = '/Users/rorden/Desktop/harvest'; %'/Root'
+outDir = '/media/FAT1000GY/Master_In';
+baseDir = '/media/FAT1000GY/Master_DB/'; %'/Root'
 if ~exist('baseDir','var') || isempty(baseDir)
     baseDir = pwd; %uigetdir('','Pick folder that contains all subjects');
 end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 modalityKeysVerbose = {'T1', 'T2', 'Lesion', 'ASL', 'DTIrev','DTI_', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
+modalityKeysVerbose = {'T1', 'T2', 'Lesion', 'Rest_'}; % temporary, for testing only!!! -- GY
+
 modalityKeys = strrep(modalityKeysVerbose,'_','');
-xperimentKeys = {'SE', 'LIME', 'CT', 'R01'}; %order specifies priority: 1st item checked first!
+xperimentKeys = {'POLAR','SE', 'LIME', 'CT', 'R01'}; %order specifies priority: 1st item checked first!
 %create empty structure
 blank = [];
 blank.subjName = [];
@@ -24,7 +27,7 @@ for i = 1: numel(modalityKeys)
 end;
 %1st: acquire data
 nSubj = 0;
-subjDirs = []; subjDirs{1} = 'M2109';% _DONOTUSE
+subjDirs = []; subjDirs{1} = 'M2049';% _DONOTUSE
 for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
     subjName = deblank(subjDirs{s});
     if subjName(1) == '.', continue; end;
@@ -95,6 +98,7 @@ for s = 1: nSubj
         setAcpcSub(matName);
         %disable next lines if you do not want to compute
         nii_preprocess(mat);
+        
     end
 end
 %end nii_harvest
