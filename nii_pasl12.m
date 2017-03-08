@@ -118,7 +118,7 @@ for ses = 1 : nses
             RFBlocks = 82;
             TE=6.7; %Echo time, in ms
         else
-            error('Unknown pCASL sequence (%d slices): %s', nSlices, Filename{1});
+            error('Unknown pCASL sequence (%d slices): %s\n', nSlices, Filename{1});
         end
         Labeltime =  RFBlocks*0.0185; %in seconds, The CFN pCASL RF block duration is ALWAYS = 0.0185s (20 RF pulses with gaps) - 18500us 
         Slicetime = (MinTRms - (Delaytime *1000) - (Labeltime * 1000) ) / nSlices; %Slicetime in ms, not sec!!!

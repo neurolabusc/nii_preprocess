@@ -1,26 +1,28 @@
 function nii_harvest (baseDir)
 
+% /Root/subj1/study1/T1.nii
+% /Root/subj1/study2/T2.nii
+% /Root/subj2/study1/T1.nii
+% /Root/subj2/study2/T2.nii
+% /Root/subj2/study2/ASL.nii
+%global ForceRest;  ForceRest = true; warning('Forcing rest processing');
+
 outDir = '/home/crlab/Desktop/pp';
 outDir = '/media/FAT1000/Master_In';
 baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
-isExitAfterTable = false; % <- if true, only generates table, does not process data
-reprocessRest = true;
-reprocessfMRI = false;
-reprocessASL = false;
+
 
 %outDir = '/media/UBU/Master_In/';
 %baseDir = '/media/UBU/Master_DB/'; %'/Root'
 
 if ~exist('baseDir','var') || isempty(baseDir)
-    %baseDir = pwd; %
-    baseDir = uigetdir('','Pick folder that contains all subjects');
-    
+    baseDir = pwd; %uigetdir('','Pick folder that contains all subjects');
 end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
-subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
-subjDirs = {'M2118'}; % temporary, for testing only!!! -- GY
-
+%subjDirs = subjDirs(1:140);
+subjDirs = {'M2036'}; % temporary, for testing only!!! -- GY
+isExitAfterTable = true;
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
@@ -39,6 +41,7 @@ for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
     subjName = deblank(subjDirs{s});
     if subjName(1) == '.', continue; end;
     %if (numel(subjName) > 1) && (subjName(2) == '4'), fprintf('SKIPPING %s\n', subjName); continue; end; %ignore folders with underscore, "M2015_needsmatfile"
+
     if isStringInKeySub (subjName,'_'), continue; end; %ignore folders with underscore, "M2015_needsmatfile"
     subjDir = [baseDir,filesep, subjName]; %no filesep
     %fprintf('%s\n', subjDir);
@@ -62,7 +65,6 @@ end
 fprintf('Found %d subjects in %s\n', nSubj, baseDir);
 if nSubj < 1, return; end;
 %report results
-startTime = tic;
 % 1st row: describe values
 f = fieldnames(imgs(1).nii);
 str = 'n,subj';
@@ -74,7 +76,6 @@ fprintf('%s\n', str);
 for s = 1: nSubj
     subj = deblank(imgs(s).subjName);
     subjDir = fullfile(outDir, subj);
-    matName = fullfile(subjDir, [subj, '_limegui.mat']);
     imgs(s) = findNovelImgs(subjDir, imgs(s), modalityKeysVerbose);  
     str = [int2str(s), ',', imgs(s).subjName];
     for i = 1: numel(f)
@@ -83,27 +84,24 @@ for s = 1: nSubj
            x = imgs(s).nii.(f{i}).x;
            if ~imgs(s).nii.(f{i}).newImg, x = ['~', x]; end;
         end
+        
         str = sprintf('%s\t%s',str, x );
     end
     fprintf('%s\n', str);
 end
-fprintf('Table required %g seconds\n', toc(startTime));
+%fprintf('Comment line 93 for full analyses\n', str); return; %return when we are done  
 %copy core files to new folder
 if isExitAfterTable 
     fprintf('Disable isExitAfterTable for full analyses\n', str); 
-    return; %return when we are done   
+    return; %return when we are done  
+    
 end
 if exist(outDir, 'file') ~= 7, error('Unable to find folder %s', outDir); end;
 %find images we have already processed
 
 for s = 1: nSubj
-    anyNewImg = false;
     subj = deblank(imgs(s).subjName);
     subjDir = fullfile(outDir, subj);
-    if ~isfield(imgs(s).nii.T1,'img')
-        fprintf('Skipping %s: no T1!\n', subj);
-        continue;
-    end
     %imgs(s) = findNovelImgs(subjDir, imgs(s), modalityKeysVerbose);
     global ForcefMRI;
     global ForceRest;
@@ -116,31 +114,18 @@ for s = 1: nSubj
     if imgs(s).nii.fMRI.newImg, ForcefMRI = true; end;
     if imgs(s).nii.Rest.newImg, ForceRest = true; end;
     if imgs(s).nii.ASL.newImg, ForceASL = true; end;
-    if imgs(s).nii.DTI.newImg, ForceDTI = true; end;
-      %to reprocess one modality for EVERYONE....
-    if reprocessRest && isfield(imgs(s).nii.Rest,'img')
-        ForceRest = true;
-        anyNewImg = true;
-    end
-    if reprocessfMRI && isfield(imgs(s).nii.fMRI,'img')
-        ForcefMRI = true;
-        anyNewImg = true;
-    end
-    if reprocessASL && isfield(imgs(s).nii.ASL,'img')
-        ForceASL = true;
-        anyNewImg = true;
-    end
-    
     %if imgs(s).nii.DTI.newImg, ForceDTI = true; end;
+    ForceRest = true; %666
     
     %fprintf('%s %d\n', f{i}, imgs.nii.(f{i}).newImg);
     if exist(subjDir,'file') == 0, mkdir(subjDir); end;
     matName = fullfile(subjDir, [subj, '_limegui.mat']);
     mat = [];
-    
+
     if exist(matName,'file'), mat = load(matName); end;
+    
     for i = 1: numel(f)
-        if ~isempty(imgs(s).nii.(f{i})) && (imgs(s).nii.(f{i}).newImg)
+        if ~isempty(imgs(s).nii.(f{i})) &&(imgs(s).nii.(f{i}).newImg)
             m = f{i}; % modality: T1, T2..
             if ~isfield(imgs(s).nii.(f{i}),'img')
                 mat.(m) = ''; %e.g. we used to have DTI+DTIrev, now we have DTI
@@ -149,7 +134,6 @@ for s = 1: nSubj
             elseif isempty(imgs(s).nii.(f{i}).img)
                 mat.(m) = ''; %e.g. we used to have DTI+DTIrev, now we have DTI
             else
-                anyNewImg = true;
                 m = f{i}; % modality: T1, T2..
                 x = imgs(s).nii.(f{i}).x; %e.g. experiment name "LIME", "CT"
                 imgin = imgs(s).nii.(f{i}).img; %e.g. '~/dir/m2000/CT/T1.nii'
@@ -159,28 +143,28 @@ for s = 1: nSubj
                 mat.(m) = imgout;
             end
         end
-        if ~isempty(imgs(s).nii.(f{i})) && isfield(imgs(s).nii.(f{i}), 'x') && (~imgs(s).nii.(f{i}).newImg) %CR 2/2017: in case folder names have changed
-                m = f{i}; % modality: T1, T2..
-                x = imgs(s).nii.(f{i}).x; %e.g. experiment name "LIME", "CT"
-                imgout = fullfile(subjDir, sprintf('%s_%s_%s.nii',m, subj, x));
-                mat.(m) = imgout;
-        end
     end
-    if anyNewImg
-        matNameGUI = fullfile(subjDir, [subj, '_limegui.mat']);
-        fprintf('Creating %s\n',matNameGUI);
-        save(matNameGUI,'-struct', 'mat');
-        %determine T1 name even if output folder renamed...
-        
-        if imgs(s).nii.T1.newImg, setAcpcSubT1(matNameGUI); end;
 
-        if imgs(s).nii.Lesion.newImg, setAcpcSubT1 (matNameGUI); end;
-        if imgs(s).nii.DTI.newImg, setAcpcSubDTI (matNameGUI); end;
+%     can delete this, only using to debug    
+%     mat
+%     if (mat.DTI == null)
+%         x=1
+%     end
+%     imgs(s).nii.DTI.newImg
+%     imgs(s).nii.DTIrev.newImg
+%     imgs(s).nii.ASL.newImg
+%     imgs(s).nii.Rest.newImg
+%     mat    
 
-        %process the data
+    if ~isempty(mat)
+        matName = fullfile(subjDir, [subj, '_limegui.mat']);
+        fprintf('Creating %s\n',matName);
+        save(matName,'-struct', 'mat');
+        if imgs(s).nii.Lesion.newImg, setAcpcSubT1 (matName); end;
+        if imgs(s).nii.DTI.newImg, setAcpcSubDTI (matName); end;
+        %setAcpcSub(matName);
+        %disable next lines if you do not want to compute
         nii_preprocess(mat);
-        %matName = fullfile(subjDir, sprintf('T1_%s_%s_lime.mat', subj, imgs(s).nii.T1.x));
-        %nii_preprocess(mat,matName);
         
     end
 end
@@ -197,7 +181,7 @@ tf = strncmpi(strEnd,pattern, numel(pattern));
 function imgs = findNovelImgs(subjDir, imgs, modalityKeysVerbose)
 f = fieldnames(imgs.nii);
 for i = 1: numel(f)
-    imgs.nii.(f{i}).newImg = true;%??
+    imgs.nii.(f{i}).newImg = false;
 end
 %'fMRI'
 if ~isfield(imgs.nii,'T1') || isempty(imgs.nii.T1), return; end;
@@ -211,11 +195,12 @@ if isfield(m,'T1')
     imgs.nii.Lesion.newImg = imgs.nii.T1.newImg;
 end;
 if isfield(m,'cbf') && isfield(imgs.nii.ASL, 'x') 
-   % m.cbf.hdr.fname
- 
     imgs.nii.ASL.newImg = ~endsWithSub(m.cbf.hdr.fname, ['_',imgs.nii.ASL.x,'M0CSF.nii']);
 end;
+
 if isfield(m,'fa') && isfield(imgs.nii.DTI, 'x') 
+    %m.fa.hdr.fname
+    %['_',imgs.nii.DTI.x,'_FA.nii']
     imgs.nii.DTI.newImg = ~endsWithSub(m.fa.hdr.fname, ['_',imgs.nii.DTI.x,'_FA.nii']);
     imgs.nii.DTIrev.newImg = imgs.nii.DTI.newImg;
 end;

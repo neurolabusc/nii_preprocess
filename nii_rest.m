@@ -20,7 +20,6 @@ function prefix = nii_rest (imgs, TRsec, SliceOrder)
 %  TRsec = 1.65;
 %  nii_rest (imgs, TRsec);
 
-
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if ~exist('nii_batch12','file'), error('Make sure nii_batch12 is in path'); end;
 if ~exist('imgs','var') %no input: select imgs[s]
@@ -56,7 +55,7 @@ p.FWHM = 6;
 for ses = 1 : length(imgs.Rest(:,1));
     p.fmriname = deblank(imgs.Rest(ses,:));
     [pth,nam,ext] = spm_fileparts(p.fmriname);
-    [prefix, TRsec, ~, maskName] = nii_batch12(p);
+    [prefix, TRsec, so, maskName] = nii_batch12(p);
     % warning('demo code: skipping preprocessing'); 
     % prefix = 'sw';
     % TRsec = 1.65;
@@ -81,8 +80,17 @@ for ses = 1 : length(imgs.Rest(:,1));
     %ALFF - after complex detrending
     alffSub(fullfile(pth,[prefix, nam, ext]), TRsec, maskName, '', true);
     %remove frequencies that are too high or low to be resting state
-    prefix = [nii_temporalFilter(fullfile(pth,[prefix, nam, ext]), TRsec, true), prefix]; %#ok<AGROW>
+    prefix = [nii_temporalFilter(fullfile(pth,[prefix, nam, ext]), TRsec, true), prefix]; %#ok<AGROW>        
     % note: bandpass AFTER detrend http://www.ncbi.nlm.nih.gov/pubmed/23747457 
+    % GY, Feb 3, 2016: running ICA and removing lesion-driven ICs
+    if isfield (imgs, 'Lesion')
+        if ~isempty (imgs.Lesion)
+            [lpth, lnam, lext] = fileparts(imgs.Lesion);
+            lesName = fullfile(lpth,['wsr', lnam ,lext]);
+            if ~exist(lesName,'file'), error('Catastrophic failure: can not find %s', lesName); end;
+            prefix = [nii_filter_lesion_ICs(lesName, fullfile(pth,[prefix, nam, ext]), TRsec), prefix]; %#ok<AGROW> 
+        end
+    end        
 end; %for each session
 fprintf('Done processing sessions in %0.3fsec\n', toc);
 %end nii_rest()
@@ -161,10 +169,7 @@ else % Low pass, such as freq < 0.08 Hz
 end
 data4D=reshape(data4D,[],nDimTimePoints)';
 data4D = 2*abs(fft(data4D))/sampleLength;
-%CR: prior to 6Dec2016 this was
-% fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:(paddedLength/2 + 1),:));
-%floor added to avoid "Warning: Integer operands are required for colon operator when used as index: 
-fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:floor(paddedLength/2 + 1),:)); 
+fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:(paddedLength/2 + 1),:));
 fALFF_2D(~isfinite(fALFF_2D))=0;
 fALFFBrain = reshape(fALFF_2D,nDim1, nDim2, nDim3);
 %mask data

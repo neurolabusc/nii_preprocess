@@ -34,9 +34,11 @@ if ~isfield(imgs,'fMRI'), imgs.fMRI = []; end;
 
 if ~exist('matName','var')
     [p,n] = filepartsSub(imgs.T1);
+    if ~exist(p,'dir')
+        error('Please provide a matName: files no longer located in %s', p);
+    end
     matName = fullfile(p, [n, '_lime.mat']);
 end
-
 if true
     diary([matName, '.log.txt'])
     imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
@@ -58,12 +60,12 @@ if true
             dtiDir = fileparts(imgs.DTI);
             doDtiSub(imgs);
             %-->(un)comment next line for JHU tractography
-            % doDtiTractSub(imgs, matName, dtiDir, 'jhu');
+            doDtiTractSub(imgs, matName, dtiDir, 'jhu');
             %-->(un)comment next line for AICHA tractography
             doDtiTractSub(imgs, matName, dtiDir, 'AICHA'); % uncommented by GY, Aug10_2016
             %-->compute scalar DTI metrics
             doFaMdSub(imgs, matName);
-            doTractographySub(imgs);
+            % doTractographySub(imgs);
             doDkiSub(imgs, matName);
 
             tStart = timeSub(tStart,'DTI');
@@ -186,7 +188,9 @@ imgs.fMRI = removeDotSub (imgs.fMRI);
 cstat = fullfile(p,[n], 'con_0002.nii');
 bstat = fullfile(p,[n], 'beta_0001.nii');
 global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
-if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+%do not check cstat files anymore, as folder names may have changed...
+%if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+if isempty(ForcefMRI) && isFieldSub(matName, 'fmri'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
 if ~exist(imgs.fMRI,'file'), warning('Unable to find %s', imgs.fMRI); return; end;
 %if ~isempty(ForcefMRI)
     d = fullfile(p,n);
@@ -304,7 +308,11 @@ function doDkiSub(imgs, matName, isDki)
 if exist('isDki','var') && (isDki)
     if ~isfield(imgs,'DKI'), return; end;
     if isempty(imgs.DKI), return; end; %nothing to do!
-    if isFieldSub(matName, 'mk'), return; end; %stats already exist
+    global ForceDTI;
+    if isempty(ForceDTI) && isFieldSub(matName, 'mk')
+        fprintf('Skipping MK estimates: already computed\n');
+        return; 
+    end; %stats already exist
     if isEddyCuda7Sub()
          command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
     else
@@ -362,7 +370,11 @@ T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
 FA = prepostfixSub('', '_FA', imgs.DTI);
 MD = prepostfixSub('', '_MD', imgs.DTI);
 if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file'), return; end; %required
-if isFieldSub(matName, 'fa') , return; end; %skip: previously computed
+global ForceDTI;
+if isempty(ForceDTI) && isFieldSub(matName, 'fa')
+    fprintf('Skipping MD/FA estimates: already computed\n');
+    return; 
+end; %skip: previously computed
 FA = unGzSub (FA);
 nii_famask(FA, true); %8/2016: remove speckles at rim of cortex
 MD = unGzSub (MD);
@@ -384,7 +396,8 @@ if ~exist(betT1,'file'), fprintf('doDti unable to find %s\n', betT1); return; en
 eT1 = prefixSub('e',imgs.T1); %enantimorphic image
 if ~exist(eT1,'file'), eT1 = imgs.T1; end; %if no lesion, use raw T1
 if ~exist(eT1,'file'), fprintf('doDti unable to find %s\n', eT1); return; end; %required
-if isDtiDone(imgs), fprintf('Skipping DTI processing (probtrackx done)\n'); return; end;
+global ForceDTI;
+if isempty(ForceDTI) && isDtiDone(imgs), fprintf('Skipping DTI processing (probtrackx done)\n'); return; end;
 n = bvalCountSub(imgs.DTI);
 if (n < 1)
     fprintf('UNABLE TO FIND BVECS/BVALS FOR %s\n', imgs.DTI);
@@ -395,7 +408,7 @@ if (n < 12)
     return
 end
 dti_u=prepostfixSub('', 'u', imgs.DTI);
-if exist(dti_u, 'file')
+if isempty(ForceDTI) && exist(dti_u, 'file')
     fprintf('Skipping DTI preprocessing: found %s\n', dti_u);
 else
     clipSub (imgs); %topup requires images with even dimensions
@@ -506,7 +519,8 @@ pth = fileparts(dti);
 bed_dirX=fullfile(pth, 'bedpost.bedpostX');
 %if exist(bed_dirX, 'file'), rmdir(bed_dirX, 's'); end; %666 ForceBedpost
 bed_done=fullfile(bed_dirX, 'xfms', 'eye.mat');
-if exist(bed_done,'file'), fprintf('Skipping bedpost (already done)\n'), return, end;
+global ForceDTI;
+if isempty(ForceDTI) && exist(bed_done,'file'), fprintf('Skipping bedpost (already done)\n'), return, end;
 if ~exist(bed_dirX, 'file'), mkdir(bed_dirX); end;
 bed_dir=fullfile(pth, 'bedpost');
 %if exist(bed_dir, 'file'), rmdir(bed_dir, 's'); end; %666 ForceBedpost
@@ -551,12 +565,14 @@ if ~exist(bvec,'file') || ~exist(bval,'file'), error('Can not find files %s %s',
 
 function doDtiTractSub(imgs, matName, dtiDir, atlas)
 dti = imgs.DTI;
+global ForceDTI;
 if ~exist('atlas','var'), 
     atlas = 'jhu'; 
-    if isFieldSub(matName, 'dti'), fprintf('Skipping tractography (JHU DTI already computed) %s\n', imgs.ASL); return; end;
+    
+    if isempty(ForceDTI) &&  isFieldSub(matName, 'dti'), fprintf('Skipping tractography (JHU DTI already computed) %s\n', imgs.ASL); return; end;
 
 end;
-if isFieldSub(matName, ['dti_' atlas]), fprintf('Skipping tractography (DTI already computed) %s\n', imgs.ASL); return; end;
+if isempty(ForceDTI) &&   isFieldSub(matName, ['dti_' atlas]), fprintf('Skipping tractography (DTI already computed) %s\n', imgs.ASL); return; end;
 doDtiWarpSub(imgs, atlas); %warp atlas to DTI
 pth = fileparts(dti);
 bed_dir=fullfile(pth, 'bedpost');
@@ -712,7 +728,8 @@ if ~exist(atlasImg,'file')
 end
 [outhdr, outimg] = nii_reslice_target(atlasImg, '', T1, 0) ;
 roiname = prepostfixSub('', atlasext, imgs.DTI);
-if ~strcmpi(atlas,'jhu') &&  exist(roiname,'file')
+global ForceDTI;
+if isempty(ForceDTI) && ~strcmpi(atlas,'jhu') &&  exist(roiname,'file')
     fprintf('Skipping doDtiWarpSub: file exists %s\n', roiname);
     return;
 end
@@ -891,7 +908,11 @@ delImgs('fdswa', imgs.Rest);
 delImgs('fdw', imgs.Rest); %old routines combine 's'mooth and 'd'etrend
 delImgs('fdwa', imgs.Rest);
 delMat(imgs.Rest);
-nii_rest(imgs);
+%%% commented out by GY, March 4, 2017
+%nii_rest(imgs);
+%%% instead: (GY)
+rest_prefix = nii_rest (imgs)
+
 %7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
 prefix = 'a'; %assume slice time 'a'ligned
 restName = prefixSub(['dsw', prefix ],imgs.Rest);
@@ -902,7 +923,8 @@ if ~exist(restName,'file'),
         error('Catastrophic unspecified resting state error %s', restName);
     end
 end; %required
-nii_nii2mat (prefixSub(['fdsw', prefix ],imgs.Rest), 'rest', matName)
+%nii_nii2mat (prefixSub(['fdsw', prefix ],imgs.Rest), 'rest', matName)
+nii_nii2mat (prefixSub(rest_prefix,imgs.Rest), 'rest', matName) % slightly modified by GY, March 3
 nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended 
 nii_nii2mat (prefixSub(['palf_sw', prefix ],imgs.Rest), 'palf', matName) %conventional linear trends only
 vox2mat(prefixSub(['wmean' ],imgs.Rest), 'RestAve', matName); %no prefix: prior to slice time
@@ -953,7 +975,7 @@ if mx < 60,
 end;
 asl = imgs.ASL(ind,:);
 if ~exist(prefixSub('b',imgs.T1),'file'), return; end; %required
-if exist(prefixSub('wmeanCBF_0_src',asl),'file'), return; end; %already computed
+if isempty(ForceASL) && exist(prefixSub('wmeanCBF_0_src',asl),'file'), fprintf('Skipping ASL (wmeanCBF already computed) %s\n', imgs.ASL); return; end; %already computed
 [cbf, c1L, c1R, c2L, c2R] = nii_pasl12(asl, imgs.T1);
 nii_nii2mat(cbf, 'cbf', matName); %2
 stat = load(matName);
