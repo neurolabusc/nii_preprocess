@@ -571,11 +571,13 @@ if ~isfield(p,'t2name'),
     t2name = [];
 else
     t2name = findImgSub(p.t2name, '');
-    [pth, nm, ext] = fileparts(t2name);
-    t2name = fullfile(pth, ['r', nm, ext]);
     if ~exist(t2name, 'file')
         fprintf('T2 will not be used for fMRI normalization (unable to find registered %s\n', t2name);
         t2name = '';
+    else
+        disp(t2name)
+        [pth, nm, ext] = fileparts(t2name);
+        t2name = fullfile(pth, ['r', nm, ext]);
     end;
 end;
 
