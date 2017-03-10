@@ -41,14 +41,6 @@ if [ $nvol -lt 7 ]; then
 fi
 echo "Filenames dti= $dti dtir=$dtir"
 
-eddyExeName=eddy_openmp
-if [[ $PATH == *"cuda"* ]]; then
-  eddyExeName=eddy_cuda7.0
-  echo "cuda found in path: will use $eddyExeName"
-else
-  echo "cuda NOT found in path: will use $eddyExeName"
-fi
-
 #process dti data
 dti_bvec=${dti}.bvec
 dti_bval=${dti}.bval
@@ -71,6 +63,7 @@ then
 	exit 1
 fi
 
+
 # read -a bval0 <$dti_bval
 # #next line used to be "$bval0 -ne 0", changed since CMRR correctly reports small B values
 # if [ $bval0 -gt 10 ] #undistortion assumes first volume has b-value of zero
@@ -86,7 +79,7 @@ dti_faEro=${dti}_FA_ero #eroded dti fractional anisotropy map
 
 #########
 if [ ${#dtir} -eq 0 ]; then  #only given a single DTI
-	echo "1 EDDY: half-sphere bvecs should use dti_1_eddy_correct.sh"
+	echo "1X EDDY: undistort DTI data"
         #https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;dd9c03b7.1504
 	dti_b0=${dti}b0
 	#echo fslroi $dti $dti_b0 $minBvalIdx0 1
@@ -103,10 +96,17 @@ if [ ${#dtir} -eq 0 ]; then  #only given a single DTI
 	indx=""
 	for ((i=1; i<=nvol; i+=1)); do indx="$indx 1"; done
 	echo $indx > $dti_txt2
-	echo $eddyExeName --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --topup=$dti_t --repol --out=$dti_u
-	time $eddyExeName --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --repol --out=$dti_u
-	#cr 2017: use rotated vectors
+	echo eddy_cuda7.0 --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --topup=$dti_t --repol --out=$dti_u
+	time eddy_cuda7.0 --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --repol --out=$dti_u
+	#cr 2017: use rotated vectors	
 	dti_bvec=${dti}u.eddy_rotated_bvecs
+elif [ ${#dtir} -eq 0 ]; then  #only given a single DTI
+        #THIS CODE NEVER RUNS!!!!!!!!!!!!!
+	echo "1 EDDY_CORRECT: undistort DTI data"
+	#eddy_correct $dti $dti_u 0
+	eddy_correct $dti $dti_u $minBvalIdx0
+	bet $dti_u $dti_b  -f 0.2 -n -R -m
+	dti_b=${dti}b_mask #masked brain-extracted dti
 else #dual DTI: run topup
 	echo "1 TOPUP+EDDY: undistort DTI data"
 	#http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/TOPUP/ExampleTopupFollowedByApplytopup
@@ -154,14 +154,15 @@ else #dual DTI: run topup
 	dti_merge=${dti}both #merged
 	fslmerge -t $dti_merge $dti $dtir
 	#For GPU eddy_cuda7.0 instead of eddy_openmp
-	#eddy takes about 11 minutes for LIME data
+	#eddy takes about 11 minutes for LIME data	
+	# echo eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
+	# time eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
 	#CR 3/2017: with FSL 5.0.10 and later, use "--repol": https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/eddy/UsersGuide
-	#  https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/
-	echo $eddyExeName --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
-	time $eddyExeName --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
+	echo eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
+	time eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
 	#use merged dataset for dtifit
 	#dti_bvec=$dti_bvecm
-	#cr 2017: use rotated vectors
+	#cr 2017: use rotated vectors	
 	dti_bvec=${dti}u.eddy_rotated_bvecs
 	dti_bval=$dti_bvalm
 fi #if single DTI else dual DTI

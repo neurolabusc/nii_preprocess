@@ -84,7 +84,7 @@ diary off
 
 function addLimeVersionSub(matName)
 %add 'timestamp' to file allowing user to autodetect if there mat files are current
-% e.g. after running 
+% e.g. after running
 %  m = load(matName);
 %  fprintf('LIME version (YYYY.MMDD): %.4f\n', m.T1.lime);
 v = nii_matver;
@@ -336,14 +336,15 @@ if exist('isDki','var') && (isDki)
     global ForceDTI;
     if isempty(ForceDTI) && isFieldSub(matName, 'mk')
         fprintf('Skipping MK estimates: already computed\n');
-        return; 
+        return;
     end; %stats already exist
     warning('If you are using fsl 5.0.9, ensure you have patched version of eddy ("--repol" option) https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
-    if isEddyCuda7Sub()
-         command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
-    else
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
-    end
+    %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
+    %if isEddyCuda7Sub()
+    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+    %else
+    %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
+    %end
     command=sprintf('%s "%s"',command, imgs.DKI);
     doFslCmd (command);
     doDkiCoreSub(imgs.T1, imgs.DKI, matName)
@@ -399,7 +400,7 @@ if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file'), return; end; %re
 global ForceDTI;
 if isempty(ForceDTI) && isFieldSub(matName, 'fa')
     fprintf('Skipping MD/FA estimates: already computed\n');
-    return; 
+    return;
 end; %skip: previously computed
 FA = unGzSub (FA);
 nii_famask(FA, true); %8/2016: remove speckles at rim of cortex
@@ -439,11 +440,12 @@ if isempty(ForceDTI) && exist(dti_u, 'file')
 else
     clipSub (imgs); %topup requires images with even dimensions
     %1 - eddy current correct
-    if isEddyCuda7Sub()
-         command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
-    else
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
-    end
+    %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
+    %if isEddyCuda7Sub()
+	command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+    %else
+    %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
+    %end
     if isempty(imgs.DTIrev)
         command=sprintf('%s "%s"',command, imgs.DTI);
     else
@@ -598,9 +600,9 @@ if ~exist(bvec,'file') || ~exist(bval,'file'), error('Can not find files %s %s',
 function doDtiTractSub(imgs, matName, dtiDir, atlas)
 dti = imgs.DTI;
 global ForceDTI;
-if ~exist('atlas','var'), 
-    atlas = 'jhu'; 
-    
+if ~exist('atlas','var'),
+    atlas = 'jhu';
+
     if isempty(ForceDTI) &&  isFieldSub(matName, 'dti'), fprintf('Skipping tractography (JHU DTI already computed) %s\n', imgs.ASL); return; end;
 
 end;
@@ -920,7 +922,7 @@ end
 fileID = fopen(bnm,'r');
 [A, n] = fscanf(fileID,'%g'); %#ok<ASGLU>
 fclose(fileID);
-%check that number of elements in bval matches nifti! 
+%check that number of elements in bval matches nifti!
 if n < 2, return; end;
 if strcmpi(ext,'.nii')
    h = spm_vol(fnm);
@@ -946,7 +948,7 @@ rest_prefix = nii_rest (imgs)
 %7/2016 "dsw" nof "dw" as smoothing is now prior to detrending (for Chinese-style ALFF)
 prefix = 'a'; %assume slice time 'a'ligned
 restName = prefixSub(['dsw', prefix ],imgs.Rest);
-if ~exist(restName,'file'), 
+if ~exist(restName,'file'),
     prefix = ''; %unaligned: multi-band
     restName = prefixSub(['dsw', prefix ],imgs.Rest);
     if ~exist(restName,'file')
@@ -955,20 +957,20 @@ if ~exist(restName,'file'),
 end; %required
 %nii_nii2mat (prefixSub(['fdsw', prefix ],imgs.Rest), 'rest', matName)
 nii_nii2mat (prefixSub(rest_prefix,imgs.Rest), 'rest', matName) % slightly modified by GY, March 3
-nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended 
+nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended
 nii_nii2mat (prefixSub(['palf_sw', prefix ],imgs.Rest), 'palf', matName) %conventional linear trends only
 vox2mat(prefixSub(['wmean' ],imgs.Rest), 'RestAve', matName); %no prefix: prior to slice time
 vox2mat(prefixSub(['wbmean' ],imgs.Rest), 'RestAve', matName);
 %end doRestSub()
 
-function delImgs(prefix, fnm) 
-%e.g. delImgs('sw', 'X.nii') would delete wX.nii and swX.nii 
+function delImgs(prefix, fnm)
+%e.g. delImgs('sw', 'X.nii') would delete wX.nii and swX.nii
 [pth,nam] = spm_fileparts(fnm);
 fnmMat = fullfile(pth,[nam,'.mat']);
-for i = 1: numel(prefix), 
-    p = prefix(end-i+1:end); 
+for i = 1: numel(prefix),
+    p = prefix(end-i+1:end);
     d = prefixSub(p, fnm);
-    if exist(d,'file'), delete(d); end; %delete image    
+    if exist(d,'file'), delete(d); end; %delete image
     d = prefixSub(p, fnmMat);
     if exist(d,'file'), delete(d); end; %delete lmat
 end;
@@ -1406,7 +1408,6 @@ v = ~isempty(strfind(getenv('PATH'),'cuda'));
 %end
 %[s, thisVer] = system(['/usr/local/cuda/bin/nvcc --version | grep -o "' vstr '"']);
 %v = strcmpi(deblank(thisVer),vstr);
-
 %end isGpuInstalledSub()
 
 
