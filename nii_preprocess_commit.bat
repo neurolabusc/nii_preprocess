@@ -1,9 +1,9 @@
 #!/bin/bash
 #go to nii_preprocess folder
-if [[ ! -e /usr/local/nii_preprocess ]]; then
-            mkdir /usr/local/nii_preprocess
+if [[ ! -e /home/crlab/nii_preprocess ]]; then
+            mkdir /home/crlab/nii_preprocess
 fi
-cd /usr/local/nii_preprocess
+cd /home/crlab/nii_preprocess
 #commit with message
 git add .
 d=`date`
