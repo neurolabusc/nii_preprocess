@@ -79,28 +79,6 @@ dti_faEro=${dti}_FA_ero #eroded dti fractional anisotropy map
 
 #########
 if [ ${#dtir} -eq 0 ]; then  #only given a single DTI
-	echo "1X EDDY: undistort DTI data"
-        #https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;dd9c03b7.1504
-	dti_b0=${dti}b0
-	#echo fslroi $dti $dti_b0 $minBvalIdx0 1
-	fslroi $dti $dti_b0 $minBvalIdx0 1
-	#echo bet $dti_b0 $dti_b  -f 0.2 -R -n -m
-	bet $dti_b0 $dti_b  -f 0.2 -R -n -m
-	dti_b=${dti}b_mask #masked brain-extracted dti
-	#create acq_param: dummies as we will not run TOPUP
-	dti_txt=${dti}_acq_param.txt
-	printf "0 1 0 0.03388\n0 -1 0 0.03388\n" > $dti_txt
-	#create index files: all = 1 as we will not run TOPUP
-	dti_txt2=${dti}_index.txt
-	nvol=$(fslnvols $dti)
-	indx=""
-	for ((i=1; i<=nvol; i+=1)); do indx="$indx 1"; done
-	echo $indx > $dti_txt2
-	echo eddy_openmp --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --topup=$dti_t --repol --out=$dti_u
-	time eddy_openmp --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --repol --out=$dti_u
-	#cr 2017: use rotated vectors	
-	dti_bvec=${dti}u.eddy_rotated_bvecs
-elif [ ${#dtir} -eq 0 ]; then  #only given a single DTI
 	echo "1 EDDY_CORRECT: undistort DTI data"
 	#eddy_correct $dti $dti_u 0
 	eddy_correct $dti $dti_u $minBvalIdx0
@@ -132,7 +110,7 @@ else #dual DTI: run topup
 	dti_t=${dti}tp #topup dti
 	dti_tb0=${dti}tp #topup b0 map
 	#topup requires about 6 minutes for LIME data
-	echo "topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0"	
+	echo "topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0"
 	time topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0
 	#applytopup --imain=$dti,$dtir --inindex=1,2 --datain=$dti_txt --topup=$dti_t --out=$dti_u
 	#http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/EDDY/UsersGuide
@@ -150,14 +128,13 @@ else #dual DTI: run topup
 	paste ${dti}.bval ${dtir}.bval > $dti_bvalm
 	dti_merge=${dti}both #merged
 	fslmerge -t $dti_merge $dti $dtir
-	#CPU based: eddy_openmp instead of eddy_cuda7.0 
-	# echo eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
-	# time eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
+	#For GPU eddy_cuda7.0 instead of eddy_openmp
+	#eddy takes about 11 minutes for LIME data	
+	# echo eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
+	# time eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
 	#CR 3/2017: with FSL 5.0.10 and later, use "--repol": https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/eddy/UsersGuide
-	echo eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
-	time eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
-	
-	
+	echo eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
+	time eddy_cuda7.0 --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
 	#use merged dataset for dtifit
 	dti_bvec=$dti_bvecm
 	dti_bval=$dti_bvalm

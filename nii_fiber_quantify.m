@@ -499,8 +499,7 @@ if strcmpi(ext, x)
    [pth nam ext] = fileparts(fullfile(pth, nam));
    isMatch = true;
 end
-
-%end nii_filepartsSub()çç
+%end isExt()
 
 
 function [h, machine] = readHdrSub (data)

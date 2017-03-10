@@ -16,7 +16,7 @@ function [cbfName, c1L, c1R, c2L, c2R] = nii_pasl12 (ASLnames, T1name)
 % nii_pasl12('/Users/rorden/Desktop/pre/LM1010/ASL_LM1010.nii', '/Users/rorden/Desktop/pre/LM1010/T1_LM1010.nii', 1.1, [2 2 2]);
 % nii_pasl12('ASL_P022.nii','T1_P022.nii')
 % [cbfName, c1L, c1R, c2L, c2R] = nii_pasl12('ASL_P022.nii','T1_P022.nii')
-cbfName = '';
+cbfName = ''; c1L =''; c1R = ''; c2L = ''; c2R = '';
 maskLeft = true;
 isSPM12orNewerSub;
 addpath(fullfile(spm('Dir'),'compat')); %ASLtbx uses spm_chi2_plot 

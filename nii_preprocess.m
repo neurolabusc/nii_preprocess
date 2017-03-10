@@ -65,9 +65,8 @@ if true
             doDtiTractSub(imgs, matName, dtiDir, 'AICHA'); % uncommented by GY, Aug10_2016
             %-->compute scalar DTI metrics
             doFaMdSub(imgs, matName);
-            % doTractographySub(imgs);
+            doTractographySub(imgs);
             doDkiSub(imgs, matName);
-
             tStart = timeSub(tStart,'DTI');
         end
         doDkiSub(imgs, matName, true);
@@ -243,26 +242,52 @@ XYZmm = XYZmm(1:3);
 
 function doTractographySub(imgs)
 if isempty(imgs.DTI), return; end; %required
-Mask = prepostfixSub('', '_FA_thr', imgs.DTI);
-if ~exist(Mask,'file') , return; end; %required
+FAimg = prepostfixSub('', '_FA', imgs.DTI);
+if ~exist(FAimg,'file') , return; end; %required
 [p,n] = fsl_filepartsSub(imgs.DTI);
 basename = fullfile(p,n);
 vtkname = [basename, '.vtk'];
-if exist(vtkname,'file') , fprintf('Skipping tractography (alredy done): %s\n', vtkname); return; end; %required
-imgCnv = [basename, '_dtitk.nii.gz'];
-ConvExe = 'TVFromEigenSystem';
-PathConvExe = findExeSub(ConvExe);
-if isempty(PathConvExe), fprintf('Tractography skipped: unable to find %s', ConvExe); return; end;
-TrakExe = 'SingleTensorFT';
+%next: check for bedpost
+BPimg = fullfile(p, 'bedpost.bedpostX', 'dyads1.nii');
+if ~exist(BPimg,'file'), BPimg = fullfile(p, 'bedpost.bedpostX', 'dyads1.nii.gz'); end;
+if exist(BPimg,'file'), basename = BPimg; end;
+global ForceDTI;
+if isempty(ForceDTI) && exist(vtkname,'file') , fprintf('Skipping tractography (already done): %s\n', vtkname); return; end; %required
+if ismac
+    TrakExe = fullfile(fileparts(which(mfilename)), 'tracktionOSX');
+elseif isunix % Code to run on Linux plaform
+    TrakExe = fullfile(fileparts(which(mfilename)), 'tracktionLX');
+end
 PathTrakExe = findExeSub(TrakExe);
 if isempty(PathTrakExe), fprintf('Tractography skipped: unable to find %s', TrakExe); return; end;
-cmd = sprintf('%s -basename "%s" -out %s -type FSL',ConvExe,basename, imgCnv);
-[status, fullnam]  = system(cmd,'-echo');
-%e.g. TVFromEigenSystem -basename 199_99_AP_7 -type FSL
-cmd = sprintf('%s -in "%s" -seed "%s" -out "%s"',TrakExe, imgCnv, Mask, vtkname );
-%e.g. SingleTensorFT -in 199_99_AP_7.nii.gz -seed 199_99_AP_7_FA_thr.nii.gz -out t.vtk
+cmd = sprintf('%s -o "%s" "%s"',TrakExe, vtkname, basename);
 [status, fullnam]  = system(cmd,'-echo');
 %end doTractographySub()
+
+%old version uses SingleTensorFT that does not preserve NIfTI orientation
+%and can not use BEDPOSTX
+% function doTractographySub(imgs)
+% if isempty(imgs.DTI), return; end; %required
+% Mask = prepostfixSub('', '_FA_thr', imgs.DTI);
+% if ~exist(Mask,'file') , return; end; %required
+% [p,n] = fsl_filepartsSub(imgs.DTI);
+% basename = fullfile(p,n);
+% vtkname = [basename, '.vtk'];
+% if exist(vtkname,'file') , fprintf('Skipping tractography (alredy done): %s\n', vtkname); return; end; %required
+% imgCnv = [basename, '_dtitk.nii.gz'];
+% ConvExe = 'TVFromEigenSystem';
+% PathConvExe = findExeSub(ConvExe);
+% if isempty(PathConvExe), fprintf('Tractography skipped: unable to find %s', ConvExe); return; end;
+% TrakExe = 'SingleTensorFT';
+% PathTrakExe = findExeSub(TrakExe);
+% if isempty(PathTrakExe), fprintf('Tractography skipped: unable to find %s', TrakExe); return; end;
+% cmd = sprintf('%s -basename "%s" -out %s -type FSL',ConvExe,basename, imgCnv);
+% [status, fullnam]  = system(cmd,'-echo');
+% %e.g. TVFromEigenSystem -basename 199_99_AP_7 -type FSL
+% cmd = sprintf('%s -in "%s" -seed "%s" -out "%s"',TrakExe, imgCnv, Mask, vtkname );
+% %e.g. SingleTensorFT -in 199_99_AP_7.nii.gz -seed 199_99_AP_7_FA_thr.nii.gz -out t.vtk
+% [status, fullnam]  = system(cmd,'-echo');
+% %end doTractographySub()
 
 function fullnam = findExeSub(nam)
 %findExeSub('nano') returns path of executable ("/usr/bin/nano") or empty if not found
@@ -313,6 +338,7 @@ if exist('isDki','var') && (isDki)
         fprintf('Skipping MK estimates: already computed\n');
         return; 
     end; %stats already exist
+    warning('If you are using fsl 5.0.9, ensure you have patched version of eddy ("--repol" option) https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
     if isEddyCuda7Sub()
          command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
     else
@@ -555,10 +581,16 @@ function [bvec, bval] = getBVec(dti)
 dti = unGzNameSub(deblank(dti));
 [p,n] = fileparts(dti);
 dti = fullfile(p,n);
-bvec = [dti 'both.bvec'];
+bvec = [dti 'u.eddy_rotated_bvecs'];
+if ~exist(bvec,'file')
+    error('Unable to find %s', bvec);
+    bvec = [dti 'both.bvec'];
+end
 bval = [dti 'both.bval'];
 if exist(bvec,'file') && exist(bval,'file'), return; end;
-bvec = [dti '.bvec'];
+if ~exist(bvec,'file')
+    bvec = [dti '.bvec'];
+end
 bval = [dti '.bval'];
 if ~exist(bvec,'file') || ~exist(bval,'file'), error('Can not find files %s %s', bvec, bval); end;
 %end getBVec()
@@ -752,7 +784,7 @@ if strcmpi(deblank(x),'.gz') %.nii.gz
     [p, n, x] = fileparts(fullfile(p,n));
     x = [x, '.gz'];
 end
-%end unGzNameSub()
+%end fsl_filepartsSub()
 
 function imgname = unGzNameSub(imgname)
 [p, n, x] = fileparts(imgname);
@@ -760,8 +792,6 @@ if strcmpi(deblank(x),'.gz') %.nii.gz
     imgname = fullfile(p,n);
 end
 %end unGzNameSub()
-
-
 
 function oldNormSub(src, tar, smoref, reg, interp)
 %coregister T2 to match T1 image, apply to lesion
@@ -977,6 +1007,7 @@ asl = imgs.ASL(ind,:);
 if ~exist(prefixSub('b',imgs.T1),'file'), return; end; %required
 if isempty(ForceASL) && exist(prefixSub('wmeanCBF_0_src',asl),'file'), fprintf('Skipping ASL (wmeanCBF already computed) %s\n', imgs.ASL); return; end; %already computed
 [cbf, c1L, c1R, c2L, c2R] = nii_pasl12(asl, imgs.T1);
+if isempty(cbf), warning('Catastrophic error with nii_pasl12'); return; end;
 nii_nii2mat(cbf, 'cbf', matName); %2
 stat = load(matName);
 stat.cbf.nV = nV;

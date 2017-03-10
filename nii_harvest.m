@@ -1,12 +1,14 @@
 function nii_harvest (baseDir)
 
-outDir = '/home/crlab/Desktop/pp';
-outDir = '/media/FAT1000/Master_In';
-baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
+baseDir = '/home/crlab/input';
+outDir = '/home/crlab/output';
+%outDir = '/media/FAT1000/Master_In';
+%baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
 isExitAfterTable = false; % <- if true, only generates table, does not process data
-reprocessRest = true;
+reprocessRest = false;
 reprocessfMRI = false;
 reprocessASL = false;
+reprocessDTI = false;
 
 %outDir = '/media/UBU/Master_In/';
 %baseDir = '/media/UBU/Master_DB/'; %'/Root'
@@ -18,8 +20,8 @@ if ~exist('baseDir','var') || isempty(baseDir)
 end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
-subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
-subjDirs = {'M2118'}; % temporary, for testing only!!! -- GY
+%subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
+%subjDirs = {'M2118'}; % temporary, for testing only!!! -- GY
 
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
@@ -118,6 +120,10 @@ for s = 1: nSubj
     if imgs(s).nii.ASL.newImg, ForceASL = true; end;
     if imgs(s).nii.DTI.newImg, ForceDTI = true; end;
       %to reprocess one modality for EVERYONE....
+    if reprocessDTI && isfield(imgs(s).nii.DTI,'img')
+        ForceDTI = true;
+        anyNewImg = true;
+    end
     if reprocessRest && isfield(imgs(s).nii.Rest,'img')
         ForceRest = true;
         anyNewImg = true;
