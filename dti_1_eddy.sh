@@ -98,7 +98,7 @@ if [ ${#dtir} -eq 0 ]; then  #only given a single DTI
 	echo $indx > $dti_txt2
 	echo eddy_openmp --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --topup=$dti_t --repol --out=$dti_u
 	time eddy_openmp --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --repol --out=$dti_u
-	#cr 2017: use rotated vectors	
+	#cr 2017: use rotated vectors
 	dti_bvec=${dti}u.eddy_rotated_bvecs
 elif [ ${#dtir} -eq 0 ]; then  #only given a single DTI
 	echo "1 EDDY_CORRECT: undistort DTI data"
@@ -113,7 +113,7 @@ else #dual DTI: run topup
 	dtir_b0=${dtir}b0
 	both_b0=${dti}b0m #merged
 	#fslroi $dti $dti_b0 0 1
-	fslroi $dti $dti_b0 $minBvalIdx0 $minBvalIdx
+	fslroi $dti $dti_b0 $minBvalIdx0 1
 	#fslroi $dtir $dtir_b0 0 1
 	dtir_bval=${dtir}.bval
 	minBval=$(awk '{m=$1;for(i=1;i<=NF;i++)if($i>=0 && $i<m)m=$i;print m}' $dtir_bval)
@@ -124,7 +124,7 @@ else #dual DTI: run topup
 	fi
 	minBvalIdx=$(awk '{m=$1; idx=1;for(i=1;i<=NF;i++){if($i>=0 && $i<m){m=$i;idx=i}}print idx}' $dtir_bval)
 	minBvalIdx0=`expr $minBvalIdx - 1`
-	fslroi $dtir $dtir_b0 $minBvalIdx0 $minBvalIdx
+	fslroi $dtir $dtir_b0 $minBvalIdx0 1
 	fslmerge -t $both_b0 $dti_b0 $dtir_b0
 	echo 'topup assuming flip in 2nd dimension and a readout of 0.3388x'
 	dti_txt=${dti}_acq_param.txt
@@ -132,7 +132,7 @@ else #dual DTI: run topup
 	dti_t=${dti}tp #topup dti
 	dti_tb0=${dti}tp #topup b0 map
 	#topup requires about 6 minutes for LIME data
-	echo "topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0"	
+	echo "topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0"
 	time topup --imain=$both_b0 --datain=$dti_txt --config=b02b0.cnf --out=$dti_t  --iout=$dti_tb0
 	#applytopup --imain=$dti,$dtir --inindex=1,2 --datain=$dti_txt --topup=$dti_t --out=$dti_u
 	#http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/EDDY/UsersGuide
@@ -150,14 +150,14 @@ else #dual DTI: run topup
 	paste ${dti}.bval ${dtir}.bval > $dti_bvalm
 	dti_merge=${dti}both #merged
 	fslmerge -t $dti_merge $dti $dtir
-	#CPU based: eddy_openmp instead of eddy_cuda7.0 
+	#CPU based: eddy_openmp instead of eddy_cuda7.0
 	# echo eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
 	# time eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --out=$dti_u
 	#CR 3/2017: with FSL 5.0.10 and later, use "--repol": https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/eddy/UsersGuide
 	echo eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
 	time eddy_openmp --imain=$dti_merge --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvecm --bvals=$dti_bvalm --topup=$dti_t --repol --out=$dti_u
-	
-	
+
+
 	#use merged dataset for dtifit
 	dti_bvec=$dti_bvecm
 	dti_bval=$dti_bvalm
