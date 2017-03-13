@@ -567,7 +567,7 @@ else
     FWHM = 6; 
 
 end;
-if ~isfield(p,'t2name'), 
+if ~isfield(p,'t2name') || isempty(p.t2name), 
     t2name = [];
 else
     t2name = findImgSub(p.t2name, '');
