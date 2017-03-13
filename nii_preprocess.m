@@ -593,11 +593,11 @@ dti = unGzNameSub(deblank(dti));
 dti = fullfile(p,n);
 bvec = [dti 'u.eddy_rotated_bvecs'];
 if ~exist(bvec,'file')
-    error('Unable to find %s', bvec);
     bvec = [dti 'both.bvec'];
 end
 bval = [dti 'both.bval'];
-if exist(bvec,'file') && exist(bval,'file'), return; end;
+if exist(bvec,'file') && exist(bval,'file'), return; end; %combined AP/PA bvecs
+%fall back to original bvecs and bvals
 if ~exist(bvec,'file')
     bvec = [dti '.bvec'];
 end
