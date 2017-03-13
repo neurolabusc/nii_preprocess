@@ -1,1 +1,0 @@
-ID	lesion	cbf	rest	i3mT1	i3mT2	fa	dti	md	ttp	mtt	cbv	dtifc	fmri	fmrib	alf	mk	palf	
