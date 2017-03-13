@@ -29,10 +29,10 @@ subjDirs = {'M2005','M2014','M2030','M2034','M2036','M2037','M2039','M2040',...
     'M2041','M2051','M2069','M2074','M2096','M2106','M2111','M2117','M2119',...
     'M2120','M2122','M2124','M2125','M2142','M2143','M2145','M2147','M2164',...
     'M4148','M4150','M4180','M4189','M4211','M4214'};
-
+subjDirs = {'M2005'};
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI', 'DKI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
-modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
+modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0, 0]; %T1 and T2 must be from same study as lesion
 
 modalityKeys = strrep(modalityKeysVerbose,'_','');
 xperimentKeys = {'POLAR','SE', 'LIME', 'CT', 'R01', 'CAT'}; %order specifies priority: 1st item checked first!
