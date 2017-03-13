@@ -1,17 +1,16 @@
 function nii_harvest (baseDir)
 
-%change target directory when you are doing this on a different machine
-%(like titan or your own computer
-
+baseDir = '/home/crlab/Desktop/Master_In_CON';
+outDir = '/home/crlab/Desktop/Master_DB_CON';
 %baseDir = '/home/crlab/input';
 %outDir = '/home/crlab/output';
-outDir = '/media/FAT1000/Master_In';
-baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
+%outDir = '/media/FAT1000/Master_In';
+%baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
 isExitAfterTable = false; % <- if true, only generates table, does not process data
 reprocessRest = false;
 reprocessfMRI = false;
 reprocessASL = false;
-reprocessDTI = true;
+reprocessDTI = false;
 
 %outDir = '/media/UBU/Master_In/';
 %baseDir = '/media/UBU/Master_DB/'; %'/Root'
@@ -24,18 +23,14 @@ end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
-%subjDirs = {'M2140'}; % temporary, for testing only!!! -- GY
-subjDirs = {'M2014','M2030','M2034','M2036','M2037','M2039','M2040',...
-    'M2041','M2051','M2069','M2074','M2096','M2106','M2111','M2117','M2119',...
-    'M2120','M2122','M2124','M2125','M2142','M2143','M2145','M2147','M2164',...
-    'M4148','M4150','M4180','M4189','M4211','M4214'};
-subjDirs = {'M2124'};
+%subjDirs = {'M2118'}; % temporary, for testing only!!! -- GY
+subjDirs = {'P0082'};
 
-modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI', 'DKI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
-modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0, 0]; %T1 and T2 must be from same study as lesion
+modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
+modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
 
 modalityKeys = strrep(modalityKeysVerbose,'_','');
-xperimentKeys = {'POLAR','SE', 'LIME', 'CT', 'R01', 'CAT'}; %order specifies priority: 1st item checked first!
+xperimentKeys = {'dayzero','followup','POLAR','SE', 'LIME', 'CT', 'R01', 'CAT'}; %order specifies priority: 1st item checked first!
 %create empty structure
 blank = [];
 blank.subjName = [];
@@ -210,7 +205,9 @@ tf = strncmpi(strEnd,pattern, numel(pattern));
 function imgs = findNovelImgs(subjDir, imgs, modalityKeysVerbose)
 f = fieldnames(imgs.nii);
 for i = 1: numel(f)
-    imgs.nii.(f{i}).newImg = true;%??
+%    if isfield(imgs.nii,f{i})
+        imgs.nii.(f{i}).newImg = true;%??
+%    end
 end
 %'fMRI'
 if ~isfield(imgs.nii,'T1') || isempty(imgs.nii.T1), return; end;
@@ -245,18 +242,18 @@ end;
 
 function setAcpcSubT1 (matname)
 m = load(matname);
-if isfield(m,'T2') && isfield(m,'Lesion')
+if isfield(m,'T2') && isfield(m,'Lesion') && ~isempty(m.T2) && ~isempty(m.Lesion)
     nii_setOrigin12({m.T2,m.Lesion}, 2, true); %T2
 end
-if isfield(m,'T1')
+if isfield(m,'T1') && ~isempty(m.T1)
     nii_setOrigin12(m.T1, 1, true); %T1 - crop
 end
 
 function setAcpcSubDTI (matname)
 m = load(matname);
-if isfield(m,'DTI') && isfield(m,'DTIrev')
+if isfield(m,'DTI') && isfield(m,'DTIrev') && ~isempty(m.DTI) && ~isempty(m.DTIrev)
     nii_setOrigin12({m.DTI,m.DTIrev}, 3, false); %DTI
-elseif isfield(m,'DTI')
+elseif isfield(m,'DTI') && ~isempty(m.DTI)
     nii_setOrigin12(m.DTI, 3, false); %DTI
 end
 %end setAcpcSub();
