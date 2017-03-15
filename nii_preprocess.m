@@ -849,6 +849,14 @@ if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 function nii_check_dependencies
 %make sure we can run nii_preprocess optimally
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
+if isempty(which('nii_batch12')), 
+    p = fileparts(which('nii_preprocess'));
+    p = fullfile(p,'nii_fmri');
+    addpath(p);
+    if isempty(which('nii_batch12'))
+        error('Unable to find nii_batch12'); 
+    end;
+end;  
 if ~exist('spm_create_vol','file'), error('SPM12 required'); end;
 %make sure user uncomments timing line in spm
 fnm = which('spm_create_vol');

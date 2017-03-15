@@ -624,7 +624,6 @@ if  (TRsec == 0)
         fprintf('Auto-detected repetition time (TR) as %gsec\n', TRfmri); 
     end
     TRsec = TRfmri;
-    
 else
     if (TRfmri > 0) && (abs(TRsec - TRfmri) > 0.001)
        warning('Please check TR, header reports %g (not %g)\n', TRfmri, TRsec);
@@ -671,7 +670,11 @@ if (hdr.dim(1) == 90) && (hdr.dim(2) == 90) && (hdr.dim(3) == 50)
     slice_order = -1; %skip: multiband!
     return;
 end
-
+if ~isempty(findstr(hdr(1).private.aux_file,'_MB'))
+    slice_order = -1; %skip: multiband!
+    fprintf('Multi-band detected: slice time correction skipped\n');
+    return;    
+end
 if (slice_order > 0) && (slice_order <= 7)
     fprintf('Auto-detected slice order as %d\n',slice_order);
 else

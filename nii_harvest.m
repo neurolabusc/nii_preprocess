@@ -1,9 +1,7 @@
 function nii_harvest (baseDir)
 
-baseDir = '/home/crlab/Desktop/Master_In_CON';
-outDir = '/home/crlab/Desktop/Master_DB_CON';
-%baseDir = '/home/crlab/input';
-%outDir = '/home/crlab/output';
+baseDir = '/home/crlab/input';
+outDir = '/home/crlab/output';
 %outDir = '/media/FAT1000/Master_In';
 %baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
 isExitAfterTable = false; % <- if true, only generates table, does not process data
@@ -24,7 +22,7 @@ subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
 %subjDirs = {'M2118'}; % temporary, for testing only!!! -- GY
-subjDirs = {'P0082'};
+subjDirs = {'M2030'};
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
