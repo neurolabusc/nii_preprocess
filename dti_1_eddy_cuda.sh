@@ -103,7 +103,7 @@ if [ ${#dtir} -eq 0 ]; then  #only given a single DTI
 	indx=""
 	for ((i=1; i<=nvol; i+=1)); do indx="$indx 1"; done
 	echo $indx > $dti_txt2
-	echo $eddyExeName --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --topup=$dti_t --repol --out=$dti_u
+	echo $eddyExeName --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --repol --out=$dti_u
 	time $eddyExeName --imain=$dti --mask=$dti_b --acqp=$dti_txt --index=$dti_txt2 --bvecs=$dti_bvec --bvals=$dti_bval --repol --out=$dti_u
 	#cr 2017: use rotated vectors
 	dti_bvec=${dti}u.eddy_rotated_bvecs

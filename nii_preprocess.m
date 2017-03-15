@@ -697,7 +697,11 @@ end
 fprintf ('computing probtrackx for %d regions (this may take a while)\n',numel(commands) );
 doThreads(commands, prob_dir);
 fprintf ('probtrackx2 took %f seconds to run.\n', toc(t_start) ); %t_start=tic;
-nii_fiber_quantify(matName, dtiDir, atlas);
+if isempty(ForceDTI)
+    nii_fiber_quantify(matName, dtiDir, atlas);
+else
+    nii_fiber_quantify(matName, dtiDir, atlas, true);
+end
 %sum(nOK(:))
 
 function [hd,im] = loadSub(fnm);
