@@ -100,6 +100,7 @@ if isExitAfterTable
 end
 if exist(outDir, 'file') ~= 7, error('Unable to find folder %s', outDir); end;
 %find images we have already processed
+if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 
 for s = 1: nSubj
     anyNewImg = false;
