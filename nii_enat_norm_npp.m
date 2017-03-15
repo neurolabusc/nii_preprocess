@@ -6,13 +6,13 @@ function nii_enat_norm(T1,lesion,T2, UseXTemplate, vox, bb, DeleteIntermediateIm
 %  T2: (optional) filename of image used to draw lesion, if '' then lesion drawn on T1
 %  UseXTemplate: if false (default) standard SPM template is used, else special template 
 %Examples
-% nii_norm12('MB_T1.nii','MB_LESION.nii') %lesion drawn on T1 scan
-% nii_norm12('MB_T1.nii','MB_LESION.nii','MB_T2.nii') %lesion drawn on T2 scan
-% nii_enat_norm('T1_P018.nii','') %no T1
+% nii_enat_norm('T1_LM1054.nii','LS_LM1054.nii','') %lesion drawn on T1 scan
+% nii_enat_norm('T1_LM1054.nii','LS_LM1054.nii',''T2_LM1054.nii') %lesion drawn on T2 scan
+% nii_norm12('MB_T1.nii','',''); %no lesion - control participant
 % nii_norm12 %use graphical interface
 
 %STEP 0: check inputs
-isSPM12orNewerSub;
+isSPM12orNewerSub;spm fmri
 T1param = exist('T1','var'); %did the user provide a T1 scan
 if ~T1param, T1 = spm_select(1,'image','Select T1 images'); end;
 if isempty(T1), return; end;
@@ -30,14 +30,20 @@ if ~exist('autoOrigin','var')
    %autoOrigin = strcmpi(ButtonName,'Yes');
    autoOrigin = false;
 end
-
 T1 = stripVolSub(T1); lesion = stripVolSub(lesion); T2 = stripVolSub(T2);
-if 
-[T1,lesion,T2] = checkDimsSub(T1, lesion, T2); %check alignment
-
+if isDoneSub(T1), fprintf('Already done: skipping normalization of %s\n',T1); return; end;
+if ~isempty(lesion), [T1,lesion,T2] = checkDimsSub(T1, lesion, T2); end; %check alignment
 %0: rough estimate for origin and alignment
 if autoOrigin
     setOriginSub({T1, T2, lesion}, 1); 
+end
+if isempty(lesion) %if no lesion - standard normalization
+   newSegSub(T1,'', UseXTemplate);
+   %2: create 'b' (brain extracted) image without scalp signal
+    bT1 = extractSub(ssthresh, T1, prefixSub('c2', T1), prefixSub('c1', T1));
+    rT1 = newSegWriteSub(T1, bT1, [0.9 0.9 0.9]); %#ok<NASGU>
+    %wT1 = newSegWriteSub(T1, T1, vox, bb); %#ok<NASGU>
+   return;
 end
 %1: align lesion/t2 to match T1
 [rT2, rlesion] = coregEstWriteSub(T1,T2,lesion); %#ok<ASGLU>
@@ -49,7 +55,7 @@ eT1 = entiamorphicSub (T1, rlesion);
 newSegSub(eT1,'', UseXTemplate);
 %newSegSub(eT1, erT2, UseXTemplate); %for multichannel
 %4: create 'b' (brain extracted) image without scalp signal
-bT1 = extractSub(ssthresh, T1, prefixSub('c1', eT1), prefixSub('c2', eT1));
+bT1 = extractSub(ssthresh, T1, prefixSub('c2', eT1), prefixSub('c1', eT1));
 %5: warp render image to standard space
 rT1 = newSegWriteSub(eT1, bT1, [0.9 0.9 0.9]); %#ok<NASGU>
 %6: warp lesion to standard space
@@ -65,6 +71,16 @@ if DeleteIntermediateImages, deleteSub(T1); end;
 %spm_smooth(img, smth, FWHM, 0);  
 %img = smth;
 %end smoothSub()
+
+function isDone = isDoneSub(T1)
+isDone = false;
+[pth,nam,ext] = fileparts(T1);
+b = fullfile(pth,['b', nam, ext]); %brain extracted image
+if ~exist(b,'file'), return; end; 
+defname = fullfile(pth,['y_' nam ext]); %control normalization
+edefname = fullfile(pth,['y_e' nam ext]); %patient normalization
+if exist(defname,'file') || exist(edefname,'file'), isDone = true; end;
+%end isDoneSub()
 
 function img = smoothSub(img, FWHM)
 if isempty(img), return; end;
@@ -98,7 +114,8 @@ img = fullfile(n, [m, x]);
 
 function [T1,lesion,T2] = checkDimsSub(T1, lesion, T2)
 if ~exist(T1,'file'), error('T1 image required %s', T1); end;
-if ~exist(lesion,'var'), return; end;
+if ~exist('lesion','var'), return; end;
+if isempty(lesion), return; end;
 if ~exist(lesion,'file'), error('Lesion image not found %s', lesion); end;
 hdrT1 = spm_vol(T1);
 hdrLS = spm_vol(lesion);
@@ -190,11 +207,7 @@ if thresh <= 0
     m=m.*w;
 else
     mask= zeros(size(m));
-    for px=1:length(w(:)),
-      if w(px) >= thresh
-        mask(px) = 255;
-      end;
-    end;
+    mask(w >= thresh) = 255;
     spm_smooth(mask,mask,1); %feather the edges
     mask = mask / 255;
     m=m.*mask;
@@ -333,6 +346,7 @@ hdr = spm_vol(nam);
 img = spm_read_vols(hdr);
 hdr_flip = spm_vol(namLR); 
 imgFlip = spm_read_vols(hdr_flip);
+if ~isequal(size(img), size(imgLesion)), error('Dimensions do not match %s %s', lesion, nam); end;
 rdata = (img(:) .* (1.0-imgLesion(:)))+ (imgFlip(:) .* imgLesion(:));
 rdata = reshape(rdata, size(img));
 [pth, nam, ext] = spm_fileparts(hdr.fname);

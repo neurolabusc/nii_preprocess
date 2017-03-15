@@ -16,9 +16,9 @@ function matName = nii_preprocess(imgs, matName)
 fprintf('%s version 1Aug2016\n', mfilename);
 %warning('Not checking for updates 6666');
 checkForUpdate(fileparts(mfilename('fullpath')));
+nii_check_dependencies;
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(which('NiiStat')), error('NiiStat required'); end;
-if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 %f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
 
@@ -846,6 +846,37 @@ bDir = fullfile(p,'probtrackx');
 if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 %end rmBedpostDir()
 
+function nii_check_dependencies
+%make sure we can run nii_preprocess optimally
+if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
+if ~exist('spm_create_vol','file'), error('SPM12 required'); end;
+%make sure user uncomments timing line in spm
+fnm = which('spm_create_vol');
+txt = fileread(fnm);
+badStr = '%try, N.timing = V.private.timing; end';
+if ~isempty(strfind(txt,badStr))
+   error('Please uncomment "%s" from "%s"', badStr, fnm); 
+end
+%make sure the user had the correct version of fsl_sub
+fsldir = fslDirSub;
+fnm = fullfile(fsldir, 'bin', 'fsl_sub');
+if ~exist(fnm,'file'), error('%s required', fnm); end;
+txt = fileread(fnm);
+goodStr = '_gpu';
+if isempty(strfind(txt,goodStr))
+   error('Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm); 
+end
+%make sure eddy supports repol
+cmd = fullfile(fsldir, 'bin', 'eddy_openmp');
+fslEnvSub;
+cmd = fslCmdSub(cmd);
+[~,cmdout]  = system(cmd);
+goodStr = '--repol';
+if isempty(strfind(cmdout,goodStr))
+   error('Update eddy files to support "repol" https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
+end
+%end nii_check_dependencies()
+
 function fsldir = fslDirSub;
 fsldir= '/usr/local/fsl/'; %CentOS intall location
 if ~exist(fsldir,'dir')
@@ -1062,7 +1093,8 @@ imgs.T1 = removeDotSub (imgs.T1);
 if size(imgs.T1,1) > 1 || size(imgs.T2,1) > 1 || size(imgs.Lesion,1) > 1
     error('Require no more than one image for these modalities: T1, T2, lesion');
 end;
-nii_enat_norm(imgs.T1,imgs.Lesion,imgs.T2);
+%we have a separate version of nii_enat_norm in SPM scripts as well
+nii_enat_norm_npp(imgs.T1,imgs.Lesion,imgs.T2);
 if ~isFieldSub(matName, 'T1')
     bT1 = prefixSub('wb',imgs.T1);
     vox2mat(bT1,'T1',matName);
