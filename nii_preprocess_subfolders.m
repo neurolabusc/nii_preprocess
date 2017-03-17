@@ -6,20 +6,25 @@ function nii_preprocess_subfolders(pth)
 % nii_preprocess_subfolders; % search from current working directory
 %Notes: will skip folders with "_" in name, e.g. will skip M2002:
 % pth/M2000 pth/M2001 pth/M2002_dementia pth/M2003
+vers = nii_matver;
+
+ButtonName = questdlg(sprintf('Version %g?', vers.lime), 'Yes', 'No');
+if ~strcmpi(ButtonName,'Yes'), return; end;
 if ~exist('pth','var'), pth = pwd; end;
 f = subFolderSub(pth);
+
 if isempty(f), error('No folders in parent folder %s', pth); end;
 %global ForcefMRI;  ForcefMRI = true; warning('FORCED fMRI REPROCESSING'); %comment line for auto-processing
 %global ForceRest;  ForceRest =  warning('FORCED REST REPROCESSING'); %comment line for auto-processing
 %global ForceASL;  ForceASL = true; warning('FORCED ASL REPROCESSING'); %comment line for auto-processing
-
+global ForceDTI; ForceDTI = [];
 global ForcefMRI;  ForcefMRI = []; %comment line for auto-processing
 global ForceRest;  ForceRest = [];   %comment line for auto-processing
 global ForceASL;  ForceASL = []; %comment line for auto-processing
 isPreprocess = false; %process data
 isCopymat = true;
 
-%f = {'M2039';}; %for a single folder
+f = {'M2049';}; %for a single folder
 %f = {'M2121';'M2122';'M2123';'M2124';'M2125';'M2126';'M4191';'M4209';'M4211';'M2042';'M2096';'M2103'};%
 if isPreprocess
     t = tic;
@@ -43,7 +48,7 @@ end %if isPreprocess
 if isCopymat
     vers = nii_matver;
     vers = sprintf('%.4f', vers.lime);
-    vers = '2017.0307'; %%% GY
+    %vers = '2017.0307'; %%% GY
     outpth = fullfile(pth, ['M.', vers]);
     mkdir(outpth);
     %MasterID = {'M2025', 'M2071', 'M2005', 'M2036', 'M2006', 'M2002', 'M2069', 'M2007', 'M2020', 'M2141', 'M2142', 'M2046', 'M2014', 'M2074', 'M2061', 'M2078', 'M2143', 'M2072', 'M2144', 'M2145', 'M2146', 'M2075', 'M2059', 'M2040', 'M2076', 'M2016', 'M2147', 'M2148', 'M2082', 'M2079', 'M2070', 'M2149', 'M2150', 'M2151', 'M2152', 'M2085', 'M2153', 'M2086', 'M4138', 'M2154', 'M4148', 'M2088', 'M2044', 'M2087', 'M2155', 'M2084', 'M2030', 'M2156', 'M2157', 'M2158', 'M2159', 'M2160', 'M2094', 'M2161', 'M2162', 'M2031', 'M2017', 'M2163', 'M2103', 'M4180', 'M2164', 'M2106', 'M2165', 'M2110', 'M2109', 'M2114', 'M2166', 'M2112', 'M2111', 'M2029'};

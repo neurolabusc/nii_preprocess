@@ -23,10 +23,13 @@ subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
 %subjDirs = {'M2118'}; % temporary, for testing only!!! -- GY
 
-subjDirs = {'M4214';'M2037';'M2039';'M2040';...
-    'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
-    'M2120';'M2122';'M2124';'M2125';'M2142';'M2143';'M2145';'M2147';'M2164';...
-    'M4148';'M4150';'M4180';'M4189';'M4211'};
+% subjDirs = {'M4214';'M2037';'M2039';'M2040';...
+%     'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
+%     'M2120';'M2122';'M2124';'M212clc5';'M2142';'M2143';'M2145';'M2147';'M2164';...
+%     'M4148';'M4150';'M4180';'M4189';'M4211'};
+
+subjDirs = {'M2036'};
+
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
 
@@ -101,7 +104,7 @@ end
 if exist(outDir, 'file') ~= 7, error('Unable to find folder %s', outDir); end;
 %find images we have already processed
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
-
+process1st = true;
 for s = 1: nSubj
     anyNewImg = false;
     subj = deblank(imgs(s).subjName);
@@ -188,7 +191,8 @@ for s = 1: nSubj
         if imgs(s).nii.DTI.newImg, setAcpcSubDTI (matNameGUI); end;
 
         %process the data
-        nii_preprocess(mat);
+        nii_preprocess(mat,[],process1st);
+        process1st = false; %only check for updates for first person
         %matName = fullfile(subjDir, sprintf('T1_%s_%s_lime.mat', subj, imgs(s).nii.T1.x));
         %nii_preprocess(mat,matName);
         

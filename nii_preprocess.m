@@ -1,4 +1,4 @@
-function matName = nii_preprocess(imgs, matName)
+function matName = nii_preprocess(imgs, matName, checkForUpdates)
 %preprocess data from multiple modalities3
 % imgs.T1: filename of T1 scan - ONLY REQUIRED INPUT: ALL OTHERS OPTIONAL
 % imgs.T2: filename used to draw lesion, if absent lesion drawn on T1
@@ -15,10 +15,11 @@ function matName = nii_preprocess(imgs, matName)
 
 fprintf('%s version 1Aug2016\n', mfilename);
 %warning('Not checking for updates 6666');
-checkForUpdate(fileparts(mfilename('fullpath')));
+if ~exist('checkForUpdates','var') || checkForUpdates
+    checkForUpdate(fileparts(mfilename('fullpath')));
+end
 nii_check_dependencies;
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
-if isempty(which('NiiStat')), error('NiiStat required'); end;
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 %f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
 
@@ -32,7 +33,7 @@ if ~isfield(imgs,'DTI'), imgs.DTI = []; end;
 if ~isfield(imgs,'DTIrev'), imgs.DTIrev = []; end;
 if ~isfield(imgs,'fMRI'), imgs.fMRI = []; end;
 
-if ~exist('matName','var')
+if ~exist('matName','var') || isempty(matName)
     [p,n] = filepartsSub(imgs.T1);
     if ~exist(p,'dir')
         error('Please provide a matName: files no longer located in %s', p);
@@ -852,6 +853,7 @@ if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 
 function nii_check_dependencies
 %make sure we can run nii_preprocess optimally
+if isempty(which('NiiStat')), error('NiiStat required (https://github.com/neurolabusc/NiiStat)'); end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(which('nii_batch12')), 
     p = fileparts(which('nii_preprocess'));
