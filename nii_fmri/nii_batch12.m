@@ -44,7 +44,8 @@ end;
 %2.) brain extact mean (for better coregistration)
 %if ~isNormalized %bet can fail with patient scans
 if ~isempty(t1name) %if we have a T1, coregister BET fMRI to BET T1, if we do not have T1 we will keep the scalp (it is in TPM.nii)
-   meanname = betSub(meanname); %brain extract mean image for better coreg
+   meanname = betSubFSL(meanname); %brain extract mean image for better coreg
+    %meanname = betSub(meanname); %brain extract mean image for better coreg
 end
 %end
 %3.) slice-time correction
@@ -1198,3 +1199,62 @@ matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol = [0.02 0.02 0.02 0.001 0
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
 spm_jobman('run',matlabbatch);
 %end coregEstTemplateSub()
+
+
+function namBet = betSubFSL(nam)
+%apply brain extraction tool on an image
+[p,n,x] = spm_fileparts(nam);
+namBet = fullfile(p, ['bmask', n, '.nii.gz']);
+command=sprintf('bet "%s" "%s" -R -f 0.3',nam, namBet);
+doFslCmd(command);
+namBet = unGzCSub(namBet);
+%end betSubFSL()
+
+function [status,cmdout]  = doFslCmd (command, verbose)
+if ~exist('verbose', 'var'),
+    verbose = true;
+end;
+fslEnvSub;
+cmd = fslCmdSub(command);
+if verbose
+    fprintf('Running \n %s\n', cmd);
+    [status,cmdout]  = system(cmd,'-echo');
+else
+  [status,cmdout]  = system(cmd);
+end
+%end doFslCmd()
+
+function fsldir = fslDirSub
+fsldir= '/usr/local/fsl/'; %CentOS intall location
+if ~exist(fsldir,'dir')
+    fsldir = '/usr/share/fsl/5.0/'; %Debian install location (from neuro debian)
+    if ~exist(fsldir,'dir')
+        error('FSL is not in the standard CentOS or Debian locations, please check you installation!');
+    end
+end
+%end fslDirSub()
+
+function fslEnvSub
+fsldir = fslDirSub;
+curpath = getenv('PATH');
+k = strfind(curpath, fsldir);
+if isempty(k)
+	setenv('PATH',sprintf('%s:%s',fullfile(fsldir,'bin'),curpath));
+end
+%end fslEnvSub()
+
+function command  = fslCmdSub (command)
+fsldir = fslDirSub;
+cmd=sprintf('sh -c ". %setc/fslconf/fsl.sh; ',fsldir);
+command = [cmd command '"'];
+%fslCmdSub
+
+function [fnm, isGz] = unGzCSub (fnm)
+if isempty(fnm) || ~exist(fnm, 'file'), return; end;
+fnm = deblank(fnm);
+[pth,nam,ext] = spm_fileparts(fnm);
+if ~strcmpi(ext,'.gz'), return; end;
+ofnm = fnm;
+fnm = char(gunzip(fnm));
+delete(ofnm);
+%end unGzSub()
