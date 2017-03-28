@@ -1,7 +1,7 @@
 function coivox = nii_setOrigin12(vols, modality, cropBB)
 %Align images so that origin and alignment roughly match MNI space
 %  vols : cell string of image name(s) - first image used for estimate, others yoked
-%  modality : modality of first image 1=T1, 2=T2, 3=EPI
+%  modality : modality of first image 1=T1, 2=T2, 3=EPI, 4=CT
 %  cropBB : (optional) crop resulting image to standard bounding box
 %Example
 % nii_setOrigin12('T1_P001.nii', 1, true); %T1
@@ -17,17 +17,17 @@ if ~exist('vols','var') || isempty(vols) %no files specified
  vols = spm_select(inf,'image','Reset origin for selected image(s) (estimated from 1st)');
 end
 if ischar(vols), vols = cellstr(vols); end
-vols = nii_ungz (vols, true, true);
+vols = ungzSub (vols, true, true);
 if ~exist('modality','var') || isempty(modality) %no files specified
  modality = 1;
- fprintf('%s Modality not specified, assuming %d (1=T1,2=T2,3=EPI)\n', mfilename, modality);
+ fprintf('%s Modality not specified, assuming %d (1=T1,2=T2,3=EPI,4=CT)\n', mfilename, modality);
 end
 nii_isSPM12orNewer;
 setCenterOfIntensitySub(vols);
 coregEstTemplateSub(vols, modality);
 deleteMatFilesSub(vols);
 if exist('cropBB','var') && (cropBB) %only if requested
- nii_clip2bb(vols, [], modality < 3, true, modality > 2); %clipZ for T1 and T2
+ nii_clip2bb(vols, [], modality ~= 3, true, modality == 3); %clipZ for T1 and T2
 end
 %end MAIN FUNCTION - LOCAL FUNCTIONS FOLLOW
 
@@ -88,12 +88,16 @@ end%for each volume
 
 function coregEstTemplateSub(vols, modality)
 %vols: images to coregister - first used for estimate
+template = fullfile(spm('Dir'),'canonical','avg152T1.nii');
 if modality == 2
    template = fullfile(spm('Dir'),'canonical','avg152T2.nii');
 elseif modality == 1
     template = fullfile(spm('Dir'),'canonical','avg152T1.nii');
-else
+elseif modality == 3
     template  = fullfile(spm('Dir'),'toolbox','OldNorm','EPI.nii');
+elseif modality == 4
+    template  = fullfile(spm('Dir'),'toolbox','Clinical','scct.nii');
+    warning('Please make sure your CT scans are in "Cormack" units (clinical_h2c)');
 end
 if ~exist(template,'file')
     error('Unable to find template named %s\n', template);
@@ -114,4 +118,43 @@ matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.tol = [0.02 0.02 0.02 0.001 0
 matlabbatch{1}.spm.spatial.coreg.estimate.eoptions.fwhm = [7 7];
 spm_jobman('run',matlabbatch);
 %end coregEstTemplateSub()
+
+function Vout = ungzSub (V, isCell, del)
+%Unzips a .nii.gz image to .nii
+%  V: image(s) to decompress
+%  isCell: are results a cell strings or char strings?
+%  del : (optional) if true delete original .gz image (FSL does not like
+%         co-existing img.nii and img.nii.gz)
+%Output: list of unzipped images
+% Examples
+%   ungzSub('brain.nii.gz');
+if ~exist('V','var') || isempty(vols) %no files specified
+ V = spm_select(inf,'^.*\.(gz|voi)$','Select gz files to decompress');
+end;
+if ischar(V), V = cellstr(V); end
+Vout = {};
+for i=1:numel(V)
+  ref = deblank(V{i});
+  [pth,nam,ext] = spm_fileparts(ref);
+  if (length(ext)==3)  && min((ext=='.gz')==1) 
+    gunzip(ref);
+    Vout ={Vout{:} fullfile(pth, [nam])};
+    if exist('del','var') && del %del not specified
+         delete(ref); 
+    end;
+  elseif (length(ext)==4)  && min((ext=='.voi')==1) 
+    unz = gunzip(ref);
+    [upth,unam,uext] = spm_fileparts(strvcat(unz)); %#ok<REMFF1>
+    if isempty(uext) %if "file.voi" -> "file" then -> "file.nii"
+        uext = '.nii';
+        movefile(strvcat(unz),fullfile(upth, [unam uext])); %#ok<REMFF1>
+    end;
+    Vout ={Vout{:} fullfile(upth, [unam uext])};    
+  else 
+    Vout = {Vout{:} ref};
+  end;
+end; %for each file
+if exist('isCell','var') && isCell, return; end;
+Vout = strvcat(Vout); %#ok<REMFF1>
+%end ungzSub()
 
