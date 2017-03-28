@@ -128,7 +128,7 @@ function Vout = ungzSub (V, isCell, del)
 %Output: list of unzipped images
 % Examples
 %   ungzSub('brain.nii.gz');
-if ~exist('V','var') || isempty(vols) %no files specified
+if ~exist('V','var') || isempty(V) %no files specified
  V = spm_select(inf,'^.*\.(gz|voi)$','Select gz files to decompress');
 end;
 if ischar(V), V = cellstr(V); end
