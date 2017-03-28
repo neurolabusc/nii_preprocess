@@ -878,7 +878,7 @@ if numel(hdr) > 1, hdr = hdr(1); error('betSub is slow with 4D images - are you 
    flags.nerode=2;
    flags.ndilate=4;
    flags.thresh=0.5;
-   flags.reg = 0.02;
+   flags.reg = 0.05;%0.02; %default can generate "Input to SCHUR must not contain NaN or Inf."
    flags.graphics=0;
 pm_brain_mask(hdr, flags);
 bnam = prefixSub('bmask', nam);
