@@ -42,11 +42,18 @@ fi
 echo "Filenames dti= $dti dtir=$dtir"
 
 eddyExeName=eddy_openmp
-if [[ $PATH == *"cuda"* ]]; then
+if  [[ $PATH == *"cuda"* ]]; then
   eddyExeName=eddy_cuda7.0
+  if ! hash $eddyExeName 2>/dev/null; then
+	eddyExeName=eddy_cuda8.0
+  fi
   echo "cuda found in path: will use $eddyExeName"
 else
   echo "cuda NOT found in path: will use $eddyExeName"
+fi
+if ! hash $eddyExeName 2>/dev/null; then
+	echo "Error: unable to find $eddyExeName"
+	exit 1
 fi
 
 #process dti data
