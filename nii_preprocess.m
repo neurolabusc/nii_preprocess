@@ -1,4 +1,4 @@
-function matName = nii_preprocess(imgs, matName, checkForUpdates)
+function matName = nii_preprocess(imgs, matName, checkForUpdates, hideInteractiveGraphs)
 %preprocess data from multiple modalities3
 % imgs.T1: filename of T1 scan - ONLY REQUIRED INPUT: ALL OTHERS OPTIONAL
 % imgs.T2: filename used to draw lesion, if absent lesion drawn on T1
@@ -11,8 +11,9 @@ function matName = nii_preprocess(imgs, matName, checkForUpdates)
 %Examples
 % imgs.T1 = 'T1.nii'; imgs.ASL = 'ASL.nii';
 % nii_preprocess(imgs);
-%check dependencies
 
+
+%check dependencies
 fprintf('%s version 1Aug2016\n', mfilename);
 %warning('Not checking for updates 6666');
 if ~exist('checkForUpdates','var') || checkForUpdates
@@ -22,7 +23,10 @@ nii_check_dependencies;
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 %f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
-
+if ~exist('hideInteractiveGraphs','var') || hideInteractiveGraphs
+    fg = spm_figure('FindWin','Interactive');
+    if ~isempty(fg), close(fg); end
+end
 %set structures
 if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end;
 if ~isfield(imgs,'T2'), imgs.T2 = []; end;
@@ -854,6 +858,8 @@ if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 function nii_check_dependencies
 %make sure we can run nii_preprocess optimally
 if isempty(which('NiiStat')), error('NiiStat required (https://github.com/neurolabusc/NiiStat)'); end;
+if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
+if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(which('nii_batch12')), 
     p = fileparts(which('nii_preprocess'));
