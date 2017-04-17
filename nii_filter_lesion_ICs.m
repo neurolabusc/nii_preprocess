@@ -18,7 +18,7 @@ if ~exist ('TR') || (TR == 0)
         else
             TR = 1.65;
         end
-        fprintf ('%s: TR not specified in the header, assuming %f\n', fmri_fname, TR);
+        warning ('%s: TR not specified in the header, assuming %f\n', fmri_fname, TR);
     end
 end
 % 1. run MELODIC ICA
@@ -33,7 +33,7 @@ end
 % significant overlap: Jaccard index > 5%
 lesion_hdr = spm_vol (lesion_fname);
 lesion_img = spm_read_vols (lesion_hdr);
-all_ic_hdr = spm_vol ('melodic_output/melodic_IC.nii'); 
+all_ic_hdr = spm_vol ('melodic_output/melodic_IC.nii');
 all_ic_img = spm_read_vols (all_ic_hdr);
 for i = 1:size (all_ic_img, 4)
     ic_img = squeeze (all_ic_img (:, :, :, i));
@@ -49,7 +49,7 @@ if isempty (lesion_ic) % no ICs overlap with lesion
 end
 lesion_ic_str = sprintf ('%d,', lesion_ic);
 lesion_ic_str = lesion_ic_str (1:length(lesion_ic_str)-1);
-% 3. filter the lesion ICs from the fMRI data 
+% 3. filter the lesion ICs from the fMRI data
 prefix = 'm'; % for "melodic"
 [p, n, x] = fileparts (fmri_fname);
 if ~isempty (p)
