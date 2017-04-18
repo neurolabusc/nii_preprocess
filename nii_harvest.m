@@ -4,7 +4,8 @@ function nii_harvest (baseDir)
 %outDir = '/home/crlab/Desktop/testIn';
 outDir = '/media/FAT1000/Master_In';
 baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
-isExitAfterTable = false; % <- if true, only generates table, does not process data
+isExitAfterTable = true; % <- if true, only generates table, does not process data
+isReportDims = false; %if true, report dimensions of raw data
 reprocessRest = false;
 reprocessfMRI = false;
 reprocessASL = false;
@@ -21,8 +22,8 @@ end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
-subjDirs = {'M2081'}; % temporary, for testing only!!! -- GY
-
+%subjDirs = {'M2081'}; % temporary, for testing only!!! -- GY
+%subjDirs = {'M4119'}; 
 % subjDirs = {'M4214';'M2037';'M2039';'M2040';...
 %     'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
 %     'M2120';'M2122';'M2124';'M212clc5';'M2142';'M2143';'M2145';'M2147';'M2164';...
@@ -69,6 +70,9 @@ for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
 end
 fprintf('Found %d subjects in %s\n', nSubj, baseDir);
 if nSubj < 1, return; end;
+if isReportDims
+    reportDimsSub(imgs, nSubj); 
+end;
 %report results
 startTime = tic;
 % 1st row: describe values
@@ -95,6 +99,7 @@ for s = 1: nSubj
     end
     fprintf('%s\n', str);
 end
+
 fprintf('Table required %g seconds\n', toc(startTime));
 %copy core files to new folder
 if isExitAfterTable 
@@ -199,6 +204,41 @@ for s = 1: nSubj
     end
 end
 %end nii_harvest
+
+function reportDimsSub(imgs,nSubj)
+for s = 1: nSubj
+    subj = deblank(imgs(s).subjName);
+    f = fieldnames(imgs(1).nii);
+    fprintf('\nID\tMRI\tstudy\tx\ty\tz\tvols\tTR\n');
+    for i = 1: numel(f)
+         x = '-';
+        if ~isempty(imgs(s).nii.(f{i})) && isfield(imgs(s).nii.(f{i}), 'x') && exist(imgs(s).nii.(f{i}).img,'file')
+            fnm = imgs(s).nii.(f{i}).img;
+            hdr = readNiftiHdrSub(fnm);
+            tr = 0; 
+            if isfield (hdr(1).private, 'timing')
+               tr =hdr(1).private.timing.tspace 
+            end
+            fprintf('%s\t%s\t%s\t%d\t%d\t%d\t%d\t%g\n', subj, f{i}, imgs(s).nii.(f{i}).x, hdr(1).dim(1),hdr(1).dim(2),hdr(1).dim(3),numel(hdr),tr  );
+        end
+    end
+    
+    
+%     subjDir = fullfile(outDir, subj);
+%     matName = fullfile(subjDir, [subj, '_limegui.mat']);
+%     imgs(s) = findNovelImgs(subjDir, imgs(s), modalityKeysVerbose);  
+%     str = [int2str(s), ',', imgs(s).subjName];
+%     for i = 1: numel(f)
+%         x = '-';
+%         if ~isempty(imgs(s).nii.(f{i})) && isfield(imgs(s).nii.(f{i}), 'x')
+%            x = imgs(s).nii.(f{i}).x;
+%            if ~imgs(s).nii.(f{i}).newImg, x = ['~', x]; end;
+%         end
+%         str = sprintf('%s\t%s',str, x );
+%     end
+%     fprintf('%s\n', str);
+end
+%end reportDimsSub
 
 function tf = endsWithSub(str,pattern) %endsWith only in Matlab 2016 and later
 tf = false;
@@ -336,6 +376,18 @@ nVol = 0;
 if isempty(hdr), return; end;
 nVol = numel(hdr);
 %end nVolSub
+
+function hdr = readNiftiHdrSub(filename)
+[p, n,x] = fileparts(filename);
+if strcmpi(x,'.gz') %unzip compressed data
+	filename = gunzip(filename);
+    filename = deblank(char(filename));
+    hdr = spm_vol(filename);
+    error(fnm);
+    delete(fnm);
+    return;
+end;
+hdr = spm_vol(filename);
 
 function [hdr, img] = readNiftiSub(filename)
 %load NIfTI (.nii, .nii.gz, .hdr/.img) image and header
