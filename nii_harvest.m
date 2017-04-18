@@ -8,7 +8,7 @@ isExitAfterTable = false; % <- if true, only generates table, does not process d
 reprocessRest = false;
 reprocessfMRI = false;
 reprocessASL = false;
-reprocessDTI = true;
+reprocessDTI = false;
 
 %outDir = '/media/UBU/Master_In/';
 %baseDir = '/media/UBU/Master_DB/'; %'/Root'
@@ -21,7 +21,7 @@ end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
-%subjDirs = {'M2118'}; % temporary, for testing only!!! -- GY
+subjDirs = {'M2081'}; % temporary, for testing only!!! -- GY
 
 % subjDirs = {'M4214';'M2037';'M2039';'M2040';...
 %     'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
@@ -250,10 +250,18 @@ function setAcpcSubT1 (matname)
 m = load(matname);
 if isfield(m,'T2') && isfield(m,'Lesion') && ~isempty(m.T2) && ~isempty(m.Lesion)
     nii_setOrigin12({m.T2,m.Lesion}, 2, true); %T2
+    if isfield(m,'T1') && ~isempty(m.T1)
+        nii_setOrigin12(m.T1, 1, true); %T1 - crop
+    end
+else %no T2
+    if isfield(m,'T1') && ~isempty(m.T1) && isfield(m,'Lesion') && ~isempty(m.Lesion)
+        nii_setOrigin12({m.T1,m.Lesion}, 1, true); %T1 - crop
+    elseif isfield(m,'T1') && ~isempty(m.T1)
+        nii_setOrigin12(m.T1, 1, true); %T1 - crop 
+    end
 end
-if isfield(m,'T1') && ~isempty(m.T1)
-    nii_setOrigin12(m.T1, 1, true); %T1 - crop
-end
+
+
 
 function setAcpcSubDTI (matname)
 m = load(matname);
