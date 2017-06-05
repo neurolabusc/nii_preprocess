@@ -189,10 +189,10 @@ for s = 1: nSubj
         fprintf('Creating %s\n',matNameGUI);
         save(matNameGUI,'-struct', 'mat');
         %determine T1 name even if output folder renamed...
+        if imgs(s).nii.T1.newImg || imgs(s).nii.Lesion.newImg, setAcpcSubT1(matNameGUI); end;
+        %if imgs(s).nii.T1.newImg, setAcpcSubT1(matNameGUI); end;
+        %if imgs(s).nii.Lesion.newImg, setAcpcSubT1 (matNameGUI); end;
         
-        if imgs(s).nii.T1.newImg, setAcpcSubT1(matNameGUI); end;
-
-        if imgs(s).nii.Lesion.newImg, setAcpcSubT1 (matNameGUI); end;
         if imgs(s).nii.DTI.newImg, setAcpcSubDTI (matNameGUI); end;
 
         %process the data
@@ -290,18 +290,15 @@ function setAcpcSubT1 (matname)
 m = load(matname);
 if isfield(m,'T2') && isfield(m,'Lesion') && ~isempty(m.T2) && ~isempty(m.Lesion)
     nii_setOrigin12({m.T2,m.Lesion}, 2, true); %T2
-    if isfield(m,'T1') && ~isempty(m.T1)
-        nii_setOrigin12(m.T1, 1, true); %T1 - crop
-    end
-else %no T2
-    if isfield(m,'T1') && ~isempty(m.T1) && isfield(m,'Lesion') && ~isempty(m.Lesion)
-        nii_setOrigin12({m.T1,m.Lesion}, 1, true); %T1 - crop
-    elseif isfield(m,'T1') && ~isempty(m.T1)
-        nii_setOrigin12(m.T1, 1, true); %T1 - crop 
-    end
+    return;
 end
-
-
+if isfield(m,'T1') && isfield(m,'Lesion') && ~isempty(m.T1) && ~isempty(m.Lesion)
+    nii_setOrigin12({m.T1,m.Lesion}, 1, true); %T1 - crop with lesion
+    return;
+end
+if isfield(m,'T1') && ~isempty(m.T1)
+    nii_setOrigin12(m.T1, 1, true); %T1 - crop
+end
 
 function setAcpcSubDTI (matname)
 m = load(matname);

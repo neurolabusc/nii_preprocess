@@ -1,0 +1,41 @@
+
+Melodic Version 3.14
+
+/usr/share/fsl/5.0/bin/melodic -i /media/research/FAT1000/Master_In_Fresh_Harvest/M2152/fdswaRest_M2152_LIME.nii -o melodic_output --tr=1.85 
+---------------------------------------------
+
+Melodic results will be in melodic_output
+
+Create mask ... done
+Reading data file /media/research/FAT1000/Master_In_Fresh_Harvest/M2152/fdswaRest_M2152_LIME  ...  done
+  Estimating data smoothness ...  done 
+  Removing mean image ... done
+  Normalising by voxel-wise variance ... done
+Excluding voxels with constant value ... done
+
+  Data size : 196 x 246294
+
+Starting PCA  ... done
+Start whitening using  25 dimensions ... 
+  retaining 86.4739 percent of the variability 
+ ... done
+
+Starting ICA estimation using symm
+
+  Step no. 1 change : 0.997755
+  Step no. 2 change : 0.647831
+  Step no. 3 change : 0.194731
+  Step no. 4 change : 0.0586938
+  Step no. 5 change : 0.033524
+  Step no. 6 change : 0.0293404
+  Step no. 7 change : 0.0216789
+  Step no. 8 change : 0.0106812
+  Step no. 9 change : 0.00793184
+  Step no. 10 change : 0.00753512
+  Step no. 11 change : 0.00636912
+  Step no. 12 change : 0.0045714
+  Step no. 13 change : 0.00284959
+  Step no. 14 change : 0.00166487
+  Step no. 15 change : 0.000982865
+  Step no. 16 change : 0.000867018
+  Step no. 17 change : 0.000863258
