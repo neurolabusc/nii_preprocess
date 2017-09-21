@@ -1,0 +1,2 @@
+To create a password protected archive where no segment is greater than 3Gb (to fit on FAT disks):
+  7z a -v3g -pMyPassword  M.2017.0612.zip ./M.2017.0612
