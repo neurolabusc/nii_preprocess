@@ -10,8 +10,6 @@ function imgs = nii_preprocess_gui(loadprev, ignoreImgPaths)
 % nii_preprocess_gui(1) %use gui to select previous mat file
 % nii_preprocess_gui('T1_M2094_limegui.mat') %specify previous mat file
 % nii_preprocess_gui(pwd) %open mat file if it exists or auto-create new one
-
-
 if nargin > 0
     if isdir(loadprev) %if user passes folder, than either process limegui file or auto-generate and process limegui file
         mfile = dir(char(fullfile(loadprev,'*limegui.mat')));

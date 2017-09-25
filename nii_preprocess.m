@@ -51,8 +51,9 @@ if true
     imgs = doT1Sub(imgs, matName); %normalize T1
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
+    %CR - skip while Grogori puts in new code
     imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
-    tStart = timeSub(tStart,'REST');
+    %tStart = timeSub(tStart,'REST');
     imgs = doAslSub(imgs, matName);
     tStart = timeSub(tStart,'ASL');
     imgs = dofMRISub(imgs, matName);
@@ -77,6 +78,7 @@ if true
         doDkiSub(imgs, matName, true);
     end
     tStart = timeSub(tStart,'DKI');
+    %matName
     addLimeVersionSub(matName); %update versioning
 end
 %print output
@@ -94,6 +96,7 @@ function addLimeVersionSub(matName)
 %  fprintf('LIME version (YYYY.MMDD): %.4f\n', m.T1.lime);
 v = nii_matver;
 stat.T1.lime = v.lime;
+fprintf('adding lime version to %s\n', matName);
 if exist(matName,'file')
     old = load(matName);
     stat = nii_mergestruct(stat,old); %#ok<NASGU>
@@ -725,11 +728,11 @@ if ~isempty(delnam), delete(delnam); end;
 %end loadSub()
 
 function nROI = nRoiSub(fnm)
-hdr = spm_vol(fnm);
-img = spm_read_vols(hdr);
+[hdr,img] = loadSub(fnm);
 nROI = max(img(:));
 %if ~spm_type(hdr.dt,'intt'), fprintf('WARNING: expected integer datatype %s\n', fnm); end;
 %end nRoiSub()
+
 
 function doThreads(commands, out_dir)
 fslParallelSub;

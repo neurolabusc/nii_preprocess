@@ -2,9 +2,14 @@ function nii_harvest (baseDir)
 
 %baseDir = '/home/crlab/Desktop/testDB';
 %outDir = '/home/crlab/Desktop/testIn';
-outDir = '/media/FAT1000/Master_In';
-baseDir = '/media/FAT1000/Master_DB/'; %'/Root'
-isExitAfterTable = true; % <- if true, only generates table, does not process data
+outDir = '/media/research/FAT1000/Master_In';
+baseDir = '/media/research/FAT1000/Master_DB'; %'/Root'
+
+% outDir = '/home/research/In';
+% baseDir = '/home/research/DB';
+
+isExitAfterTable = false; % <- if true, only generates table, does not process data
+isPreprocess = true; % <- if true full processing, otherwise just cropping
 isReportDims = false; %if true, report dimensions of raw data
 reprocessRest = false;
 reprocessfMRI = false;
@@ -22,20 +27,20 @@ end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
-%subjDirs = {'M2081'}; % temporary, for testing only!!! -- GY
-%subjDirs = {'M4119'}; 
+%subjDirs = {'M4119'}; % temporary, for testing only!!! -- GY
+subjDirs = {'M41018'; 'M41019'; 'M41022'; 'M41027'}; 
 % subjDirs = {'M4214';'M2037';'M2039';'M2040';...
 %     'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
 %     'M2120';'M2122';'M2124';'M212clc5';'M2142';'M2143';'M2145';'M2147';'M2164';...
 %     'M4148';'M4150';'M4180';'M4189';'M4211'};
 
-%subjDirs = {'14-140-0042'};
-
+%subjDirs = {'M4217';'M4218';'M2001'};
+%subjDirs = {'M2130'};
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
 
 modalityKeys = strrep(modalityKeysVerbose,'_','');
-xperimentKeys = {'dayzero','followup','POLAR','SE', 'LIME', 'CT', 'R01', 'CAT'}; %order specifies priority: 1st item checked first!
+xperimentKeys = {'POLAR','SE', 'LIME', 'CT', 'R01', 'CAT'}; %order specifies priority: 1st item checked first!
 %create empty structure
 blank = [];
 blank.subjName = [];
@@ -66,7 +71,6 @@ for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
             %imgs(nSubj) = findImgsSub(imgs(nSubj), xDir, xLabel);
         end
     end
-
 end
 fprintf('Found %d subjects in %s\n', nSubj, baseDir);
 if nSubj < 1, return; end;
@@ -199,10 +203,15 @@ for s = 1: nSubj
         nii_preprocess(mat,[],process1st);
         process1st = false; %only check for updates for first person
         %matName = fullfile(subjDir, sprintf('T1_%s_%s_lime.mat', subj, imgs(s).nii.T1.x));
-        %nii_preprocess(mat,matName);
+        if isPreprocess
+            nii_preprocess(mat,matName)
+        else
+            fprintf('Cropped but did not preprocess %s\n',matName);
+        end
         
     end
 end
+fprintf('All done\n');
 %end nii_harvest
 
 function reportDimsSub(imgs,nSubj)
@@ -290,6 +299,9 @@ function setAcpcSubT1 (matname)
 m = load(matname);
 if isfield(m,'T2') && isfield(m,'Lesion') && ~isempty(m.T2) && ~isempty(m.Lesion)
     nii_setOrigin12({m.T2,m.Lesion}, 2, true); %T2
+    if isfield(m,'T1') && isfield(m,'Lesion') 
+        nii_setOrigin12({m.T1}, 1, true); %T1 - crop with lesion
+    end
     return;
 end
 if isfield(m,'T1') && isfield(m,'Lesion') && ~isempty(m.T1) && ~isempty(m.Lesion)
