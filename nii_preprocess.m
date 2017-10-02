@@ -21,12 +21,16 @@ if ~exist('checkForUpdates','var') || checkForUpdates
 end
 nii_check_dependencies;
 if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
-if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
+if isempty(spm_figure('FindWin','Graphics')), 
+    spm fmri; 
+    %spm_get_defaults('cmdline',true); %enable command line mode in scripts
+end; %launch SPM if it is not running
 %f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
 if ~exist('hideInteractiveGraphs','var') || hideInteractiveGraphs
     fg = spm_figure('FindWin','Interactive');
     if ~isempty(fg), close(fg); end
 end
+if ischar(imgs), imgs = load(imgs); end;
 %set structures
 if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end;
 if ~isfield(imgs,'T2'), imgs.T2 = []; end;
@@ -160,7 +164,7 @@ spm_clf;
 spm_figure('Clear', 'Graphics');
 spm_orthviews('Reset');
 f = spm_figure('FindWin','Graphics'); clf(f.Number); %clear SPM window
-FA = prepostfixSub('n', '_FA', imgs.DTI);
+FA = prepostfixSub('n', 'd_FA', imgs.DTI);
 ROI = prepostfixSub('', '_roi', imgs.DTI);
 if ~exist(FA,'file') || ~exist(ROI,'file') , return; end; %required
 FA = unGzSub (FA);
@@ -250,7 +254,7 @@ XYZmm = XYZmm(1:3);
 
 function doTractographySub(imgs)
 if isempty(imgs.DTI), return; end; %required
-FAimg = prepostfixSub('', '_FA', imgs.DTI);
+FAimg = prepostfixSub('', 'd_FA', imgs.DTI);
 if ~exist(FAimg,'file') , return; end; %required
 [p,n] = fsl_filepartsSub(imgs.DTI);
 basename = fullfile(p,n);
@@ -349,10 +353,11 @@ if exist('isDki','var') && (isDki)
     warning('If you are using fsl 5.0.9, ensure you have patched version of eddy ("--repol" option) https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
     %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
     %if isEddyCuda7Sub()
-    if isFullSphereSub(imgs.DKI)
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+    if HalfSphere(imgs.DKI)
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh'];
     else
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+        %command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
     end
     %else
     %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
@@ -369,9 +374,13 @@ function doDkiCoreSub(T1, DTI, matName)
 if isempty(T1) || isempty(DTI), return; end; %required
 if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
 wbT1 = prefixSub('wb',T1); %warped brain extracted image
-if ~exist('dkifx','file'),  fprintf('skipping DKI: requires dkifx script\n'); return; end;
-mask=prepostfixSub('', 'b_mask', DTI);
-dti_u=prepostfixSub('', 'u', DTI);
+if ~exist('dkifx2','file'),  error('skipping DKI: requires dkifx2 script\n'); return; end;
+mask=prepostfixSub('', 'db_mask', DTI);
+mask = unGzSub (mask);
+if ~exist(mask,'file'),  error('unable to find %s\n', mask); return; end;
+MKfa=prepostfixSub('', 'd_FA', DTI);
+if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
+dti_u=prepostfixSub('', 'du', DTI);
 [pth,nam] = filepartsSub(DTI);
 bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
 if ~exist(bvalnm, 'file')
@@ -385,16 +394,18 @@ if max(bval(:)) < 1500
     fprintf('Skipping DKI preprocessing. Require B-values >1500. Max b-value: %d\n',max(bval(:)));
     return;
 end
-dkifx(dti_u, bvalnm, mask);
-MKmask = prepostfixSub('', 'u_ldfDKI_MASK', DTI);
-MK=prepostfixSub('', 'u_ldfDKI_MK', DTI);
+MK=dkifx2(dti_u, bvalnm, mask, true);
+MKmask=mask;
+%MKmask = prepostfixSub('', 'u_ldfDKI_MASK', DTI);
+%MK=prepostfixSub('', 'u_ldfDKI_MK', DTI);
 if ~exist(MK, 'file') || ~exist(MKmask, 'file')
     fprintf('Serious error: no kurtosis images named %s %s\n', MK, MKmask);
     return;
 end;
+if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
 %normalize mean kurtosis to match normalized, brain extracted T1
 wMK = prepostfixSub('w', '', MK);
-oldNormSub( {MKmask, MK}, wbT1, 8, 8 );
+oldNormSub( {MKfa, MK}, wbT1, 8, 8 );
 nii_nii2mat(wMK, 'mk', matName);
 %save note
 fid = fopen('dki.txt', 'a+');
@@ -402,12 +413,11 @@ fprintf(fid, '%s\n', matName);
 fclose(fid);
 %end doDkiCoreSub()
 
-
 function doFaMdSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.DTI), return; end; %required
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
-FA = prepostfixSub('', '_FA', imgs.DTI);
-MD = prepostfixSub('', '_MD', imgs.DTI);
+FA = prepostfixSub('', 'd_FA', imgs.DTI);
+MD = prepostfixSub('', 'd_MD', imgs.DTI);
 if ~exist(T1,'file') || ~exist(FA,'file') || ~exist(MD,'file'), return; end; %required
 global ForceDTI;
 if isempty(ForceDTI) && isFieldSub(matName, 'fa')
@@ -446,7 +456,23 @@ if (n < 12)
     fprintf('INSUFFICIENT BVECS/BVALS FOR %s\n', imgs.DTI);
     return
 end
-dti_u=prepostfixSub('', 'u', imgs.DTI);
+%preprocess - denoise
+dti_d=prepostfixSub('', 'd', imgs.DTI);
+if exist(imgs.DTIrev)
+    dti_dr=prepostfixSub('', 'd', imgs.DTI);
+end;
+if isempty(ForceDTI) && exist(dti_d, 'file')
+   fprintf('Skipping DTI denoising: found %s\n', dti_d);
+else
+    mm = imgMM(imgs.DTI);
+    degibbs = (mm > 1.9); %partial fourier used for HCP 1.5mm isotropic images
+    dti_d = nii_dwidenoise (imgs.DTI, degibbs);
+    if exist(imgs.DTIrev)
+        dti_dr = nii_dwidenoise (imgs.DTIrev, degibbs);
+    end;
+end;
+%preprocess - eddy
+dti_u=prepostfixSub('', 'du', imgs.DTI);
 if isempty(ForceDTI) && exist(dti_u, 'file')
     fprintf('Skipping DTI preprocessing: found %s\n', dti_u);
 else
@@ -454,29 +480,42 @@ else
     %1 - eddy current correct
     %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
     %if isEddyCuda7Sub()
-    if isFullSphereSub(imgs.DTI)
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+    %9/2017: always use Eddy
+    %if isFullSphereSub(imgs.DTI)
+    if HalfSphere(imgs.DTI)
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh'];
+    
     else
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
-    end
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+    end;
+    %else
+    %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
+    %end
     %else
     %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
     %end
     if isempty(imgs.DTIrev)
-        command=sprintf('%s "%s"',command, imgs.DTI);
+        command=sprintf('%s "%s"',command, dti_d);
     else
-        nr = bvalCountSub(imgs.DTIrev);
+        nr = bvalCountSub(dti_dr);
         if (nr ~= n)
-            fprintf('WARNING: BVECS/BVALS DO NOT MATCH %s %s\n', imgs.DTI, imgs.DTIrev);
+            fprintf('WARNING: BVECS/BVALS DO NOT MATCH %s %s\n', dti_d, dti_dr);
             %return
         end
-        command=sprintf('%s "%s" "%s"',command, imgs.DTI, imgs.DTIrev);
+        command=sprintf('%s "%s" "%s"',command, dti_d, dti_dr);
     end
     cleanupDtiDir(imgs.DTI);
     doFslCmd (command);
 end
 doDtiBedpostSub(imgs.DTI);
 %end doDtiSub()
+
+function mm = imgMM(fnm)
+%mean voxel size, 2x2x2=2, 2x2x4=2.52
+h = spm_vol([fnm ',1']);
+mm = h.mat(1:3, 1:3) * [1 1 1]';
+mm = nthroot(prod(abs(mm)), 3);
+%end imgMM
 
 function isEddyCuda = isEddyCuda7Sub
 %eddy_cuda7.0 is a beta version supplied by Jesper Andersson that supports the GTX970 and has new features
@@ -569,7 +608,7 @@ if ~exist(bed_dirX, 'file'), mkdir(bed_dirX); end;
 bed_dir=fullfile(pth, 'bedpost');
 %if exist(bed_dir, 'file'), rmdir(bed_dir, 's'); end; %666 ForceBedpost
 if ~exist(bed_dir, 'file'), mkdir(bed_dir); end;
-dti_u=prepostfixSub('', 'u', dti);
+dti_u=prepostfixSub('', 'du', dti);
 dti_x=fullfile(bed_dir, 'data.nii.gz');
 if ~exist(dti_u,'file'), error('Bedpost unable to find %s', dti_u); end;
 copyfile(dti_u, dti_x);
@@ -578,7 +617,7 @@ dti_x=fullfile(bed_dir, 'bvecs');
 copyfile(bvec, dti_x);
 dti_x=fullfile(bed_dir, 'bvals');
 copyfile(bval, dti_x);
-dti_faThr=prepostfixSub('', '_FA_thr', dti);
+dti_faThr=prepostfixSub('', 'd_FA_thr', dti);
 dti_x=fullfile(bed_dir, 'nodif_brain_mask.nii.gz');
 copyfile(dti_faThr, dti_x);
 if isGpuInstalledSub
@@ -586,6 +625,7 @@ if isGpuInstalledSub
 else
     command=sprintf('bedpostx "%s" ', bed_dir);
 end
+
 fslParallelSub;
 doFslCmd (command);
 while ~exist(bed_done,'file')
@@ -633,7 +673,7 @@ if ~exist(bed_dir,'file') || ~exist(bed_dirX,'file')
     fprintf('Please run bedpost to create files %s %s\n',bed_dir, bed_dirX);
     return;
 end
-dti_u=prepostfixSub('', 'u', dti);
+dti_u=prepostfixSub('', 'du', dti);
 if ~exist(dti_u,'file')
     fprintf('Can not find undistorted DTI %s\n',dti_u);
     return;
@@ -645,10 +685,10 @@ else
    atlasext = ['_' atlas];
 end
 template_roiW=prepostfixSub('', ['_roi', atlasext], dti);
-dti_faThr=prepostfixSub('', '_FA_thr', dti);
+dti_faThr=prepostfixSub('', 'd_FA_thr', dti);
 mask_dir=fullfile(pth, ['masks', atlasext]);
 if ~exist(template_roiW,'file') || ~exist(dti_u,'file') || ~exist(dti_faThr,'file')
-    fprintf('Can not find %s or %s or %s\n',template_roiW, dti_u, dti_faThr);
+    error('doDtiTractSub Can not find %s or %s or %s\n',template_roiW, dti_u, dti_faThr);
     return;
 end
 template_roiWThr=prepostfixSub('', ['_roi_thr', atlasext], dti);
@@ -768,11 +808,11 @@ else
    atlasext = ['_roi_' atlas];
 end
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
-FA = prepostfixSub('', '_FA', imgs.DTI);
-MD = prepostfixSub('', '_MD', imgs.DTI);
+FA = prepostfixSub('', 'd_FA', imgs.DTI);
+MD = prepostfixSub('', 'd_MD', imgs.DTI);
 if ~exist(T1,'file') fprintf('Unable to find image: %s\n',T1); return; end; %required
-if ~exist(FA,'file') fprintf('Unable to find image: %s\n',FA); return; end; %required
-if ~exist(MD,'file') fprintf('Unable to find image: %s\n',MD); return; end; %required
+if ~exist(FA,'file') error('Unable to find image: %s\n',FA); return; end; %required
+if ~exist(MD,'file') error('Unable to find image: %s\n',MD); return; end; %required
 FA = unGzSub (FA);
 MD = unGzSub (MD);
 nFA = rescaleSub(FA);
@@ -1473,22 +1513,19 @@ v = ~isempty(strfind(getenv('PATH'),'cuda'));
 %v = strcmpi(deblank(thisVer),vstr);
 %end isGpuInstalledSub()
 
-function [isFullSphere, meanLength] = isFullSphereSub(vNam) %does bvec sample whole sphere?
-%given FSL style bvec, determine if sampling over full or half sphere
-%useful for determining if one should run eddy (requires full sphere) or eddy_correct
-%see nii_plotBvec for visualization
-% vNam : name of bvec file
-%Output
-% isFullSphere: returns true if mean vector near zero (vectors cancel each other)
-% meanLength: length of mean vector, near zero for full sphere
-%Examples
-% isFull = nii_meanBvec('a.bvec');
-% isFull = nii_meanBvec(); %use GUI
-if ~exist('vNam','var') %no files
- vNam = spm_select(1,'^.*\.(bvec)$','Select bvec file to view');
+function isHalfSphere = HalfSphere(bvec_nam)
+%return true if DWI vectors sample half sphere
+% bvec_nam : filename of b-vector file
+%Example
+% HalfSphere('dki.bvec')
+if ~exist('bvec_nam','var') %file not specified
+   fprintf('Select b-vec file\n');
+   [A,Apth] = uigetfile({'*.bvec'},'Select b-vec file');
+   if isnumeric(A), return; end; %nothing selected
+   bvec_nam = strcat(Apth,char(A));
 end;
-%handle different extensions bvec/nii/nii.gz
-[p,n,x]=fileparts(vNam);
+% %handle different extensions bvec/nii/nii.gz
+[p,n,x]=fileparts(bvec_nam);
 if ~strcmpi(x,'.bvec')
     fnm = fullfile(p,[n,'.bvec']);
     if ~exist(fnm,'file') %assume img.nii.gz
@@ -1498,18 +1535,70 @@ if ~strcmpi(x,'.bvec')
     if ~exist(fnm,'file')
         error('Unable to find bvec file for %s', vNam);
     end
-    vNam = fnm;
+    bvec_nam = fnm;
 end
-if ~exist(vNam, 'file'), error('Unable to find file %s',vNam); end;
-%read input
-v = textread(vNam);
-v( :, all( ~any( v ), 1 ) ) = []; %delete vectors with all zeros (e.g. B=0)
-v = mean(v,2); %mean vector
-meanLength = sqrt(sum((v) .^ 2)); %mean vector length
-%if sperical then vectors cancel out and mean length near zero
-%if half-sphere than the "center of mass" for vectors is biased
-isFullSphere = (meanLength < 0.25);
-%end isFullSphereSub()
+isHalfSphere = false;
+bvecs = load(bvec_nam); 
+bvecs = unitLengthSub(bvecs)';
+bvecs(~any(~isnan(bvecs')),:) = [];
+if isempty(bvecs), return; end;
+mn = unitLengthSub(mean(bvecs)')';
+if isnan(mn), return; end;
+mn = repmat(mn,size(bvecs,1),1);
+minV = min(dot(bvecs',mn'));
+thetaInDegrees = acosd(minV);
+if thetaInDegrees < 110
+    isHalfSphere = true;
+    fprintf('Sampling appears to be half sphere (%g-degrees): %s\n', thetaInDegrees, bvec_nam);
+end;
+%end HalfSphere()
+
+function Xu = unitLengthSub(X) 
+%Use pythagorean theorem to set all vectors to have length 1
+%does not require statistical toolbox 
+if size(X,1) ~= 3, error('expected each column to have three rows (X,Y,Z coordinates)'); end;
+Dx =  sqrt(sum((X.^2)));
+Dx = [Dx; Dx; Dx];
+Xu = X./Dx;
+%end unitLengthSub()
+
+% function [isFullSphere, meanLength] = isFullSphereSub(vNam) %does bvec sample whole sphere?
+% %given FSL style bvec, determine if sampling over full or half sphere
+% %useful for determining if one should run eddy (requires full sphere) or eddy_correct
+% %see nii_plotBvec for visualization
+% % vNam : name of bvec file
+% %Output
+% % isFullSphere: returns true if mean vector near zero (vectors cancel each other)
+% % meanLength: length of mean vector, near zero for full sphere
+% %Examples
+% % isFull = nii_meanBvec('a.bvec');
+% % isFull = nii_meanBvec(); %use GUI
+% if ~exist('vNam','var') %no files
+%  vNam = spm_select(1,'^.*\.(bvec)$','Select bvec file to view');
+% end;
+% %handle different extensions bvec/nii/nii.gz
+% [p,n,x]=fileparts(vNam);
+% if ~strcmpi(x,'.bvec')
+%     fnm = fullfile(p,[n,'.bvec']);
+%     if ~exist(fnm,'file') %assume img.nii.gz
+%         [~,n,x] = fileparts(n);
+%         fnm = fullfile(p,[n,'.bvec']);
+%     end
+%     if ~exist(fnm,'file')
+%         error('Unable to find bvec file for %s', vNam);
+%     end
+%     vNam = fnm;
+% end
+% if ~exist(vNam, 'file'), error('Unable to find file %s',vNam); end;
+% %read input
+% v = textread(vNam);
+% v( :, all( ~any( v ), 1 ) ) = []; %delete vectors with all zeros (e.g. B=0)
+% v = mean(v,2); %mean vector
+% meanLength = sqrt(sum((v) .^ 2)); %mean vector length
+% %if sperical then vectors cancel out and mean length near zero
+% %if half-sphere than the "center of mass" for vectors is biased
+% isFullSphere = (meanLength < 0.25);
+% %end isFullSphereSub()
 
 
 

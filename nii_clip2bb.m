@@ -105,6 +105,7 @@ for v = 1 : numel(vols) %apply parameters from first session to others
     else
         delete(fname);
     end
+    hdr.fname
     for vol=1:size(img,4)
         hdr.n(1)=vol;
         spm_write_vol(hdr,img(:, :, :, vol));

@@ -22,9 +22,9 @@ if ~exist ('TR') || (TR == 0)
     end
 end
 % 1. run MELODIC ICA
-system ('sh -c ". ${FSLDIR}/etc/fslconf/fsl.sh"');
+systemSub ('sh -c ". ${FSLDIR}/etc/fslconf/fsl.sh"');
 command = sprintf ('%s/melodic -i %s -o melodic_output --tr=%.2f', fsl_path, fmri_fname, TR);
-system (command);
+systemSub (command);
 if strcmp (fsl_outtype, 'NIFTI_GZ')
     system ('gunzip -f melodic_output/melodic_IC.nii.gz');
 end
@@ -57,9 +57,21 @@ if ~isempty (p)
 end
 filtered_fname = [p prefix n x];
 command = sprintf ('%s/fsl_regfilt  -i %s -o %s -d melodic_output/melodic_mix -f %s\n', fsl_path, fmri_fname, filtered_fname, lesion_ic_str);
-system (command);
+systemSub (command);
 if strcmp (fsl_outtype, 'NIFTI_GZ')
     system (['gunzip -f ' filtered_fname '.gz']);
 end
 % 4. clear MELODIC output
-system ('rm -r melodic_output'); %% commented out for now
+systemSub ('rm -r melodic_output'); %% commented out for now
+%end nii_filter_lesion_ICs()
+
+function status  = systemSub (cmd)
+% Save library paths
+MatlabPath = getenv('LD_LIBRARY_PATH');
+% Make Matlab use system libraries
+setenv('LD_LIBRARY_PATH',getenv('PATH'));
+fprintf('%s\n',cmd);
+status = system(cmd);
+% Reassign old library paths
+setenv('LD_LIBRARY_PATH',MatlabPath);
+%systemSub
