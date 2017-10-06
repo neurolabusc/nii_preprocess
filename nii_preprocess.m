@@ -20,7 +20,11 @@ if ~exist('checkForUpdates','var') || checkForUpdates
     checkForUpdate(fileparts(mfilename('fullpath')));
 end
 nii_check_dependencies;
-if nargin < 1, error('Please use nii_preprocess_gui to select images'); end;
+if nargin < 1 %, error('Please use nii_preprocess_gui to select images'); 
+    %imgs = 'T1_limegui.mat';
+    [f, p] = uigetfile('*limegui.mat', 'Select a mat file');
+    imgs = fullfile(p,f);
+end;
 if isempty(spm_figure('FindWin','Graphics')), 
     spm fmri; 
     %spm_get_defaults('cmdline',true); %enable command line mode in scripts
@@ -56,11 +60,11 @@ if true
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
     %CR - skip while Grogori puts in new code
-    imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
+    %  imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
     %tStart = timeSub(tStart,'REST');
     imgs = doAslSub(imgs, matName);
     tStart = timeSub(tStart,'ASL');
-    imgs = dofMRISub(imgs, matName);
+    %  imgs = dofMRISub(imgs, matName);
     tStart = timeSub(tStart,'fMRI');
     %warning('Skipping DTI');
     if true
@@ -69,12 +73,13 @@ if true
             imgs = removeDotDtiSub(imgs);
             dtiDir = fileparts(imgs.DTI);
             doDtiSub(imgs);
+            doFaMdSub(imgs, matName);
             %-->(un)comment next line for JHU tractography
             doDtiTractSub(imgs, matName, dtiDir, 'jhu');
             %-->(un)comment next line for AICHA tractography
             doDtiTractSub(imgs, matName, dtiDir, 'AICHA'); % uncommented by GY, Aug10_2016
             %-->compute scalar DTI metrics
-            doFaMdSub(imgs, matName);
+            
             doTractographySub(imgs);
             doDkiSub(imgs, matName);
             tStart = timeSub(tStart,'DTI');
@@ -446,7 +451,7 @@ eT1 = prefixSub('e',imgs.T1); %enantimorphic image
 if ~exist(eT1,'file'), eT1 = imgs.T1; end; %if no lesion, use raw T1
 if ~exist(eT1,'file'), fprintf('doDti unable to find %s\n', eT1); return; end; %required
 global ForceDTI;
-if isempty(ForceDTI) && isDtiDone(imgs), fprintf('Skipping DTI processing (probtrackx done)\n'); return; end;
+if isempty(ForceDTI) && isDtiDoneBedpost(imgs), fprintf('Skipping DTI processing (bedpost done)\n'); return; end;
 n = bvalCountSub(imgs.DTI);
 if (n < 1)
     fprintf('UNABLE TO FIND BVECS/BVALS FOR %s\n', imgs.DTI);
@@ -526,6 +531,19 @@ isEddyCuda = exist(eddyName,'file') > 0;
 if ~isEddyCuda, printf('Hint: Eddy will run faster if you install %s', eddyName); end;
 %end isEddyCuda7Sub
 
+function done = isDtiDoneBedpost(imgs)
+done = false;
+if isempty(imgs.DTI), return; end;
+pth = fileparts( imgs.DTI );
+bed_dirX=fullfile(pth, 'bedpost.bedpostX');
+bed_done=fullfile(bed_dirX, 'xfms', 'eye.mat');
+if exist(bed_done, 'file')
+    done = true;
+end;
+%end isDtiDone()
+
+
+%{ 
 function done = isDtiDone(imgs)
 done = false;
 if isempty(imgs.DTI), return; end;
@@ -535,6 +553,7 @@ if exist(pDir, 'file')
     done = true;
 end;
 %end isDtiDone()
+%}
 
 function clipSub (imgs)
 if isempty(imgs.DTIrev)
@@ -625,13 +644,14 @@ if isGpuInstalledSub
 else
     command=sprintf('bedpostx "%s" ', bed_dir);
 end
-
 fslParallelSub;
 doFslCmd (command);
-while ~exist(bed_done,'file')
-    pause(1.0);
+if ~exist(bed_done,'file')
+    error('Fatal error running bedpostx');
 end
-fprintf ('Bedpost took %f seconds to run.\n', toc(t_start) );
+%while ~exist(bed_done,'file')
+%    pause(1.0);
+%end
 %end doDtiBedpostSub()
 
 function [bvec, bval] = getBVec(dti)
@@ -639,11 +659,11 @@ function [bvec, bval] = getBVec(dti)
 dti = unGzNameSub(deblank(dti));
 [p,n] = fileparts(dti);
 dti = fullfile(p,n);
-bvec = [dti 'u.eddy_rotated_bvecs'];
+bvec = [dti 'du.eddy_rotated_bvecs'];
 if ~exist(bvec,'file')
     bvec = [dti 'both.bvec'];
 end
-bval = [dti 'both.bval'];
+bval = [dti 'dboth.bval'];
 if exist(bvec,'file') && exist(bval,'file'), return; end; %combined AP/PA bvecs
 %fall back to original bvecs and bvals
 if ~exist(bvec,'file')
@@ -658,9 +678,7 @@ dti = imgs.DTI;
 global ForceDTI;
 if ~exist('atlas','var'),
     atlas = 'jhu';
-
     if isempty(ForceDTI) &&  isFieldSub(matName, 'dti'), fprintf('Skipping tractography (JHU DTI already computed) %s\n', imgs.ASL); return; end;
-
 end;
 if isempty(ForceDTI) &&   isFieldSub(matName, ['dti_' atlas]), fprintf('Skipping tractography (DTI already computed) %s\n', imgs.ASL); return; end;
 doDtiWarpSub(imgs, atlas); %warp atlas to DTI
@@ -697,7 +715,6 @@ fprintf('Creating thresholded image %s\n', template_roiWThr);
 doFslCmd (command);
 template_roiWThr=prepostfixSub('', ['_roi_thr', atlasext], dti);
 fprintf('PROBTRACKX: Create seed data\n');
-
 if ~exist(mask_dir, 'file'), mkdir(mask_dir); end;
 nROI = nRoiSub(template_roiWThr);
 %now run probtrackx
@@ -976,6 +993,9 @@ if verbose
     [status,cmdout]  = system(cmd,'-echo');
 else
   [status,cmdout]  = system(cmd);
+end
+if status ~= 0
+   warning('doFslCmd error %s\n', command); 
 end
 %end doFslCmd()
 

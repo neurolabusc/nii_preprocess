@@ -2,8 +2,10 @@ function nii_harvest (baseDir)
 
 %baseDir = '/home/crlab/Desktop/testDB';
 %outDir = '/home/crlab/Desktop/testIn';
-outDir = '/media/research/FAT1000/Master_In';
-baseDir = '/media/research/FAT1000/Master_DB'; %'/Root'
+%outDir = '/media/research/FAT1000/Master_In';
+%baseDir = '/media/research/FAT1000/Master_DB'; %'/Root'
+outDir = '/media/research/NEW2TBDRIVE/Out';
+baseDir = '/media/research/NEW2TBDRIVE/In'; %'/Root'
 
 % outDir = '/home/research/In';
 % baseDir = '/home/research/DB';
@@ -24,18 +26,19 @@ if ~exist('baseDir','var') || isempty(baseDir)
     baseDir = uigetdir('','Pick folder that contains all subjects');
     
 end
+
+%***Ignores directories containing '_' symbol
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
+
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
 %subjDirs = {'M4119'}; % temporary, for testing only!!! -- GY
-subjDirs = {'M41018'; 'M41019'; 'M41022'; 'M41027'}; 
+%subjDirs = {'M41018'; 'M41019'; 'M41022'; 'M41027'}; 
 % subjDirs = {'M4214';'M2037';'M2039';'M2040';...
 %     'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
 %     'M2120';'M2122';'M2124';'M212clc5';'M2142';'M2143';'M2145';'M2147';'M2164';...
-%     'M4148';'M4150';'M4180';'M4189';'M4211'};
 
-%subjDirs = {'M4217';'M4218';'M2001'};
-%subjDirs = {'M2130'};
+subjDirs = {'P1002'}; %temporary for texting only
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
 
@@ -260,9 +263,7 @@ tf = strncmpi(strEnd,pattern, numel(pattern));
 function imgs = findNovelImgs(subjDir, imgs, modalityKeysVerbose)
 f = fieldnames(imgs.nii);
 for i = 1: numel(f)
-%    if isfield(imgs.nii,f{i})
         imgs.nii.(f{i}).newImg = true;%??
-%    end
 end
 %'fMRI'
 if ~isfield(imgs.nii,'T1') || isempty(imgs.nii.T1), return; end;
