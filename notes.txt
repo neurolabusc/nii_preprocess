@@ -1,0 +1,32 @@
+To process new images
+ nii_preprocess_gui
+ nii_harvest
+ nii_harvest_fast
+To copy mat files into M.vers and LIME.vers folders
+ update nii_matver with latest date and push to github (so users will be informed of new version)
+ nii_preprocess_subfolders
+ v = nii_matver; v = v.lime;
+fullfile(pwd, sprintf('M.%.4f.pdf',v));
+
+ nii_mat2ortho(pwd,fullfile(pwd, sprintf('M.%.4f.pdf',v)));
+
+ nii_mat2ortho(pwd,fullfile(pwd, sprintf('LIME.%.4f.pdf',v)));
+7z a -v3g -pArchangel1918 M.2017.0720.zip ./M.2017.0720
+
+
+7z a -v3g -pArchangel1918 LIME.2017.0720.zip ./LIME.2017.0720
+
+
+
+dirs = dir('M*')
+for i = 3 :3% numel(dirs)
+	d = dirs(i);
+	if ~d.isdir, continue;
+	f = fullfile(pwd, d.name, '*_limegui.mat');
+	f = dir(f);
+	if isempty(f), continue; end;
+	f = fullfile(pwd, d.name, f(1).name);
+	m = load(f);
+
+end
+
