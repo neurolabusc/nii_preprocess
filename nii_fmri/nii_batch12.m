@@ -989,6 +989,7 @@ matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
 matlabbatch{1}.spm.stats.fmri_spec.timing.RT = kTR;
 matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = 16;
 matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = 1;
+warning('fmri_t = %g, fmri_t0 = %g', matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t, matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0);
 for ses = 1:nSessions
     %sesFiles = fmriname{ses};%getsesvolsSubSingle(fmriname, ses);
     sesFiles = getsesvolsSubSingle(prefix, fmriname, ses);
@@ -1001,7 +1002,7 @@ for ses = 1:nSessions
         if numel(s.duration) == 1
             matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).duration = s.duration{1};
         else
-            matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).onset = cell2mat(s.duration(ses, c));
+            matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).duration = cell2mat(s.duration(ses, c));
         end
         matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).tmod = 0;
         matlabbatch{1}.spm.stats.fmri_spec.sess(ses).cond(c).pmod = struct('name', {}, 'param', {}, 'poly', {});

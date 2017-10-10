@@ -654,7 +654,6 @@ fprintf('Creating thresholded image %s\n', template_roiWThr);
 doFslCmd (command);
 template_roiWThr=prepostfixSub('', ['_roi_thr', atlasext], dti);
 fprintf('PROBTRACKX: Create seed data\n');
-
 if ~exist(mask_dir, 'file'), mkdir(mask_dir); end;
 nROI = nRoiSub(template_roiWThr);
 %now run probtrackx
@@ -861,21 +860,21 @@ if isempty(which('NiiStat')), error('NiiStat required (https://github.com/neurol
 if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
 if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
-if isempty(which('nii_batch12')), 
+if isempty(which('nii_batch12')),
     p = fileparts(which('nii_preprocess'));
     p = fullfile(p,'nii_fmri');
     addpath(p);
     if isempty(which('nii_batch12'))
-        error('Unable to find nii_batch12'); 
+        error('Unable to find nii_batch12');
     end;
-end;  
+end;
 if ~exist('spm_create_vol','file'), error('SPM12 required'); end;
 %make sure user uncomments timing line in spm
 fnm = which('spm_create_vol');
 txt = fileread(fnm);
 badStr = '%try, N.timing = V.private.timing; end';
 if ~isempty(strfind(txt,badStr))
-   error('Please uncomment "%s" from "%s"', badStr, fnm); 
+   error('Please uncomment "%s" from "%s"', badStr, fnm);
 end
 %make sure the user had the correct version of fsl_sub
 fsldir = fslDirSub;
@@ -884,7 +883,7 @@ if ~exist(fnm,'file'), error('%s required', fnm); end;
 txt = fileread(fnm);
 goodStr = '_gpu';
 if isempty(strfind(txt,goodStr))
-   error('Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm); 
+   error('Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm);
 end
 %make sure eddy supports repol
 cmd = fullfile(fsldir, 'bin', 'eddy_openmp');
