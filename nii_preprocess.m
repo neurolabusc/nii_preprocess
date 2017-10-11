@@ -81,14 +81,14 @@ if true
             %-->compute scalar DTI metrics
             
             doTractographySub(imgs);
-            doDkiSub(imgs, matName);
+            %666 doDkiSub(imgs, matName);
             tStart = timeSub(tStart,'DTI');
         end
-        doDkiSub(imgs, matName, true);
+        %666 doDkiSub(imgs, matName, true);
     end
     tStart = timeSub(tStart,'DKI');
     %matName
-    addLimeVersionSub(matName); %update versioning
+    %addLimeVersionSub(matName); %update versioning
 end
 %print output
 pth = '~/Desktop';
