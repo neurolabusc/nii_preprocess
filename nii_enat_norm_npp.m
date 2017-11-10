@@ -1,10 +1,19 @@
-function nii_enat_norm(T1,lesion,T2, UseXTemplate, vox, bb, DeleteIntermediateImages, ssthresh, autoOrigin)
+function nii_enat_norm_npp(T1,lesion,T2, UseXTemplate, vox, bb, DeleteIntermediateImages, ssthresh, autoOrigin, wideDiploe)
 %Perform enantiomorphic normalization using SPM12
 % see Nachev et al. (2008) http://www.ncbi.nlm.nih.gov/pubmed/18023365
 %  T1: filename of T1 image
 %  Lesion: filename of lesion map
 %  T2: (optional) filename of image used to draw lesion, if '' then lesion drawn on T1
 %  UseXTemplate: if false (default) standard SPM template is used, else special template
+%  vox : (optional) voxel size
+%  bb : (optional) bounding box
+%  DeleteIntermediateImages : (optional) remove temporary images
+%  ssthresh : (optional) skull-scalp threhsold
+%  autoOrigin : (optional) if true, image coregistered to set starting estimate
+%  wideDiploe : (optional) if true rim around brain is darkened to improve segmentation
+%Updates
+%  20171104: Use 12-dog normalization not 6-dof coregistration https://github.com/neurolabusc/nii_preprocess/wiki
+%             For old behavior "global force6dof; force6dof = 1;"
 %Examples
 % nii_enat_norm('T1_LM1054.nii','LS_LM1054.nii','') %lesion drawn on T1 scan
 % nii_enat_norm('T1_LM1054.nii','LS_LM1054.nii',''T2_LM1054.nii') %lesion drawn on T2 scan
@@ -31,6 +40,9 @@ if ~exist('autoOrigin','var')
    %autoOrigin = strcmpi(ButtonName,'Yes');
    autoOrigin = false;
 end
+if ~exist('wideDiploe','var')
+    wideDiploe = true;
+end
 T1 = stripVolSub(T1); lesion = stripVolSub(lesion); T2 = stripVolSub(T2);
 if isDoneSub(T1), fprintf('Already done: skipping normalization of %s\n',T1); return; end;
 if ~isempty(lesion), [T1,lesion,T2] = checkDimsSub(T1, lesion, T2); end; %check alignment
@@ -50,7 +62,14 @@ end
 [rT2, rlesion] = coregEstWriteSub(T1,T2,lesion); %#ok<ASGLU>
 rlesion = smoothSub(rlesion, 3);
 %2: make image without lesion
-eT1 = entiamorphicSub (T1, rlesion);
+eT1 = entiamorphicSub (T1, rlesion, rT2);
+if wideDiploe %see nii_diploe
+    if isempty(T2), error('wideDiploe requires T2'); end
+    newSegSub(rT2, '', UseXTemplate, 0);
+    T2bet = extractSub(0.25, rT2, prefixSub('c1',rT2), prefixSub('c2',rT2), prefixSub('c3',rT2));
+    maskSub(T1, T2bet, 0.25, true);
+    eT1 = maskSub(eT1, T2bet, 0.25, true);
+end
 %[eT1, erT2] = entiamorphicSub (T1, rlesion, rT2); %for multichannel
 %3: new-segment image
 newSegSub(eT1,'', UseXTemplate);
@@ -72,6 +91,35 @@ if DeleteIntermediateImages, deleteSub(T1); end;
 %spm_smooth(img, smth, FWHM, 0);
 %img = smth;
 %end smoothSub()
+
+function maskImgName = maskSub(imgName, maskName, modulation, rimMask)
+%reduce voxels outside of mask by factor modulation
+% imgName: image to mask
+% mask: image with zeros in regions to be attenuated
+% modulation : fraction of attenuation outside the mask
+% rimMask : if true, only rim around bounary of mask will be attenuated
+%Example
+% maskSub('i.nii', 'msk.nii, 0.25, true); %decrease intensity outside mask to 25% input
+%
+hdr = spm_vol(maskName);
+mask = spm_read_vols(hdr);
+mask(mask ~= 0) = 1;
+if rimMask
+    inmask = mask + 0;
+    spm_smooth(inmask, mask,4);
+    mask(mask > 0.05) = modulation;
+    mask(mask < modulation) = 1;
+    mask(inmask==1) = 1;
+end;
+hdr = spm_vol(imgName);
+img = spm_read_vols(hdr);
+if ~isequal(size(mask), size(img)), error('Images size mismatch %s %s', imgName, maskName); end;
+img = img .* mask;
+maskImgName = prefixSub('m',imgName);
+hdr.fname = maskImgName;
+%hdr.dt(1)    =16;
+spm_write_vol(hdr,img);
+%end maskSub()
 
 function isDone = isDoneSub(T1)
 isDone = false;
@@ -246,10 +294,10 @@ thresh = ((mx-mn)*0.5) + mn;
 spm_write_vol(hdr,+(img > thresh));
 %end newSegWriteSub()
 
-function newSegSub(t1, t2, UseXTemplate)
+function newSegSub(t1, t2, UseXTemplate, createDartel)
 %apply new segment - return name of warping matrix
 template = fullfile(spm('Dir'),'tpm','TPM.nii');
-if nargin > 2 && UseXTemplate
+if nargin > 2 && ~isempty(UseXTemplate) && UseXTemplate
     xtemplate = fullfile(spm('Dir'),'toolbox','Clinical','TPM4mm.nii');
     if exist(xtemplate,'file')
         template = xtemplate;
@@ -259,6 +307,9 @@ if nargin > 2 && UseXTemplate
 end
 if ~exist(template,'file')
     error('Unable to find template named %s',template);
+end
+if ~exist('createDartel', 'var')
+    createDartel = 1;
 end
 fprintf('NewSegment of %s\n', t1);
 matlabbatch{1}.spm.spatial.preproc.channel(1).vols = {t1};
@@ -273,11 +324,11 @@ if nargin > 1 && ~isempty(t2)
 end;
 matlabbatch{1}.spm.spatial.preproc.tissue(1).tpm = {[template ',1']};
 matlabbatch{1}.spm.spatial.preproc.tissue(1).ngaus = 1;
-matlabbatch{1}.spm.spatial.preproc.tissue(1).native = [1 1];
+matlabbatch{1}.spm.spatial.preproc.tissue(1).native = [1 createDartel];
 matlabbatch{1}.spm.spatial.preproc.tissue(1).warped = [0 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(2).tpm = {[template ',2']};
 matlabbatch{1}.spm.spatial.preproc.tissue(2).ngaus = 1;
-matlabbatch{1}.spm.spatial.preproc.tissue(2).native = [1 1];
+matlabbatch{1}.spm.spatial.preproc.tissue(2).native = [1 createDartel];
 matlabbatch{1}.spm.spatial.preproc.tissue(2).warped = [0 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(3).tpm = {[template ',3']};
 matlabbatch{1}.spm.spatial.preproc.tissue(3).ngaus = 2;
@@ -285,11 +336,11 @@ matlabbatch{1}.spm.spatial.preproc.tissue(3).native = [1 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(3).warped = [0 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(4).tpm = {[template ',4']};
 matlabbatch{1}.spm.spatial.preproc.tissue(4).ngaus = 3;
-matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [1 0];
+matlabbatch{1}.spm.spatial.preproc.tissue(4).native = [0 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(4).warped = [0 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(5).tpm = {[template ',5']};
 matlabbatch{1}.spm.spatial.preproc.tissue(5).ngaus = 4;
-matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [1 0];
+matlabbatch{1}.spm.spatial.preproc.tissue(5).native = [0 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(5).warped = [0 0];
 matlabbatch{1}.spm.spatial.preproc.tissue(6).tpm = {[template ',6']};
 matlabbatch{1}.spm.spatial.preproc.tissue(6).ngaus = 2;
@@ -328,7 +379,12 @@ fprintf('Using lesion %s to substitute %s\n', lesionNam, T1);
 %create flipped image
 T1lr = flipSub(T1);
 T2lr = flipSub(T2);
-[T1lr, T2lr] = coregEstWriteSub(T1, T1lr, T2lr); %reslice mirror
+global force6dof
+if ~isempty(force6dof) && force6dof
+    [T1lr, T2lr] = coregEstWriteSub(T1, T1lr, T2lr); %reslice mirror
+else
+    [T1lr, T2lr] = coreg12EstWriteSub(T1, T1lr, T2lr, lesionNam); %reslice mirror
+end
 intactT2 = insertSub(T2, T2lr, lesionNam);
 intactT1 = insertSub(T1, T1lr, lesionNam);
 %end entiamorphicSub()
@@ -367,6 +423,159 @@ hdr_flip.fname = namLR;
 hdr_flip.mat = [-1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1] * hdr_flip.mat;
 spm_write_vol(hdr_flip,img);
 %end flipSub()
+
+% function [T2, lesion] = coreg12EstWriteSub(T1, T2, lesion)
+% %coregister T2 to match T1 image, apply to lesion (use 12-dof normalization instead of 6 dof coregister)
+% if isempty(T1) || isempty(T2), return; end;
+% fprintf('12-dof Coregistration of %s to match %s\n',T2,T1);
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source = {T2};
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = {[T2]; [lesion]};
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.template = {T1};
+% %n.b. masking tends to make problem worse
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 8;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smoref = 8;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'none';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25; %25 is default, linear is Inf;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 16; %16 is default, linear is 0
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = 10; %!!!penalize - make more linear 1 is default for spm_cfg_normalise, 0.1 is default for spm_normalise
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [NaN NaN NaN; NaN NaN NaN];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [NaN NaN NaN];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = 2;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.prefix = 'r';
+% spm_jobman('run',matlabbatch);
+% T2 = prefixSub('r',T2);
+% if ~isempty(lesion), lesion = prefixSub('r',lesion); end;
+% %end coreg12EstWriteSub()
+
+function [source, other] = coreg12EstWriteSub(template, source, other, TemplateLesion)
+%coregister source to match template image, apply to lesion (use 12-dof normalization instead of 6 dof coregister)
+if isempty(template) || isempty(source), return; end;
+fprintf('Nonlinear Coregistration of %s to match %s\n',source,template);
+if isempty(TemplateLesion), error('expect lesion file'); end
+[msk, mskLR] = makeMaskSub(TemplateLesion, 4);
+matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source = {source};
+matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = mskLR;
+if ~exist('other','var') || isempty(other)
+    matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = {[source]};
+else
+    matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = {[source]; [other]};
+end
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.template = {template};
+%n.b. masking tends to make problem worse
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = msk;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 4;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smoref = 4;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'mni';
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 16;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = 1;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [NaN NaN NaN; NaN NaN NaN];
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [NaN NaN NaN];
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = 2;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.prefix = 'r';
+spm_jobman('run',matlabbatch);
+source = prefixSub('r',source);
+if ~isempty(other), other = prefixSub('r',other); end;
+delete(mskLR);
+delete(msk);
+%end coreg12EstWriteSub()
+
+function [msk, mskLR] = makeMaskSub (nam, mm)
+pth = spm_fileparts(nam);
+msk = fullfile(pth, 'tempmask.nii');
+%blur
+spm_smooth(nam,msk,mm,16); 
+%make mask to only include voxels outside image
+thresh = 0.001;
+hdr = spm_vol(msk);
+img = spm_read_vols(hdr);
+img = (img < thresh);
+%hdr.fname = fullfile(pth, 'taco.nii'); 
+hdr.dt    =[2,0]; %8-bit
+hdr.pinfo = [1;0;0];
+spm_write_vol(hdr,img);
+mskLR = flipSub (msk);
+%end flipSub()
+
+% function [T2, lesion] = coreg12EstWriteSub(T1, T2, lesion)
+% %coregister T2 to match T1 image, apply to lesion (use 12-dof normalization instead of 6 dof coregister)
+% if isempty(T1) || isempty(T2), return; end;
+% fprintf('12-dof Coregistration of %s to match %s\n',T2,T1);
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source = {T2};
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = {[T2]; [lesion]};
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.template = {T1};
+% mask = makeT1BrainMaskSub(T1);
+% if exist(mask,'file')
+%     matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = {mask}; 
+%     fprintf('Applying brain mask "%s"', mask);
+% else
+%     error('unable to find brainmask "%s"', mask);
+%     matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
+% end
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 8;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smoref = 8;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'none';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = Inf;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 0;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = 1;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [NaN NaN NaN; NaN NaN NaN];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [NaN NaN NaN];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = 2;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.prefix = 'r';
+% spm_jobman('run',matlabbatch);
+% T2 = prefixSub('r',T2);
+% if ~isempty(lesion), lesion = prefixSub('r',lesion); end;
+% delete(mask);
+% %end coreg12EstWriteSub()
+% 
+% function mask = makeT1BrainMaskSub(T1);
+% %make brain mask aligned to T1, linear fit only (so OK for lesions).
+% %Assumes "T1" is T1-weighted image.
+% spmMask = fullfile(spm('Dir'),'toolbox', 'Fieldmap','brainmask.nii');
+% spmT1 = fullfile(spm('Dir'),'toolbox', 'OldNorm','T1.nii');
+% if ~exist(spmMask,'file') || ~exist(spmT1,'file')
+%     error('unable to find images "%s" "%s"', spmT1, spmMask);
+% end;
+% [p,n,x] = spm_fileparts(T1);
+% tMask = fullfile(p,'tempmask.nii');
+% tT1 = fullfile(p,'tempT1.nii');
+% copyfile(spmMask, tMask);
+% copyfile(spmT1, tT1);
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source = {tT1};
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = {tMask};
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.template = {T1};
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 0; %template already smoothed!
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smoref = 8; %smooth T1
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'mni';
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = Inf;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 0;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = 1;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [nan nan nan; nan nan nan];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [nan nan nan];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = 1;
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
+% matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
+% spm_jobman('run',matlabbatch);
+% delete(tMask);
+% delete(tT1);
+% tT1 = fullfile(p,'tempT1_sn.mat');
+% delete(tT1);
+% tMask = fullfile(p,'wtempmask.nii');
+% mask = fullfile(p,['msk', n, x]);
+% movefile(tMask, mask);
+% %end makeT1BrainMaskSub()
 
 function [T2, lesion] = coregEstWriteSub(T1, T2, lesion)
 %coregister T2 to match T1 image, apply to lesion

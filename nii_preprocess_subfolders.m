@@ -34,7 +34,7 @@ if ~strcmpi(ButtonName,'Yes'), return; end;
 
 
 %f = {'M2025';}; %for a single folder
-f = {'M2001';'M4217';'M4218'};%
+%f = {'M2001';'M4217';'M4218'};%
 if isPreprocess
     t = tic;
     n = 0;

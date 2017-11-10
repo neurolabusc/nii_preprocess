@@ -4,8 +4,8 @@ function nii_harvest (baseDir)
 %outDir = '/home/crlab/Desktop/testIn';
 %outDir = '/media/research/FAT1000/Master_In';
 %baseDir = '/media/research/FAT1000/Master_DB'; %'/Root'
-outDir = '/media/research/NEW2TBDRIVE/POLAR_MASTER_IN';
-baseDir = '/media/research/NEW2TBDRIVE/POLAR_MASTER_DB'; %'/Root'
+outDir = '/media/research/NEW2TBDRIVE/REST_POLAR_MASTER_IN';
+baseDir = '/media/research/NEW2TBDRIVE/REST_POLAR_MASTER_DB'; %'/Root'
 
 % outDir = '/home/research/In';
 % baseDir = '/home/research/DB';
@@ -13,7 +13,7 @@ baseDir = '/media/research/NEW2TBDRIVE/POLAR_MASTER_DB'; %'/Root'
 isExitAfterTable = false; % <- if true, only generates table, does not process data
 isPreprocess = true; % <- if true full processing, otherwise just cropping
 isReportDims = false; %if true, report dimensions of raw data
-reprocessRest = false;
+reprocessRest = true;
 reprocessfMRI = false;
 reprocessASL = false;
 reprocessDTI = false;
@@ -32,13 +32,13 @@ subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
-%subjDirs = {'M4119'}; % temporary, for testing only!!! -- GY
+%subjDirs = subjDirs(1); % temporary, for testing only!!! -- GY
 %subjDirs = {'M41018'; 'M41019'; 'M41022'; 'M41027'}; 
 % subjDirs = {'M4214';'M2037';'M2039';'M2040';...
 %     'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
 %     'M2120';'M2122';'M2124';'M212clc5';'M2142';'M2143';'M2145';'M2147';'M2164';...
 
-%subjDirs = {'M10212'}; %temporary for texting only
+%subjDirs = {'M10011'}; %temporary for texting only
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
@@ -107,7 +107,6 @@ for s = 1: nSubj
     end
     fprintf('%s\n', str);
 end
-
 fprintf('Table required %g seconds\n', toc(startTime));
 %copy core files to new folder
 if isExitAfterTable 
@@ -118,7 +117,8 @@ if exist(outDir, 'file') ~= 7, error('Unable to find folder %s', outDir); end;
 %find images we have already processed
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
 process1st = true;
-for s =  33:50 %1: nSubj 
+
+for s =  1: nSubj 
     anyNewImg = false;
     subj = deblank(imgs(s).subjName);
     subjDir = fullfile(outDir, subj);
@@ -135,6 +135,10 @@ for s =  33:50 %1: nSubj
     ForceRest=[];
     ForceASL=[];
     ForceDTI =[];
+    %666 ->
+    %imgs(s).nii.fMRI.newImg = false;
+    %imgs(s).nii.Rest.newImg = false;
+    %666 <-
     if imgs(s).nii.fMRI.newImg, ForcefMRI = true; end;
     if imgs(s).nii.Rest.newImg, ForceRest = true; end;
     if imgs(s).nii.ASL.newImg, ForceASL = true; end;
@@ -165,6 +169,7 @@ for s =  33:50 %1: nSubj
     mat = [];
     
     if exist(matName,'file'), mat = load(matName); end;
+    
     for i =  1:numel(f)
         if ~isempty(imgs(s).nii.(f{i})) && (imgs(s).nii.(f{i}).newImg)
             m = f{i}; % modality: T1, T2..
@@ -192,6 +197,7 @@ for s =  33:50 %1: nSubj
                 mat.(m) = imgout;
         end
     end
+    
     if anyNewImg
         matNameGUI = fullfile(subjDir, [subj, '_limegui.mat']);
         fprintf('Creating %s\n',matNameGUI);
@@ -283,7 +289,7 @@ if isfield(m,'cbf') && isfield(imgs.nii.ASL, 'x')
     imgs.nii.ASL.newImg = ~endsWithSub(m.cbf.hdr.fname, ['_',imgs.nii.ASL.x,'M0CSF.nii']);
 end;
 if isfield(m,'fa') && isfield(imgs.nii.DTI, 'x') 
-    imgs.nii.DTI.newImg = ~endsWithSub(m.fa.hdr.fname, ['_',imgs.nii.DTI.x,'_FA.nii']);
+    imgs.nii.DTI.newImg = ~endsWithSub(m.fa.hdr.fname, ['_',imgs.nii.DTI.x,'d_FA.nii']);
     imgs.nii.DTIrev.newImg = imgs.nii.DTI.newImg;
 end;
 if isfield(m,'RestAve') && isfield(imgs.nii.Rest, 'x')  

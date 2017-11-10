@@ -17,7 +17,9 @@ if ~exist('vols','var') || isempty(vols) %no files specified
 end
 if ischar(vols), vols = cellstr(vols); end
 if ~exist('bb','var') || isempty(bb) %bounding box not specified
-    bb = [-78 -112 -70; 78 76 85];
+    %bb = [-78 -112 -70; 78 76 85];
+    bb = [-70 -112 -64; 70 76 82]; %20171103 CR reduce bounding box: different neck-head rotation impairs rigid body registration
+    
 end
 if ~exist('clipZ','var') || isempty(clipZ) %x-clipping not specified
     clipZ = false;
