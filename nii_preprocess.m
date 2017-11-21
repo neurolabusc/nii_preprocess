@@ -221,7 +221,11 @@ if ~exist('nii_fmri60.m','file')
     end
     addpath(fnm);
 end
-nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2); %use fMRI for normalization
+
+%GY, Oct 5, 2017
+%nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2); %use fMRI for normalization
+nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2, imgs.Lesion);
+
 if ~exist(cstat, 'file') || ~exist(bstat,'file')
     error('fMRI analysis failed : %s\n  %s', bstat, cstat);
 end

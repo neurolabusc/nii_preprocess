@@ -69,10 +69,36 @@ meanname = prefixSub('w', meanname);
 prefix = smoothSub(FWHM, prefix, fmriname); %smooth images
 %-- get rid of images we don't need
 deleteImagesSub(prefix, fmriname); %delete intermediate images
-%6.) compute statistics
+
+%6.) (GY, Oct 2017): detrend 
+% maybe remove this thing from nii_rest because we do it in batch12 anyway?
+if isfield (p, 'lesion_name') &&  ~isempty (p.lesion_name) % i.e. we preprocess task fmri, not rest
+    [pth,nam,ext] = spm_fileparts(fmriname);
+    mocoTxt = fullfile(pth,['rp_', nam, '.txt']);    
+    prefix = [nii_detrend(fullfile(pth,[prefix, nam, ext]),meanname,'',mocoTxt,1), prefix]; %#ok<AGROW>    
+    % in future: add WM regression??? -GY
+end
+%7.) (GY, Oct 5, 2017): running ICA and removing lesion-driven ICs
+if isfield (p, 'lesion_name')
+    if ~isempty (p.lesion_name)
+        [lpth, lnam, lext] = fileparts(p.lesion_name);
+        lesName = fullfile(lpth,['wsr', lnam ,lext]);
+        if ~exist(lesName,'file')
+            lesName = fullfile(lpth,['ws', lnam ,lext]);
+        end
+        if ~exist(lesName,'file'), error('Catastrophic failure: can not find %s', lesName); end;
+        [pth, nam, ext] = fileparts(fmriname);
+        prefix = [nii_filter_lesion_ICs(lesName, fullfile(pth,[prefix, nam, ext]), p.TRsec), prefix]; %#ok<AGROW> 
+    end
+end
+
+%8.) compute statistics
 if ~isfield(p,'onsets'), return; end; %only if user provides details
 stat_1st_levelSub (prefix, fmriname, TRsec, p);
 %end nii_batch()
+
+
+
 
 %---------- LOCAL FUNCTIONS FOLLOW
 
@@ -957,6 +983,9 @@ end
 if ~exist('statdirname','var') %no input: select fMRI file[s]
  [pth,nam] = spm_fileparts(deblank(fmriname(1,:)));
  statdirname = nam;
+ if s.mocoRegress
+    statdirname = [nam '_mc'];
+ end
  fprintf('Directory for SPM.mat file not specified - using folder named %s\n',statdirname);
 end
 predir = pwd;
@@ -986,8 +1015,16 @@ end;
 clear matlabbatch
 matlabbatch{1}.spm.stats.fmri_spec.dir = {statpth};
 matlabbatch{1}.spm.stats.fmri_spec.timing.units = 'secs';
+
 matlabbatch{1}.spm.stats.fmri_spec.timing.RT = kTR;
-matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = 16;
+%666 microscale time adjustment
+if kTR > 4
+    %https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=spm;27ab2eb2.1010
+    matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = round(10*kTR);    
+else
+    matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = 16;
+end
+%matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t = 16;
 matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0 = 1;
 warning('fmri_t = %g, fmri_t0 = %g', matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t, matlabbatch{1}.spm.stats.fmri_spec.timing.fmri_t0);
 for ses = 1:nSessions
