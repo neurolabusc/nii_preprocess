@@ -17,7 +17,7 @@ function [prefix, TRsec, slice_order, meanname] = nii_batch12 (p)
 %  p.t2name   : name of anatomical scan (typically not provided)
 %  p.FWHM : full-idth half maximum for smoothing (defaults to 6mm)
 %  p.resliceMM : resampled resolution (defaults to 2mm)
-%Versions
+%Versionsf
 %   7/7/2016 added "normIntensitySub" to deal with Philips data
 %Examples
 % TO DO
@@ -607,7 +607,6 @@ else
         t2name = fullfile(pth, ['r', nm, ext]);
     end;
 end;
-
 
 isNormalized = false;
 if (~ischar(p.t1name)) %we use p.t1name = -1 to signify skipping T1

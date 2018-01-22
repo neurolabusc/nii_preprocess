@@ -2,10 +2,23 @@ function nii_harvest (baseDir)
 
 %baseDir = '/home/crlab/Desktop/testDB';
 %outDir = '/home/crlab/Desktop/testIn';
-%outDir = '/media/research/FAT1000/Master_In';
-%baseDir = '/media/research/FAT1000/Master_DB'; %'/Root'
-outDir = '/media/research/NEW2TBDRIVE/REST_POLAR_MASTER_IN';
-baseDir = '/media/research/NEW2TBDRIVE/REST_POLAR_MASTER_DB'; %'/Root'
+
+%ENTIRE MASTER DB!
+%outDir = '/media/research/MasterChief/Master_In';
+%baseDir = '/media/research/MasterChief/Master_DB'; %'/Root'
+
+%POLAR STUDY ONLY
+outDir = '/media/research/POLAREXP/POLAR_Master_In';
+baseDir = '/media/research/POLAREXP/POLAR_Master_Db'; %'/Root'
+
+%JILL STEWART ONLY
+%outDir = '/home/research/Desktop/JILL_STEWART/JILL_PILOT/Master_IN';
+%baseDir = '/home/research/Desktop/JILL_STEWART/JILL_PILOT/Master_DB';
+
+%BRIE INTERPERSONAL CORRELATION ONLY
+%outDir = '/home/research/Desktop/BRIE_PILOT/Master_IN';
+%baseDir = '/home/research/Desktop/BRIE_PILOT/Master_DB';
+
 
 % outDir = '/home/research/In';
 % baseDir = '/home/research/DB';
@@ -34,16 +47,11 @@ subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
 %subjDirs = subjDirs(1); % temporary, for testing only!!! -- GY
 %subjDirs = {'M41018'; 'M41019'; 'M41022'; 'M41027'}; 
-% subjDirs = {'M4214';'M2037';'M2039';'M2040';...
-%     'M2041';'M2051';'M2069';'M2074';'M2096';'M2106';'M2111';'M2117';'M2119';...
-%     'M2120';'M2122';'M2124';'M212clc5';'M2142';'M2143';'M2145';'M2147';'M2164';...
-
-%subjDirs = {'M10011'}; %temporary for texting only
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
 
-modalityKeys = strrep(modalityKeysVerbose,'_','');
+modalityKeys = strrep(modalityKeysVerbose,'_',''); 
 xperimentKeys = {'POLAR','SE', 'LIME', 'CT', 'R01', 'CAT'}; %order specifies priority: 1st item checked first!
 %create empty structure
 blank = [];
@@ -135,10 +143,10 @@ for s =  1: nSubj
     ForceRest=[];
     ForceASL=[];
     ForceDTI =[];
-    %666 ->
+    %666x - 
     %imgs(s).nii.fMRI.newImg = false;
     %imgs(s).nii.Rest.newImg = false;
-    %666 <-
+    %666x <-
     if imgs(s).nii.fMRI.newImg, ForcefMRI = true; end;
     if imgs(s).nii.Rest.newImg, ForceRest = true; end;
     if imgs(s).nii.ASL.newImg, ForceASL = true; end;

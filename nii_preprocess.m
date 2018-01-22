@@ -59,11 +59,19 @@ if true
     imgs = doT1Sub(imgs, matName); %normalize T1
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
-    %666 imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
+    
+    %666x -> recommented in by Roger for Jill's Data
+    imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
+    %666x <-
+    
     %tStart = timeSub(tStart,'REST');
     imgs = doAslSub(imgs, matName);
     tStart = timeSub(tStart,'ASL');
-    %  imgs = dofMRISub(imgs, matName);
+    
+    %666x -> recommented in by Roger for Data with fMRI
+    imgs = dofMRISub(imgs, matName);
+    %666x <-
+    
     tStart = timeSub(tStart,'fMRI');
     %warning('Skipping DTI');
     if true
@@ -1056,6 +1064,7 @@ end
 %end bvalCountSub()
 
 function imgs = doRestSub(imgs, matName)
+
 if isempty(imgs.T1) || isempty(imgs.Rest), return; end; %we need these images
 imgs.Rest = removeDotSub (imgs.Rest);
 global ForceRest; %e.g. user can call "global ForceRest;  ForceRest = true;"

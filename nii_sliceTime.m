@@ -11,7 +11,6 @@ function prefix = nii_sliceTime(fMRIname, slice_order, TRsec)
 %Siemens have unusual interleaving
 % http://cbs.fas.harvard.edu/node/559#slice_order
 % https://wiki.cimec.unitn.it/tiki-index.php?page=MRIBOLDfMRI
-
 %these are the possible slice_orders http://nifti.nimh.nih.gov/pub/dist/src/niftilib/nifti1.h
 kNIFTI_SLICE_UNKNOWN =  0; %AUTO DETECT
 kNIFTI_SLICE_SEQ_INC = 1; %1,2,3,4

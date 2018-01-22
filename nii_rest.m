@@ -20,6 +20,9 @@ function prefix = nii_rest (imgs, TRsec, SliceOrder)
 %  TRsec = 1.65;
 %  nii_rest (imgs, TRsec);
 
+%Roger Comment this in for Jill Data due to failed AutoDetect Slice Order of 5
+%SliceOrder = 5;
+
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if ~exist('nii_batch12','file'), error('Make sure nii_batch12 is in path'); end;
 if ~exist('imgs','var') %no input: select imgs[s]
