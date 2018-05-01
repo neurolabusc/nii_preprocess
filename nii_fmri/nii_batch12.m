@@ -704,15 +704,17 @@ end
 if (slice_order > 0) && (slice_order <= 7)
     fprintf('Auto-detected slice order as %d\n',slice_order);
 else
-    if (hdr.dim(1) == 64) && (hdr.dim(2) == 64) && (hdr.dim(3) == 34)
+    if (hdr.dim(1) == 80) && (hdr.dim(2) == 80) && (hdr.dim(3) == 42)
         kNIFTI_SLICE_SEQ_DEC = 2; %4,3,2,1
         slice_order = kNIFTI_SLICE_SEQ_DEC;
-        fprintf('Assuming descending slice order');
+        fprintf('Assuming UC Irvine descending slice order\n');
+    elseif (hdr.dim(1) == 64) && (hdr.dim(2) == 64) && (hdr.dim(3) == 34)
+        kNIFTI_SLICE_SEQ_DEC = 2; %4,3,2,1
+        slice_order = kNIFTI_SLICE_SEQ_DEC;
+        fprintf('Assuming descending slice order\n');
     else
         fprintf('Unable to detect slice order. Please manually specify slice order.\n');
-    end;
-
-    
+    end;    
 end;
 %end getSliceOrderSub()
 

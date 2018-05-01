@@ -89,8 +89,13 @@ for ses = 1 : length(imgs.Rest(:,1));
     if isfield (imgs, 'Lesion')
         if ~isempty (imgs.Lesion)
             [lpth, lnam, lext] = fileparts(imgs.Lesion);
-            lesName = fullfile(lpth,['wsr', lnam ,lext]);
-            if ~exist(lesName,'file'), error('Catastrophic failure: can not find %s', lesName); end;
+            lesName = fullfile(lpth,['ws', lnam ,lext]);
+            if ~exist(lesName,'file'), 
+                lesName = fullfile(lpth,['wsr', lnam ,lext]); %resliced to match t1 
+            end;
+            if ~exist(lesName,'file'), 
+                lesName = fullfile(lpth,['wsr', lnam ,lext]);   
+            end;
             prefix = [nii_filter_lesion_ICs(lesName, fullfile(pth,[prefix, nam, ext]), TRsec), prefix]; %#ok<AGROW> 
         end
     end        

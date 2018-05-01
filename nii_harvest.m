@@ -8,8 +8,12 @@ function nii_harvest (baseDir)
 %baseDir = '/media/research/MasterChief/Master_DB'; %'/Root'
 
 %POLAR STUDY ONLY
+%outDir = '/media/research/POLAREXP/POLAR_Master_In';
+%baseDir = '/media/research/POLAREXP/POLAR_Master_Db'; %'/Root'
 outDir = '/media/research/POLAREXP/POLAR_Master_In';
-baseDir = '/media/research/POLAREXP/POLAR_Master_Db'; %'/Root'
+baseDir = '/media/research/POLAREXP/POLAR_Master_Db';
+
+
 
 %JILL STEWART ONLY
 %outDir = '/home/research/Desktop/JILL_STEWART/JILL_PILOT/Master_IN';
@@ -26,7 +30,7 @@ baseDir = '/media/research/POLAREXP/POLAR_Master_Db'; %'/Root'
 isExitAfterTable = false; % <- if true, only generates table, does not process data
 isPreprocess = true; % <- if true full processing, otherwise just cropping
 isReportDims = false; %if true, report dimensions of raw data
-reprocessRest = true;
+reprocessRest = false;
 reprocessfMRI = false;
 reprocessASL = false;
 reprocessDTI = false;
@@ -44,9 +48,10 @@ end
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 
-%subjDirs = subjDirs(70:160);  % temporary, skip MUSC!!! -- CR
+%subjDirs = subjDirs(86:98);  % 1-50 of Polar, rest on other box - RN
 %subjDirs = subjDirs(1); % temporary, for testing only!!! -- GY
-%subjDirs = {'M41018'; 'M41019'; 'M41022'; 'M41027'}; 
+%subjDirs = { 'M10413'; 'M10463'}; 
+subjDirs = {'M10432'};
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
