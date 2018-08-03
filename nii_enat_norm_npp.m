@@ -44,7 +44,7 @@ if ~exist('wideDiploe','var')
     if isempty(T2)
        wideDiploe = false; 
     else
-        wideDiploe = true; %experimental correction for wide diploic spaces
+        wideDiploe = false; %experimental correction for wide diploic spaces
         %wideDiploe = false;
         fprintf('Note: if normalization is poor please turn on wideDiploe');
     end
