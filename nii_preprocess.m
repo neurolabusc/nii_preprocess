@@ -44,6 +44,8 @@ if ~isfield(imgs,'Rest'), imgs.Rest = []; end;
 if ~isfield(imgs,'DTI'), imgs.DTI = []; end;
 if ~isfield(imgs,'DTIrev'), imgs.DTIrev = []; end;
 if ~isfield(imgs,'fMRI'), imgs.fMRI = []; end;
+if ~isfield(imgs,'DKIrev'), imgs.DKIrev = []; end;
+if ~isfield(imgs,'DKI'), imgs.DKI = []; end;
 
 if ~exist('matName','var') || isempty(matName)
     [p,n] = filepartsSub(imgs.T1);
@@ -88,10 +90,10 @@ if true
             %-->compute scalar DTI metrics
             
             doTractographySub(imgs);
-            %666 doDkiSub(imgs, matName);
+            doDkiSub(imgs, matName);
             tStart = timeSub(tStart,'DTI');
         end
-        %666 doDkiSub(imgs, matName, true);
+    doDkiSub(imgs, matName, true);
     end
     tStart = timeSub(tStart,'DKI');
     %matName
@@ -366,6 +368,23 @@ if exist('isDki','var') && (isDki)
         fprintf('Skipping MK estimates: already computed\n');
         return;
     end; %stats already exist
+    
+    %preprocess - denoise
+dki_d=prepostfixSub('', 'd', imgs.DKI);
+if exist(imgs.DKIrev)
+    dti_dr=prepostfixSub('', 'd', imgs.DKI);
+end;
+if isempty(ForceDTI) && exist(dki_d, 'file')
+   fprintf('Skipping DTI denoising: found %s\n', dki_d);
+else
+    mm = imgMM(imgs.DKI);
+    degibbs = (mm > 1.9); %partial fourier used for HCP 1.5mm isotropic images
+    dki_d = nii_dwidenoise (imgs.DKI, degibbs);
+    if exist(imgs.DKIrev)
+        dti_dr = nii_dwidenoise (imgs.DKIrev, degibbs);
+    end;
+end;
+
     warning('If you are using fsl 5.0.9, ensure you have patched version of eddy ("--repol" option) https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
     %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
     %if isEddyCuda7Sub()
@@ -378,7 +397,7 @@ if exist('isDki','var') && (isDki)
     %else
     %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
     %end
-    command=sprintf('%s "%s"',command, imgs.DKI);
+    command=sprintf('%s "%s"',command, dki_d);
     doFslCmd (command);
     doDkiCoreSub(imgs.T1, imgs.DKI, matName)
 else
@@ -394,8 +413,8 @@ if ~exist('dkifx2','file'),  error('skipping DKI: requires dkifx2 script\n'); re
 mask=prepostfixSub('', 'db_mask', DTI);
 mask = unGzSub (mask);
 if ~exist(mask,'file'),  error('unable to find %s\n', mask); return; end;
-MKfa=prepostfixSub('', 'd_FA', DTI);
-if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
+%MKfa=prepostfixSub('', 'd_FA', DTI);
+%if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
 dti_u=prepostfixSub('', 'du', DTI);
 [pth,nam] = filepartsSub(DTI);
 bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
