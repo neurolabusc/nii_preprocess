@@ -113,6 +113,38 @@ nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (sp
 diary off
 %nii_preprocess()
 
+function doDkiTractSub(imgs,matName,dtiDir,atlas)
+dki = imgs.DKI; 
+if ~exist('atlas','var'),
+    atlas = 'jhu';
+end;
+doDkiWarpSub(imgs, atlas); %warp atlas to DTI
+dki_dt=prepostfixSub('s', 'du_DT', dki);
+dki_kt=prepostfixSub('s', 'du_DK', dki);
+dki_fa=prepostfixSub('s', 'du_FAx', dki);
+
+if ~exist(dki_kt,'file')
+    fprintf('Can not find tensors %s\n',dki_kt);
+    return;
+end   
+fid=fopen(fullfile(fileparts(mfilename('fullpath')),'ft_parameters.txt')); % original ft_parameters in nii_preprocess
+fout=fullfile(dtiDir,'ft_parameters_subj.txt'); % new ft_parameters 
+fidout=fopen(fout,'w');
+
+while(~feof(fid))
+    s=fgetl(fid);
+    s=strrep(s,'path',[dtiDir '/']);
+    fprintf(fidout,'%s\n',s);
+    disp(s)
+end
+
+fclose(fid);
+fclose(fidout);
+
+kODF_nii_preprocess(fullfile(dtiDir,'ft_parameters_subj.txt'),dki_dt,dki_kt,dki_fa)
+DKI_tractography_along_tract_stats(imgs,atlas,100) % devide tracts in 100 nodes 
+
+
 function addLimeVersionSub(matName)
 %add 'timestamp' to file allowing user to autodetect if there mat files are current
 % e.g. after running
