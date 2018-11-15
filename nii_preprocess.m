@@ -93,7 +93,13 @@ if true
             doDkiSub(imgs, matName);
             tStart = timeSub(tStart,'DTI');
         end
+    dkiDir = fileparts(imgs.DKI);    
     doDkiSub(imgs, matName, true);
+    %-->(un)comment next line for AICHA tractography
+    doDkiTractSub(imgs,matName, dkiDir, 'AICHA');
+    %-->(un)comment next line for JHU tractography
+    doDkiTractSub(imgs,matName, dkiDir, 'jhu');
+
     end
     tStart = timeSub(tStart,'DKI');
     %matName
