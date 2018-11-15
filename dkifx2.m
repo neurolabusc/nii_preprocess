@@ -33,7 +33,7 @@ else
     if ~exist(Mask_nam, 'file'), error('Unable to find %s', Mask_nam); end;
 end
 [p,n] = fileparts(bval_nam);
-bvec_nam = fullfile(p, [n '.bvec']);
+bvec_nam = fullfile(p, [n 'du.eddy_rotated_bvecs']);
 if ~exist(DWI_nam,'file'), error('Unable to find %s',DWI_nam); end;
 if ~exist(bvec_nam,'file'), error('Unable to find %s',bvec_nam); end;
 if ~exist(bval_nam,'file'), error('Unable to find %s',bval_nam); end;
