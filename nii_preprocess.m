@@ -427,9 +427,9 @@ end;
     %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
     %if isEddyCuda7Sub()
     if HalfSphere(imgs.DKI)
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh'];
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh']; %% needs to be changed to turn of dtifit 
     else
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh']; %% needs to be changed to turn of dtifit 
         %command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
     end
     %else
