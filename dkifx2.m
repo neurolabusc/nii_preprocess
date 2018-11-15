@@ -33,7 +33,7 @@ else
     if ~exist(Mask_nam, 'file'), error('Unable to find %s', Mask_nam); end;
 end
 [p,n] = fileparts(bval_nam);
-bvec_nam = fullfile(p, [n '.bvec']);
+bvec_nam = fullfile(p, [n 'du.eddy_rotated_bvecs']);
 if ~exist(DWI_nam,'file'), error('Unable to find %s',DWI_nam); end;
 if ~exist(bvec_nam,'file'), error('Unable to find %s',bvec_nam); end;
 if ~exist(bval_nam,'file'), error('Unable to find %s',bval_nam); end;
@@ -75,7 +75,7 @@ fprintf('dwi2tensor %g seconds\n', toc(start) );
 hdr = hdrT(1);
 imgM = any(imgT,4)+any(imgK,4);
 imgM(imgM > 0) = 1;
-MK_nam = fullfile(p, [n, '_MKmask.nii']);
+MK_nam = fullfile(p, ['s', n, 'du_MKmask.nii']);
 save_volSub(MK_nam, hdr, imgM);
 imgT = reshape(imgT,[],6)';
 imgK = reshape(imgK,[],15)';
@@ -87,7 +87,7 @@ imgMK = reshape(imgMK, hdr.dim(1), hdr.dim(2), hdr.dim(3));
 imgMK(((imgM(:) > 0) .* (imgMK(:) == 0)) > 0) = nan; %make all MK = zero values = NaN
 imgMK(isnan(imgMK(:))) = nan; %make all air NaN [optional]
 
-MK_nam = fullfile(p, [n, '_MK.nii']);
+MK_nam = fullfile(p, ['s', n, 'du_MK.nii']);
 save_volSub(MK_nam, hdr, imgMK)
 if ~isDeleteTempImages, return; end; %next lines delete temp files
 delete(dt);

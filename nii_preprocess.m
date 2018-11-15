@@ -44,6 +44,8 @@ if ~isfield(imgs,'Rest'), imgs.Rest = []; end;
 if ~isfield(imgs,'DTI'), imgs.DTI = []; end;
 if ~isfield(imgs,'DTIrev'), imgs.DTIrev = []; end;
 if ~isfield(imgs,'fMRI'), imgs.fMRI = []; end;
+if ~isfield(imgs,'DKIrev'), imgs.DKIrev = []; end;
+if ~isfield(imgs,'DKI'), imgs.DKI = []; end;
 
 if ~exist('matName','var') || isempty(matName)
     [p,n] = filepartsSub(imgs.T1);
@@ -88,10 +90,16 @@ if true
             %-->compute scalar DTI metrics
             
             doTractographySub(imgs);
-            %666 doDkiSub(imgs, matName);
+            doDkiSub(imgs, matName);
             tStart = timeSub(tStart,'DTI');
         end
-        %666 doDkiSub(imgs, matName, true);
+    dkiDir = fileparts(imgs.DKI);    
+    doDkiSub(imgs, matName, true);
+    %-->(un)comment next line for AICHA tractography
+    doDkiTractSub(imgs,matName, dkiDir, 'AICHA');
+    %-->(un)comment next line for JHU tractography
+    doDkiTractSub(imgs,matName, dkiDir, 'jhu');
+
     end
     tStart = timeSub(tStart,'DKI');
     %matName
@@ -104,6 +112,38 @@ if ~exist(pth,'file'), pth = ''; end;
 nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (spm_clf) show results - except DTI
 diary off
 %nii_preprocess()
+
+function doDkiTractSub(imgs,matName,dtiDir,atlas)
+dki = imgs.DKI; 
+if ~exist('atlas','var'),
+    atlas = 'jhu';
+end;
+doDkiWarpSub(imgs, atlas); %warp atlas to DTI
+dki_dt=prepostfixSub('s', 'du_DT', dki);
+dki_kt=prepostfixSub('s', 'du_DK', dki);
+dki_fa=prepostfixSub('s', 'du_FAx', dki);
+
+if ~exist(dki_kt,'file')
+    fprintf('Can not find tensors %s\n',dki_kt);
+    return;
+end   
+fid=fopen(fullfile(fileparts(mfilename('fullpath')),'ft_parameters.txt')); % original ft_parameters in nii_preprocess
+fout=fullfile(dtiDir,'ft_parameters_subj.txt'); % new ft_parameters 
+fidout=fopen(fout,'w');
+
+while(~feof(fid))
+    s=fgetl(fid);
+    s=strrep(s,'path',[dtiDir '/']);
+    fprintf(fidout,'%s\n',s);
+    disp(s)
+end
+
+fclose(fid);
+fclose(fidout);
+
+kODF_nii_preprocess(fullfile(dtiDir,'ft_parameters_subj.txt'),dki_dt,dki_kt,dki_fa)
+DKI_tractography_along_tract_stats(imgs,atlas,100) % devide tracts in 100 nodes 
+
 
 function addLimeVersionSub(matName)
 %add 'timestamp' to file allowing user to autodetect if there mat files are current
@@ -366,19 +406,36 @@ if exist('isDki','var') && (isDki)
         fprintf('Skipping MK estimates: already computed\n');
         return;
     end; %stats already exist
+    
+    %preprocess - denoise
+dki_d=prepostfixSub('', 'd', imgs.DKI);
+if exist(imgs.DKIrev)
+    dti_dr=prepostfixSub('', 'd', imgs.DKI);
+end;
+if isempty(ForceDTI) && exist(dki_d, 'file')
+   fprintf('Skipping DTI denoising: found %s\n', dki_d);
+else
+    mm = imgMM(imgs.DKI);
+    degibbs = (mm > 1.9); %partial fourier used for HCP 1.5mm isotropic images
+    dki_d = nii_dwidenoise (imgs.DKI, degibbs);
+    if exist(imgs.DKIrev)
+        dti_dr = nii_dwidenoise (imgs.DKIrev, degibbs);
+    end;
+end;
+
     warning('If you are using fsl 5.0.9, ensure you have patched version of eddy ("--repol" option) https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
     %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
     %if isEddyCuda7Sub()
     if HalfSphere(imgs.DKI)
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh'];
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh']; %% needs to be changed to turn of dtifit 
     else
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh']; %% needs to be changed to turn of dtifit 
         %command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
     end
     %else
     %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
     %end
-    command=sprintf('%s "%s"',command, imgs.DKI);
+    command=sprintf('%s "%s"',command, dki_d);
     doFslCmd (command);
     doDkiCoreSub(imgs.T1, imgs.DKI, matName)
 else
@@ -394,8 +451,8 @@ if ~exist('dkifx2','file'),  error('skipping DKI: requires dkifx2 script\n'); re
 mask=prepostfixSub('', 'db_mask', DTI);
 mask = unGzSub (mask);
 if ~exist(mask,'file'),  error('unable to find %s\n', mask); return; end;
-MKfa=prepostfixSub('', 'd_FA', DTI);
-if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
+%MKfa=prepostfixSub('', 'd_FA', DTI);
+%if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
 dti_u=prepostfixSub('', 'du', DTI);
 [pth,nam] = filepartsSub(DTI);
 bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
@@ -421,7 +478,7 @@ end;
 if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
 %normalize mean kurtosis to match normalized, brain extracted T1
 wMK = prepostfixSub('w', '', MK);
-oldNormSub( {MKfa, MK}, wbT1, 8, 8 );
+oldNormSub( {MK}, wbT1, 8, 8 );
 nii_nii2mat(wMK, 'mk', matName);
 %save note
 fid = fopen('dki.txt', 'a+');
@@ -867,6 +924,50 @@ delete(roiname);
 wroiname = prepostfixSub('w', atlasext, imgs.DTI);
 movefile(wroiname, roiname);
 %end doFaMdSub()
+
+function doDkiWarpSub(imgs, atlas)
+
+if isempty(imgs.T1) || isempty(imgs.DKI), return; end; %required
+if ~exist('atlas','var'), atlas = 'jhu'; end;
+if strcmpi(atlas,'jhu')
+    atlasext = '_roi';
+else
+   atlasext = ['_roi_' atlas];
+end
+T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
+MKFA = prepostfixSub('s', 'du_FAx', imgs.DKI);
+%MKMD = prepostfixSub('', 'd_MD', imgs.DKI);
+%MK = prepostfixSub('', 'd_MK', imgs.DKI);
+
+if ~exist(T1,'file') fprintf('Unable to find image: %s\n',T1); return; end; %required
+if ~exist(MKFA,'file') error('Unable to find image: %s\n',MKFA); return; end; %required
+%if ~exist(MKMD,'file') error('Unable to find image: %s\n',MKMD); return; end; %required
+%if ~exist(MK,'file') error('Unable to find image: %s\n',MK); return; end; %required
+
+MKFA = unGzSub (MKFA);
+%MKMD = unGzSub (MKMD);
+%MK = unGzSub (MK);
+
+nFA = rescaleSub(MKFA);
+atlasImg = fullfile(fileparts(which('NiiStat')), 'roi' , [atlas '.nii']);
+if ~exist(atlasImg,'file')
+    error('Unable to find template %s', atlasImg);
+end
+[outhdr, outimg] = nii_reslice_target(atlasImg, '', T1, 0) ;
+roiname = prepostfixSub('', atlasext, imgs.DKI);
+
+if exist(roiname,'file') %e.g. FSL made .nii.gz version
+    delete(roiname);
+    roiname = prepostfixSub('', atlasext, imgs.DKI);
+end
+roiname = unGzNameSub(roiname);
+outhdr.fname = roiname;
+spm_write_vol(outhdr,outimg);
+oldNormSub({T1, roiname}, nFA, 8, 10, 0 );
+delete(roiname);
+wroiname = prepostfixSub('w', atlasext, imgs.DKI);
+movefile(wroiname, roiname);
+
 
 function [p,n,x] = fsl_filepartsSub(imgname)
 [p, n, x] = fileparts(imgname);

@@ -41,7 +41,13 @@ if ~exist('autoOrigin','var')
    autoOrigin = false;
 end
 if ~exist('wideDiploe','var')
-    wideDiploe = true;
+    if isempty(T2)
+       wideDiploe = false; 
+    else
+        wideDiploe = false; %experimental correction for wide diploic spaces
+        %wideDiploe = false;
+        fprintf('Note: if normalization is poor please turn on wideDiploe');
+    end
 end
 T1 = stripVolSub(T1); lesion = stripVolSub(lesion); T2 = stripVolSub(T2);
 if isDoneSub(T1), fprintf('Already done: skipping normalization of %s\n',T1); return; end;
