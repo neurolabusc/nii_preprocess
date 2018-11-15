@@ -925,6 +925,50 @@ wroiname = prepostfixSub('w', atlasext, imgs.DTI);
 movefile(wroiname, roiname);
 %end doFaMdSub()
 
+function doDkiWarpSub(imgs, atlas)
+
+if isempty(imgs.T1) || isempty(imgs.DKI), return; end; %required
+if ~exist('atlas','var'), atlas = 'jhu'; end;
+if strcmpi(atlas,'jhu')
+    atlasext = '_roi';
+else
+   atlasext = ['_roi_' atlas];
+end
+T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
+MKFA = prepostfixSub('s', 'du_FAx', imgs.DKI);
+%MKMD = prepostfixSub('', 'd_MD', imgs.DKI);
+%MK = prepostfixSub('', 'd_MK', imgs.DKI);
+
+if ~exist(T1,'file') fprintf('Unable to find image: %s\n',T1); return; end; %required
+if ~exist(MKFA,'file') error('Unable to find image: %s\n',MKFA); return; end; %required
+%if ~exist(MKMD,'file') error('Unable to find image: %s\n',MKMD); return; end; %required
+%if ~exist(MK,'file') error('Unable to find image: %s\n',MK); return; end; %required
+
+MKFA = unGzSub (MKFA);
+%MKMD = unGzSub (MKMD);
+%MK = unGzSub (MK);
+
+nFA = rescaleSub(MKFA);
+atlasImg = fullfile(fileparts(which('NiiStat')), 'roi' , [atlas '.nii']);
+if ~exist(atlasImg,'file')
+    error('Unable to find template %s', atlasImg);
+end
+[outhdr, outimg] = nii_reslice_target(atlasImg, '', T1, 0) ;
+roiname = prepostfixSub('', atlasext, imgs.DKI);
+
+if exist(roiname,'file') %e.g. FSL made .nii.gz version
+    delete(roiname);
+    roiname = prepostfixSub('', atlasext, imgs.DKI);
+end
+roiname = unGzNameSub(roiname);
+outhdr.fname = roiname;
+spm_write_vol(outhdr,outimg);
+oldNormSub({T1, roiname}, nFA, 8, 10, 0 );
+delete(roiname);
+wroiname = prepostfixSub('w', atlasext, imgs.DKI);
+movefile(wroiname, roiname);
+
+
 function [p,n,x] = fsl_filepartsSub(imgname)
 [p, n, x] = fileparts(imgname);
 if strcmpi(deblank(x),'.gz') %.nii.gz
