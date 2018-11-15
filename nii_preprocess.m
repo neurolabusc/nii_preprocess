@@ -478,7 +478,7 @@ end;
 if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
 %normalize mean kurtosis to match normalized, brain extracted T1
 wMK = prepostfixSub('w', '', MK);
-oldNormSub( {MKfa, MK}, wbT1, 8, 8 );
+oldNormSub( {MK}, wbT1, 8, 8 );
 nii_nii2mat(wMK, 'mk', matName);
 %save note
 fid = fopen('dki.txt', 'a+');
