@@ -89,6 +89,15 @@ imgMK(isnan(imgMK(:))) = nan; %make all air NaN [optional]
 
 MK_nam = fullfile(p, ['s', n, 'du_MK.nii']);
 save_volSub(MK_nam, hdr, imgMK)
+% MD
+[imgMD,param] = estimate_parameters(imgT,imgK,{'md'});
+%save MK map
+imgMD = reshape(imgMD, hdr.dim(1), hdr.dim(2), hdr.dim(3));
+imgMD(((imgM(:) > 0) .* (imgMD(:) == 0)) > 0) = nan; %make all MK = zero values = NaN
+imgMD(isnan(imgMD(:))) = nan; %make all air NaN [optional]
+MD_nam = fullfile(p, ['s', n, 'du_MD.nii']);
+save_volSub(MD_nam, hdr, imgMD)
+
 if ~isDeleteTempImages, return; end; %next lines delete temp files
 delete(dt);
 delete(dkt);
