@@ -192,7 +192,7 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5) % do along tract measurements
     map=spm_read_vols(hdr);
     if sc_map==2, map=map*1000;end % convert MD to more conventional um2/ms 
 
-    [meanInt(i,j), stdInt(i,j), ~] = trk_stats(header, tracks_trk, map, 'nearest');
+    [meanInt(i,j,sc_map), stdInt(i,j,sc_map), ~] = trk_stats(header, tracks_interp_str, map, 'nearest');
     [header_sc, tracks_sc] = trk_add_sc(header, tracks_interp_str, map, scalar_maps{sc_map});
     %initalize
     scalars = zeros(tracks_sc(1).nPoints, header_sc.n_count, header_sc.n_scalars);
@@ -225,6 +225,8 @@ scalar_sd_struc=struct(scalar_maps{1},scalar_sd(:,:,:,1),scalar_maps{2},scalar_s
 
 save([p '/scalars_mean_' atlas '.mat'],'scalar_mean_struc')
 save([p '/scalars_sd' atlas '.mat'],'scalar_sd_struc')
+save([p '/mean_' atlas '.mat'],'meanInt') %mean tract values (FA,MD,MK)
+save([p '/std' atlas '.mat'],'meanInt') %std tract values (FA,MD,MK)
 save([p '/total_tracks' atlas '.mat'],'total_tracks')
 
 
