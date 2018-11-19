@@ -178,10 +178,10 @@ end
     end
 end
 
-command=['tcksample ' path_img 'mean_all.tck ' path_img 'sDKIdu_FAx.nii mean_color.tsf -force'];
+command=['tcksample ' p '/mean_all.tck ' p '/s' n 'du_FAx.nii mean_color.tsf -force'];
 system(command)
 
-command=['tcksample ' path_img 'all.tck ' path_img 'sDKIdu_FAx.nii all_color.tsf -force'];
+command=['tcksample ' p '/all.tck ' p '/s' n 'du_FAx.nii all_color.tsf -force'];
 system(command)
 
 scalar_mean_struc=struct(scalar_maps{1},scalar_mean(:,:,:,1),scalar_maps{2},scalar_mean(:,:,:,2),scalar_maps{3},scalar_mean(:,:,:,3));
