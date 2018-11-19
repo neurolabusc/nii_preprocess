@@ -194,6 +194,8 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5) % do along tract measurements
 
     [meanInt(i,j,sc_map), stdInt(i,j,sc_map), ~] = trk_stats(header, tracks_interp_str, map, 'nearest');
     [header_sc, tracks_sc] = trk_add_sc(header, tracks_interp_str, map, scalar_maps{sc_map});
+        if sc_map==1, header_sc_trk=header_sc;tracks_sc_trk=tracks_sc; else [header_sc_trk, tracks_sc_trk] = trk_add_sc(header_sc_trk, tracks_sc_trk, map, scalar_maps{sc_map}); end
+
     %initalize
     scalars = zeros(tracks_sc(1).nPoints, header_sc.n_count, header_sc.n_scalars);
     scalars_nw = zeros(tracks_sc(1).nPoints, header_sc.n_count, header_sc.n_scalars);
