@@ -190,6 +190,7 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5) % do along tract measurements
     % SCALAR MAPS 
     hdr=spm_vol([p '/s' n  scalar_maps{sc_map} '.nii']);
     map=spm_read_vols(hdr);
+    if sc_map==2, map=map*1000;end % convert MD to more conventional um2/ms 
 
     [meanInt(i,j), stdInt(i,j), ~] = trk_stats(header, tracks_trk, map, 'nearest');
     [header_sc, tracks_sc] = trk_add_sc(header, tracks_interp_str, map, scalar_maps{sc_map});
@@ -208,6 +209,10 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5) % do along tract measurements
     scalar_mean(i,j,1:nb_nodes,sc_map) = squeeze(sum(scalars, 2)); % sum because they are weighted scalars 
     scalar_sd(i,j,1:nb_nodes,sc_map)  = squeeze(nanstd(scalars_nw, 0, 2));
     end
+    
+    %trk_write(header_sc_trk,tracks_sc_trk,[p '/all_' atlas '.trk']); can
+    %be used in the future to output.trk files ( needs debugging)
+    
 end
         end
 
