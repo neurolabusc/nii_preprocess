@@ -1,18 +1,24 @@
 function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes)
 [p, n, x] = fileparts(imgs.T1);
-fprintf('Running mrtrix 5ttgen and 5tt2gmwmi to %s\n', n);
-command=['5ttgen fsl ' p '/wwb' n x ' ' p '/5tt_' n x ' -force -quiet'];
+if exist([p '/scalars_mean_' atlas '.mat'],'file')
+    fprintf('Skipping DKI tractography with atlas: %s\n', atlas); 
+    return
+end
+%create gm-wm interface for seeding purposes 
+if ~exist([p '/5tt_' n x],'file')
+    fprintf('Running mrtrix 5ttgen and 5tt2gmwmi to %s\n', n); 
+command=['5ttgen fsl ' p '/wwb' n x ' ' p '/5tt_' n x ' -force -quiet']; % need segmentation of T1 in diffusion space, this step could probably be optimized
 system(command)
 command=['5tt2gmwmi ' p '/5tt_' n x ' ' p '/gmwmi_' n x ' -force -quiet'];
 system(command)
+spm_reslice({[p '/wwb' n x],[p '/gmwmi_' n x]}) % get in same space as wwbT1 (not sure why it's not in that space to begin with?) 
 
+else
+    fprintf('Skipping generating WM-GM interface: found %s\n', ['gmwmi_' n x]);
+end
 
-%5ttgen fsl /Users/Emilie/Box\ Sync/PhD_Projects/DKI_USC_MUSC/30_20171018_175427_test_subject_1/leo_computer/wwbT1.nii /Users/Emilie/Box\ Sync/PhD_Projects/DKI_USC_MUSC/30_20171018_175427_test_subject_1/leo_computer/5tt.nii -force
-%5tt2gmwmi /Users/Emilie/Box\ Sync/PhD_Projects/DKI_USC_MUSC/30_20171018_175427_test_subject_1/leo_computer/5tt.nii /Users/Emilie/Box\ Sync/PhD_Projects/DKI_USC_MUSC/30_20171018_175427_test_subject_1/leo_computer/gmwmi.nii -force
 %%
-spm_reslice({[p '/wwb' n x],[p '/gmwmi_' n x]})
-
-% threshold gmwm interface at 50% chance  
+% threshold gmwm interface at 50% chance 
 gmwm=spm_read_vols(spm_vol([p '/rgmwmi_' n x]));
 gmwm=gmwm>0.5;
 
@@ -140,13 +146,13 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5)
     track_mrtrix.total_count=num2str(sum(index_keep));
     track_mrtrix.data(sum(index_keep)+1:end)=[];
 
-    if ~exist([p '/all.tck'],'file')
-    write_mrtrix_tracks(track_mrtrix,[p '/all.tck']);
+    if ~exist([p '/all_' atlas '.tck'],'file')
+    write_mrtrix_tracks(track_mrtrix,[p '/all_' atlas '.tck']);
     else
     write_mrtrix_tracks(track_mrtrix,[p '/int.tck']);
     command=['tckedit ' p '/all.tck ' p '/int.tck '  p '/all_int.tck -force -quiet'];
     system(command);
-    movefile([p '/all_int.tck'],[p '/all.tck']);
+    movefile([p '/all_int.tck'],[p 'all_' atlas '.tck']);
     end
 
 
@@ -187,8 +193,8 @@ system(command)
 scalar_mean_struc=struct(scalar_maps{1},scalar_mean(:,:,:,1),scalar_maps{2},scalar_mean(:,:,:,2),scalar_maps{3},scalar_mean(:,:,:,3));
 scalar_sd_struc=struct(scalar_maps{1},scalar_sd(:,:,:,1),scalar_maps{2},scalar_sd(:,:,:,2),scalar_maps{3},scalar_sd(:,:,:,3));
 
-save([p '/scalars_mean.mat'],'scalar_mean_struc')
-save([p '/scalars_sd.mat'],'scalar_sd_struc')
-save([p '/total_tracks.mat'],'total_tracks')
+save([p '/scalars_mean_' atlas '.mat'],'scalar_mean_struc')
+save([p '/scalars_sd' atlas '.mat'],'scalar_sd_struc')
+save([p '/total_tracks' atlas '.mat'],'total_tracks')
 
 
