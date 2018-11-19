@@ -164,6 +164,28 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5) % do along tract measurements
     end
 
     % calculate scalars along the tract coordinates
+    clear header_sc_trk tracks_sc_trk
+    
+    header.id_string='TRACK ';
+    header.origin=[0 0 0];
+    header.n_properties=0;
+    header.property_name= repmat(blanks(20),[10,1]);
+    header.vox_to_ras=transform; 
+    header.reserved=blanks(444)'; 
+    header.voxel_order='LAS ';
+    header.pad2='LAS ';
+    header.image_orientation_patient= [ 1 0 0 0 1 0];
+    header.pad1='  ';
+    header.invert_x=0;
+    header.invert_y=0;
+    header.invert_z=0;
+    header.swap_xy=0;
+    header.swap_yz=0;
+    header.swap_zx=0;
+    header.version=2;
+    header.hdr_size=1000;
+    header.scalar_name=repmat(blanks(20),[10,1]);
+    
     for sc_map=1:length(scalar_maps) 
     % SCALAR MAPS 
     hdr=spm_vol([p '/s' n  scalar_maps{sc_map} '.nii']);
