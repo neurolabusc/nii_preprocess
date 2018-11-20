@@ -39,6 +39,51 @@ if ~exist(bvec_nam,'file'), error('Unable to find %s',bvec_nam); end;
 if ~exist(bval_nam,'file'), error('Unable to find %s',bval_nam); end;
 %load data
 fprintf('%s version 7/2017 loading data\n', mfilename);
+
+% renormalize USC data because of difference in TE
+load(bval_nam)
+load(bvec_nam)
+if length(DTI_99_DTI_dir42_AP_4)==99
+b0i=find([DTI_99_DTI_dir42_AP_4]==5);
+b1000i=find(abs([DTI_99_DTI_dir42_AP_4]-1000)<100); % b=1000 fluctuates from 990-1010
+b2000i=find(abs([DTI_99_DTI_dir42_AP_4]-2000)<100);
+b01i=b0i(b0i<=(b1000i(end)+1));%b0s from the 1000s set
+b02i=b0i(b0i>=(b2000i(1)-1));%b0s from the 1000s set; expression is not really that general   
+[hdr, img] = read_volsSub (DWI_nam);
+b01mean=mean(cat(4,img(:,:,:,b01i)),4); %take the mean of b0s at the same TE as the b1000s
+b02mean=mean(cat(4,img(:,:,:,b02i)),4); %take the mean of the b0s at the same TE as the b2000s
+ratio=b01mean./b02mean; %get a ratio of this
+normalization_nam = fullfile(p, ['s', n, 'du_normalization_factor.nii']);
+save_volSub(normalization_nam, hdr(1), ratio); 
+S_DKE=cat(4,b01mean,img(:,:,:,b1000i),img(:,:,:,b2000i).*ratio);
+DWI_nam = fullfile(p, [n, 'dun.nii']);
+hdr.fname=DWI_nam;
+hdr_4D=repmat(hdr,[1 sum(length(b1000i)+length(b2000i)+1)]);
+
+% write the 4D nifti file for calculation KT and DT  
+
+for ii=1:sum(length(b1000i)+length(b2000i)+1)
+   hdr_4D(ii).n=[ii 1];
+   spm_write_vol(hdr_4D(ii),S_DKE(:,:,:,ii));
+end
+
+% write gradient file and bval file for for calculation KT and DT   
+    bval_nam = fullfile(p, [n, 'n.bval']);
+    fid = fopen(bval_nam,'w');   
+    fprintf(fid,'%18.15f\t',DTI_99_DTI_dir42_AP_4([1,b1000i,b2000i])); 
+    fclose(fid);     
+    
+    bvec_nam = fullfile(p, [n, 'dun.bvec']);
+    fid = fopen(bvec_nam,'w');   
+    fprintf(fid,'%18.15f ',DTI_99_DTI_dir42_AP_4du(1,[1,b1000i,b2000i]));
+    fprintf(fid,'\n');
+    fprintf(fid,'%18.15f ',DTI_99_DTI_dir42_AP_4du(2,[1,b1000i,b2000i])); 
+    fprintf(fid,'\n');
+    fprintf(fid,'%18.15f ',DTI_99_DTI_dir42_AP_4du(3,[1,b1000i,b2000i])); 
+    fclose(fid); 
+
+end
+
 %smooth data (optional)
 sDWI_nam = DWI_nam;
 isSmooth = false;
