@@ -53,12 +53,13 @@ b02i=b0i(b0i>=(b2000i(1)-1));%b0s from the 1000s set; expression is not really t
 b01mean=mean(cat(4,img(:,:,:,b01i)),4); %take the mean of b0s at the same TE as the b1000s
 b02mean=mean(cat(4,img(:,:,:,b02i)),4); %take the mean of the b0s at the same TE as the b2000s
 ratio=b01mean./b02mean; %get a ratio of this
-normalization_nam = fullfile(p, ['s', n, 'du_normalization_factor.nii']);
+normalization_nam = fullfile(p, ['s', n, 'dun_normalization_factor.nii']);
 save_volSub(normalization_nam, hdr(1), ratio); 
 S_DKE=cat(4,b01mean,img(:,:,:,b1000i),img(:,:,:,b2000i).*ratio);
+S_DKE(isnan(S_DKE))=0;
 DWI_nam = fullfile(p, [n, 'dun.nii']);
-hdr.fname=DWI_nam;
-hdr_4D=repmat(hdr,[1 sum(length(b1000i)+length(b2000i)+1)]);
+hdr(1).fname=DWI_nam;
+hdr_4D=repmat(hdr(1),[1 sum(length(b1000i)+length(b2000i)+1)]);
 
 % write the 4D nifti file for calculation KT and DT  
 
@@ -68,7 +69,7 @@ for ii=1:sum(length(b1000i)+length(b2000i)+1)
 end
 
 % write gradient file and bval file for for calculation KT and DT   
-    bval_nam = fullfile(p, [n, 'n.bval']);
+    bval_nam = fullfile(p, [n, 'dun.bval']);
     fid = fopen(bval_nam,'w');   
     fprintf(fid,'%18.15f\t',DTI_99_DTI_dir42_AP_4([1,b1000i,b2000i])); 
     fclose(fid);     
