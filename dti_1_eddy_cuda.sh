@@ -41,7 +41,7 @@ if [ $nvol -lt 7 ]; then
 fi
 echo "Filenames dti= $dti dtir=$dtir"
 
-eddyExeName=eddy_openmp
+eddyExeName=eddy
 if  [[ $PATH == *"cuda"* ]]; then
   eddyExeName=eddy_cuda7.0
   if ! hash $eddyExeName 2>/dev/null; then

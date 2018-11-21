@@ -28,8 +28,8 @@ if strcmpi(atlas,'jhu')
     [p, n, x] = fileparts(imgs.DKI);
     hdr=spm_vol([ p '/' n  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
-    index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % if JHU do only language specific and domain general ROIs  
-
+    %index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
+    index_ROI=[1:max(ROI(:))];
 else
     atlasext = ['_roi_' atlas];
     [p, n, x] = fileparts(imgs.DKI);
@@ -75,8 +75,6 @@ transform=hdr.mat; % transformation matrix used to calculate tranformation from 
 dim=hdr.dim;
 
 mkdir([p '/temp']);
-
-
 
 parfor i=1:length(index_ROI)
 
@@ -173,7 +171,8 @@ if (total_tracks_temp(j)~=0) && (total_tracks_temp(j)>5) % do along tract measur
     track_mean = mean(tracks_interp, 3);
     int=(transform*[(track_mean./repmat(pixel_size,length(track_mean),1)) ones(length(track_mean),1)]'); % convert to .tck format (world coordinates in voxels) 
     track_mean_mrtrix_temp(:,:,j)=int(1:3,:);
-
+    
+    total_tracks_temp(j)=sum(index_keep); %update total tracks after filtering
 
     % save all bundles in .tck
         for nb=1:sum(index_keep)
@@ -181,28 +180,6 @@ if (total_tracks_temp(j)~=0) && (total_tracks_temp(j)>5) % do along tract measur
         track_mrtrix_temp{j,nb}=int(1:3,:)';
         end
 
-    %calculate scalars along the tract coordinates
-%     
-%     header.id_string='TRACK ';
-%     header.origin=[0 0 0];
-%     header.n_properties=0;
-%     header.property_name= repmat(blanks(20),[10,1]);
-%     header.vox_to_ras=transform; 
-%     header.reserved=blanks(444)'; 
-%     header.voxel_order='LAS ';
-%     header.pad2='LAS ';
-%     header.image_orientation_patient= [ 1 0 0 0 1 0];
-%     header.pad1='  ';
-%     header.invert_x=0;
-%     header.invert_y=0;
-%     header.invert_z=0;
-%     header.swap_xy=0;
-%     header.swap_yz=0;
-%     header.swap_zx=0;
-%     header.version=2;
-%     header.hdr_size=1000;
-%     header.scalar_name=repmat(blanks(20),[10,1]);
-%     
     for sc_map=1:length(scalar_maps) 
     % SCALAR MAPS 
     hdr=spm_vol([p '/s' n  scalar_maps{sc_map} '.nii']);
@@ -212,9 +189,6 @@ if (total_tracks_temp(j)~=0) && (total_tracks_temp(j)>5) % do along tract measur
     [meanInt_temp(j,sc_map), stdInt_temp(j,sc_map), ~] = trk_stats(header, tracks_interp_str, map, 'nearest');
     [header_sc, tracks_sc] = trk_add_sc(header, tracks_interp_str, map, scalar_maps{sc_map});
     
-    %be used in the future to output.trk files ( needs debugging)
-    % if sc_map==1, header_sc_trk=header_sc;tracks_sc_trk=tracks_sc; else [header_sc_trk, tracks_sc_trk] = trk_add_sc(header_sc_trk, tracks_sc_trk, map, scalar_maps{sc_map}); end
-
     %initalize
     scalars = zeros(tracks_sc(1).nPoints, header_sc.n_count, header_sc.n_scalars);
     scalars_nw = zeros(tracks_sc(1).nPoints, header_sc.n_count, header_sc.n_scalars);
@@ -231,10 +205,6 @@ if (total_tracks_temp(j)~=0) && (total_tracks_temp(j)>5) % do along tract measur
     scalar_std_temp(j,:,sc_map)  = squeeze(nanstd(scalars_nw, 0, 2));
     end
     
-        %be used in the future to output.trk files ( needs debugging)
-    %trk_write(header_sc_trk,tracks_sc_trk,[p '/all_' atlas '.trk']); can
-
-%delete([p '/temp/*' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '*' ])    
 end
     end
     total_tracks(i,:)=total_tracks_temp;
@@ -250,14 +220,14 @@ end
 %reindex because parfor didnt let me index it properly from the beginning
 for i=1:length(index_ROI)
     for j=1:length(index_ROI)
-    total_tracks_final(index_ROI(i),index_ROI(index_ROI(j)))=total_tracks(i,j);
-    meanInt_final(index_ROI(i),index_ROI(index_ROI(j)),:)=meanInt(i,j,:);
-    stdInt_final(index_ROI(i),index_ROI(index_ROI(j)),:)=stdInt(i,j,:);
-    scalar_mean_final(index_ROI(i),index_ROI(index_ROI(j)),:,:)=scalar_mean(i,j,:,:);
-    scalar_sd_final(index_ROI(i),index_ROI(index_ROI(j)),:,:)=scalar_sd(i,j,:,:);
+    total_tracks_final(index_ROI(i),index_ROI(j))=total_tracks(i,j);
+    meanInt_final(index_ROI(i),index_ROI(j),:)=meanInt(i,j,:);
+    stdInt_final(index_ROI(i),index_ROI(j),:)=stdInt(i,j,:);
+    scalar_mean_final(index_ROI(i),index_ROI(j),:,:)=scalar_mean(i,j,:,:);
+    scalar_sd_final(index_ROI(i),index_ROI(j),:,:)=scalar_sd(i,j,:,:);
 
-    track_mean_mrtrix_final(:,:,index_ROI(index_ROI(j)),index_ROI(i))=track_mean_mrtrix(:,:,j,i);
-    track_mrtrix_final(index_ROI(index_ROI(j)),:,index_ROI(i))=track_mrtrix(j,:,i);
+    track_mean_mrtrix_final(:,:,index_ROI(j),index_ROI(i))=track_mean_mrtrix(:,:,j,i);
+    track_mrtrix_final(index_ROI(j),:,index_ROI(i))=track_mrtrix(j,:,i);
     end
 end
 
@@ -266,34 +236,38 @@ end
 scalar_mean_struc=struct(scalar_maps{1},scalar_mean_final(:,:,:,1),scalar_maps{2},scalar_mean_final(:,:,:,2),scalar_maps{3},scalar_mean_final(:,:,:,3));
 scalar_sd_struc=struct(scalar_maps{1},scalar_sd(:,:,:,1),scalar_maps{2},scalar_sd(:,:,:,2),scalar_maps{3},scalar_sd(:,:,:,3));
 
-save([p '/scalars_mean_' atlas '.mat'],'scalar_mean_struc')
-save([p '/scalars_sd_' atlas '.mat'],'scalar_sd_struc')
-save([p '/mean_' atlas '.mat'],'meanInt') %mean tract values (FA,MD,MK)
-save([p '/std_' atlas '.mat'],'stdInt') %std tract values (FA,MD,MK)
-save([p '/total_tracks_' atlas '.mat'],'total_tracks')
-
-% tracks = read_mrtrix_tracks ([ p '/temp/combined_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.tck']); % tracks from mrtrix are in world coordinates (voxels) 
-% track_mean_mrtrix_tck=tracks;
-% track_mean_mrtrix_tck.data={track_mean_mrtrix_final};
-% track_mean_mrtrix_tck.count={}
-% track_mean_mrtrix_tck.total_count={}
+save([p '/scalars_mean_' atlas '.mat'],'scalar_mean_struc');
+save([p '/scalars_sd_' atlas '.mat'],'scalar_sd_struc');
+save([p '/mean_' atlas '.mat'],'meanInt_final') %mean tract values (FA,MD,MK)
+save([p '/std_' atlas '.mat'],'stdInt_final') %std tract values (FA,MD,MK)
+save([p '/total_tracks_' atlas '.mat'],'total_tracks_final');
+save([p '/track_mrtrix_final_' atlas '.mat'],'track_mrtrix_final');
+save([p '/track_mean_mrtrix_final_' atlas '.mat'],'track_mean_mrtrix_final');
 
 
-%     if ~exist([p '/mean_all_' atlas '.tck'],'file')
-%     write_mrtrix_tracks(track_mean_mrtrix,[p '/mean_all_' atlas '.tck']);
-%     else
-%     write_mrtrix_tracks(track_mean_mrtrix,[p '/mean.tck']); % save mean.tck containing the mean bundle between (i,j) 
-%     command=['tckedit ' p '/mean_all_' atlas '.tck ' p '/mean.tck '  p '/mean_all_int.tck -force -quiet']; % save all mean bundles in mean_all.tck 
-%     system(command);
-%     movefile([p '/mean_all_int.tck'],[p '/mean_all_' atlas '.tck']); % needed this workaround to concatenate .tck's 
-%     end
+tracks = read_mrtrix_tracks ([ p '/temp/combined_1_9.tck']); % tracks from mrtrix are in world coordinates (voxels) 
+track_mean_mrtrix_tck=tracks;
+for i=1:length(index_ROI)
+    for j=1:length(index_ROI)
+track_mean_mrtrix_tck.data{(i-1)*length(index_ROI)+j}=track_mean_mrtrix_final(:,:,index_ROI(i),index_ROI(j))';
+    end
+end
+track_mean_mrtrix_tck.count=length(index_ROI)*length(index_ROI);
+track_mean_mrtrix_tck.total_count=length(index_ROI)*length(index_ROI);
+write_mrtrix_tracks(track_mean_mrtrix_tck,[p '/mean_all_' atlas '.tck']);
 
+tracks = read_mrtrix_tracks ([ p '/temp/combined_1_9.tck']); % tracks from mrtrix are in world coordinates (voxels) 
+track_mrtrix_tck=tracks;
+counter=0;
+for i=1:length(index_ROI)
+    for j=1:length(index_ROI)
+        for node=1:total_tracks_final(index_ROI(i),index_ROI(j))
+        track_mrtrix_tck.data{node+counter}=track_mrtrix_final{index_ROI(j),node,index_ROI(i)};
+        end
+       counter=counter+total_tracks_final(index_ROI(i),index_ROI(j));
+    end
+end
+track_mrtrix_tck.count=counter;
+track_mrtrix_tck.total_count=counter;
+write_mrtrix_tracks(track_mrtrix_tck,[p '/all_' atlas '.tck']);
 
-%     if ~exist([p '/all_' atlas '.tck'],'file')
-%     write_mrtrix_tracks(track_mrtrix,[p '/all_' atlas '.tck']); % initialize all_atlas.tck
-%     else
-%     write_mrtrix_tracks(track_mrtrix,[p '/int.tck']); % all tracts between roi i and j 
-%     command=['tckedit ' p '/all_' atlas '.tck ' p '/int.tck '  p '/all_int.tck -force -quiet']; 
-%     system(command);
-%     movefile([p '/all_int.tck'],[p '/all_' atlas '.tck']); % concatenate tracts in all_atlas.tck 
-%     end
