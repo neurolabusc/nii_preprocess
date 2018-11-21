@@ -28,7 +28,7 @@ if strcmpi(atlas,'jhu')
     [p, n, x] = fileparts(imgs.DKI);
     hdr=spm_vol([ p '/' n  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
-    %index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
+    %index_ROI_no_empty=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
     index_ROI=[1:max(ROI(:))];
 else
     atlasext = ['_roi_' atlas];
@@ -39,6 +39,14 @@ else
     
 end
 
+%delete empty ROIs
+count=1;
+for i=1:length(index_ROI)
+if sum(sum(sum((ROI==index_ROI(i)) & (gmwm>0))))
+   index_ROI_no_empty(count)=index_ROI(i);
+   count=count+1;
+end
+end
 
 
 %%
@@ -47,25 +55,25 @@ scalar_maps={'du_FAx','du_MD','du_MK'}; % extension of parametric maps
 % initialize 
 if mod(nb_nodes,2)==0, nb_nodes=nb_nodes+1;end % when using tie at center you need uneven number of points
 
-meanInt=zeros(length(index_ROI),length(index_ROI),length(scalar_maps));
+meanInt=zeros(length(index_ROI_no_empty),length(index_ROI_no_empty),length(scalar_maps));
 meanInt_final=zeros(max(ROI(:)),max(ROI(:)),length(scalar_maps));
 
-stdInt=zeros(length(index_ROI),length(index_ROI),length(scalar_maps));
+stdInt=zeros(length(index_ROI_no_empty),length(index_ROI_no_empty),length(scalar_maps));
 stdInt_final=zeros(max(ROI(:)),max(ROI(:)),length(scalar_maps));
 
-total_tracks=zeros(length(index_ROI),length(index_ROI));
+total_tracks=zeros(length(index_ROI_no_empty),length(index_ROI_no_empty));
 total_tracks_final=zeros(max(ROI(:)),max(ROI(:)));
 
-scalar_mean=zeros(length(index_ROI),length(index_ROI),nb_nodes,length(scalar_maps)); 
+scalar_mean=zeros(length(index_ROI_no_empty),length(index_ROI_no_empty),nb_nodes,length(scalar_maps)); 
 scalar_mean_final=zeros(max(ROI(:)),max(ROI(:)),nb_nodes,length(scalar_maps)); 
 
-scalar_sd=zeros(length(index_ROI),length(index_ROI),nb_nodes,length(scalar_maps));
+scalar_sd=zeros(length(index_ROI_no_empty),length(index_ROI_no_empty),nb_nodes,length(scalar_maps));
 scalar_sd_final=zeros(max(ROI(:)),max(ROI(:)),nb_nodes,length(scalar_maps));
 
-track_mean_mrtrix=zeros(3,nb_nodes,length(index_ROI),length(index_ROI));
+track_mean_mrtrix=zeros(3,nb_nodes,length(index_ROI_no_empty),length(index_ROI_no_empty));
 track_mean_mrtrix_final=zeros(3,nb_nodes,max(ROI(:)),max(ROI(:)));
 
-track_mrtrix=cell(length(index_ROI),10000,length(index_ROI));
+track_mrtrix=cell(length(index_ROI_no_empty),10000,length(index_ROI_no_empty));
 track_mrtrix_final=cell(max(ROI(:)),10000,max(ROI(:)));
 
 pixel_size = abs(diag(hdr.mat))';
@@ -76,16 +84,18 @@ dim=hdr.dim;
 
 mkdir([p '/temp']);
 
-parfor i=1:length(index_ROI)
 
-    track_mean_mrtrix_temp=zeros(3,nb_nodes, length(index_ROI));
-    total_tracks_temp=zeros(1,length(index_ROI));
-    track_mrtrix_temp=cell(length(index_ROI),10000); % 100000 is the max amount of tracks that can be found according to tracking settings 
+
+parfor i=1:length(index_ROI_no_empty)
+
+    track_mean_mrtrix_temp=zeros(3,nb_nodes, length(index_ROI_no_empty));
+    total_tracks_temp=zeros(1,length(index_ROI_no_empty));
+    track_mrtrix_temp=cell(length(index_ROI_no_empty),10000); % 100000 is the max amount of tracks that can be found according to tracking settings 
         
-    meanInt_temp=zeros(length(index_ROI),length(scalar_maps));
-    stdInt_temp=zeros(length(index_ROI),length(scalar_maps));
-    scalar_mean_temp=zeros(length(index_ROI),nb_nodes,length(scalar_maps));
-    scalar_std_temp=zeros(length(index_ROI),nb_nodes,length(scalar_maps));
+    meanInt_temp=zeros(length(index_ROI_no_empty),length(scalar_maps));
+    stdInt_temp=zeros(length(index_ROI_no_empty),length(scalar_maps));
+    scalar_mean_temp=zeros(length(index_ROI_no_empty),nb_nodes,length(scalar_maps));
+    scalar_std_temp=zeros(length(index_ROI_no_empty),nb_nodes,length(scalar_maps));
     
     % initialize for parfor .trk header 
     header=struct;
@@ -93,28 +103,28 @@ parfor i=1:length(index_ROI)
     header.dim=dim;
     header.n_scalars=0;
 
-    for j=i+1:length(index_ROI) % calculate only upper diagonal matrix 
-        fprintf('%s: ROI %d to ROI %d\t',atlas,index_ROI(i),index_ROI(j));
+    for j=i+1:length(index_ROI_no_empty) % calculate only upper diagonal matrix 
+        fprintf('%s: ROI %d to ROI %d\t',atlas,index_ROI_no_empty(i),index_ROI_no_empty(j));
 
         hdr_loop=spm_vol([ p '/' n  atlasext x]);            
-        seed=(ROI==index_ROI(i)) & (gmwm>0); hdr_loop.fname=[p '/temp/seed_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.nii']; spm_write_vol(hdr_loop,seed>0); % seed ROI 
-        include=(ROI==index_ROI(j))& (gmwm>0); hdr_loop.fname=[p '/temp/include_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.nii']; spm_write_vol(hdr_loop,include>0); % end ROI
+        seed=(ROI==index_ROI_no_empty(i)) & (gmwm>0); hdr_loop.fname=[p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii']; spm_write_vol(hdr_loop,seed>0); % seed ROI 
+        include=(ROI==index_ROI_no_empty(j))& (gmwm>0); hdr_loop.fname=[p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii']; spm_write_vol(hdr_loop,include>0); % end ROI
         
 %% Run MRtrix tractography - deterministic, dODF based, angular threshold 60, FA>0.1
 % seed to end
-command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/seed_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.nii -cutoff 0.1 -include ' p '/temp/include_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.nii ' p '/SH_coeff.nii ' p '/temp/seed_include_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
+command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii -cutoff 0.1 -include ' p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii ' p '/SH_coeff.nii ' p '/temp/seed_include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
 system(command);
 % end to seed 
-command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/include_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.nii -cutoff 0.1 -include ' p '/temp/seed_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.nii ' p '/SH_coeff.nii ' p '/temp/include_seed_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
+command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii -cutoff 0.1 -include ' p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii ' p '/SH_coeff.nii ' p '/temp/include_seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
 system(command);
 % combine both results into one .tck 
-command=['tckedit ' p '/temp/seed_include_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.tck ' p '/temp/include_seed_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.tck ' p '/temp/combined_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.tck -force -quiet'];
+command=['tckedit ' p '/temp/seed_include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck ' p '/temp/include_seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck ' p '/temp/combined_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck -force -quiet'];
 system(command);
 %% Calculate along tract metrics (cite John Colby work: https://www.sciencedirect.com/science/article/pii/S1053811911012833?via%3Dihub ) 
 
 tracks_trk=struct;
 
-tracks = read_mrtrix_tracks ([ p '/temp/combined_' num2str(index_ROI(i)) '_' num2str(index_ROI(j)) '.tck']); % tracks from mrtrix are in world coordinates (voxels) 
+tracks = read_mrtrix_tracks ([ p '/temp/combined_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck']); % tracks from mrtrix are in world coordinates (voxels) 
 tracks_mm=tracks; % initialize the matrix needed to transform tracks from voxels to mm 
 total_tracks_temp(j)=length(tracks.data); % calculate how many tracts were found between the two ROIs 
 fprintf('Total Tracks: %d\n', total_tracks_temp(j));
@@ -218,16 +228,16 @@ end
 end
 
 %reindex because parfor didnt let me index it properly from the beginning
-for i=1:length(index_ROI)
-    for j=1:length(index_ROI)
-    total_tracks_final(index_ROI(i),index_ROI(j))=total_tracks(i,j);
-    meanInt_final(index_ROI(i),index_ROI(j),:)=meanInt(i,j,:);
-    stdInt_final(index_ROI(i),index_ROI(j),:)=stdInt(i,j,:);
-    scalar_mean_final(index_ROI(i),index_ROI(j),:,:)=scalar_mean(i,j,:,:);
-    scalar_sd_final(index_ROI(i),index_ROI(j),:,:)=scalar_sd(i,j,:,:);
+for i=1:length(index_ROI_no_empty)
+    for j=1:length(index_ROI_no_empty)
+    total_tracks_final(index_ROI_no_empty(i),index_ROI_no_empty(j))=total_tracks(i,j);
+    meanInt_final(index_ROI_no_empty(i),index_ROI_no_empty(j),:)=meanInt(i,j,:);
+    stdInt_final(index_ROI_no_empty(i),index_ROI_no_empty(j),:)=stdInt(i,j,:);
+    scalar_mean_final(index_ROI_no_empty(i),index_ROI_no_empty(j),:,:)=scalar_mean(i,j,:,:);
+    scalar_sd_final(index_ROI_no_empty(i),index_ROI_no_empty(j),:,:)=scalar_sd(i,j,:,:);
 
-    track_mean_mrtrix_final(:,:,index_ROI(j),index_ROI(i))=track_mean_mrtrix(:,:,j,i);
-    track_mrtrix_final(index_ROI(j),:,index_ROI(i))=track_mrtrix(j,:,i);
+    track_mean_mrtrix_final(:,:,index_ROI_no_empty(j),index_ROI_no_empty(i))=track_mean_mrtrix(:,:,j,i);
+    track_mrtrix_final(index_ROI_no_empty(j),:,index_ROI_no_empty(i))=track_mrtrix(j,:,i);
     end
 end
 
@@ -247,24 +257,24 @@ save([p '/track_mean_mrtrix_final_' atlas '.mat'],'track_mean_mrtrix_final');
 
 tracks = read_mrtrix_tracks ([ p '/temp/combined_1_9.tck']); % tracks from mrtrix are in world coordinates (voxels) 
 track_mean_mrtrix_tck=tracks;
-for i=1:length(index_ROI)
-    for j=1:length(index_ROI)
-track_mean_mrtrix_tck.data{(i-1)*length(index_ROI)+j}=track_mean_mrtrix_final(:,:,index_ROI(i),index_ROI(j))';
+for i=1:length(index_ROI_no_empty)
+    for j=1:length(index_ROI_no_empty)
+track_mean_mrtrix_tck.data{(i-1)*length(index_ROI_no_empty)+j}=track_mean_mrtrix_final(:,:,index_ROI_no_empty(i),index_ROI_no_empty(j))';
     end
 end
-track_mean_mrtrix_tck.count=length(index_ROI)*length(index_ROI);
-track_mean_mrtrix_tck.total_count=length(index_ROI)*length(index_ROI);
+track_mean_mrtrix_tck.count=length(index_ROI_no_empty)*length(index_ROI_no_empty);
+track_mean_mrtrix_tck.total_count=length(index_ROI_no_empty)*length(index_ROI_no_empty);
 write_mrtrix_tracks(track_mean_mrtrix_tck,[p '/mean_all_' atlas '.tck']);
 
 tracks = read_mrtrix_tracks ([ p '/temp/combined_1_9.tck']); % tracks from mrtrix are in world coordinates (voxels) 
 track_mrtrix_tck=tracks;
 counter=0;
-for i=1:length(index_ROI)
-    for j=1:length(index_ROI)
-        for node=1:total_tracks_final(index_ROI(i),index_ROI(j))
-        track_mrtrix_tck.data{node+counter}=track_mrtrix_final{index_ROI(j),node,index_ROI(i)};
+for i=1:length(index_ROI_no_empty)
+    for j=1:length(index_ROI_no_empty)
+        for node=1:total_tracks_final(index_ROI_no_empty(i),index_ROI_no_empty(j))
+        track_mrtrix_tck.data{node+counter}=track_mrtrix_final{index_ROI_no_empty(j),node,index_ROI_no_empty(i)};
         end
-       counter=counter+total_tracks_final(index_ROI(i),index_ROI(j));
+       counter=counter+total_tracks_final(index_ROI_no_empty(i),index_ROI_no_empty(j));
     end
 end
 track_mrtrix_tck.count=counter;
