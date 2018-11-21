@@ -134,13 +134,13 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5) % do along tract measurements
     track_mean_mrtrix.count='1';
     track_mean_mrtrix.total_count='1';
     
-    if ~exist([p '/mean_all.tck'],'file')
-    write_mrtrix_tracks(track_mean_mrtrix,[p '/mean_all.tck']);
+    if ~exist([p '/mean_all_' atlas '.tck'],'file')
+    write_mrtrix_tracks(track_mean_mrtrix,[p '/mean_all_' atlas '.tck']);
     else
     write_mrtrix_tracks(track_mean_mrtrix,[p '/mean.tck']); % save mean.tck containing the mean bundle between (i,j) 
-    command=['tckedit ' p '/mean_all.tck ' p '/mean.tck '  p '/mean_all_int.tck -force -quiet']; % save all mean bundles in mean_all.tck 
+    command=['tckedit ' p '/mean_all_' atlas '.tck ' p '/mean.tck '  p '/mean_all_int.tck -force -quiet']; % save all mean bundles in mean_all.tck 
     system(command);
-    movefile([p '/mean_all_int.tck'],[p '/mean_all.tck']); % needed this workaround to concatenate .tck's 
+    movefile([p '/mean_all_int.tck'],[p '/mean_all_' atlas '.tck']); % needed this workaround to concatenate .tck's 
     end
     
     % save all bundles in .tck
@@ -158,7 +158,7 @@ if (total_tracks(i,j)~=0) && (total_tracks(i,j)>5) % do along tract measurements
     write_mrtrix_tracks(track_mrtrix,[p '/all_' atlas '.tck']); % initialize all_atlas.tck
     else
     write_mrtrix_tracks(track_mrtrix,[p '/int.tck']); % all tracts between roi i and j 
-    command=['tckedit ' p '/all.tck ' p '/int.tck '  p '/all_int.tck -force -quiet']; 
+    command=['tckedit ' p '/all_' atlas '.tck ' p '/int.tck '  p '/all_int.tck -force -quiet']; 
     system(command);
     movefile([p '/all_int.tck'],[p 'all_' atlas '.tck']); % concatenate tracts in all_atlas.tck 
     end
