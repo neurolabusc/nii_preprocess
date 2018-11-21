@@ -96,7 +96,7 @@ if true
     dkiDir = fileparts(imgs.DKI);    
     doDkiSub(imgs, matName, true);
     %-->(un)comment next line for AICHA tractography
-    doDkiTractSub(imgs,matName, dkiDir, 'AICHA');
+    %doDkiTractSub(imgs,matName, dkiDir, 'AICHA');
     %-->(un)comment next line for JHU tractography
     doDkiTractSub(imgs,matName, dkiDir, 'jhu');
 
@@ -117,8 +117,15 @@ function doDkiTractSub(imgs,matName,dtiDir,atlas)
 dki = imgs.DKI; 
 if ~exist('atlas','var'),
     atlas = 'jhu';
-end;
-doDkiWarpSub(imgs, atlas); %warp atlas to DTI
+end
+
+if strcmpi(atlas,'jhu')
+    atlasext = '';
+else
+   atlasext = ['_' atlas];
+end
+
+ if ~exist(prepostfixSub('',['_roi' atlasext],dki)), doDkiWarpSub(imgs, atlas), end
 dki_dt=prepostfixSub('s', 'du_DT', dki);
 dki_kt=prepostfixSub('s', 'du_DK', dki);
 dki_fa=prepostfixSub('s', 'du_FAx', dki);
@@ -134,6 +141,7 @@ fidout=fopen(fout,'w');
 while(~feof(fid))
     s=fgetl(fid);
     s=strrep(s,'path',[dtiDir '/']);
+    if exist([dtiDir,'/SH_coeff.nii'],'file'), s=strrep(s,'odf_optimization = 1','odf_optimization = 0');, end
     fprintf(fidout,'%s\n',s);
     disp(s)
 end
