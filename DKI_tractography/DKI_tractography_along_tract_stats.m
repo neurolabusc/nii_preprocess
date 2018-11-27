@@ -13,7 +13,7 @@ system(command)
 command=['5tt2gmwmi ' p '/5tt_' n x ' ' p '/wgmwmi_' n x ' -force -quiet'];
 system(command)
 [p, n_DKI, x] = fileparts(imgs.DKI);
-nfa=[p '/ns' n_DKI 'du_fax' x];
+nfa=[p '/ns' n_DKI 'du_FAx' x];
 oldNormSub({[ p '/wb' n x],[p '/w5tt_' n x],[p '/wgmwmi_' n x]},nfa,8,10,0);
 movefile([p '/ww5tt_' n x],[p '/5tt_' n x]);
 movefile([p '/wwgmwmi_' n x],[p '/gmwmi_' n x]);
