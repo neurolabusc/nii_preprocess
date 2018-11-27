@@ -976,6 +976,13 @@ delete(roiname);
 wroiname = prepostfixSub('w', atlasext, imgs.DKI);
 movefile(wroiname, roiname);
 
+if ~isempty(imgs.Lesion) % transform lesion into native diffusion space 
+lesionname_DKI=prepostfixSub('', '_lesion', imgs.DKI);
+lesionname_MNI=prepostfixSub('wsr', '', imgs.Lesion);
+oldNormSub({T1,lesionname_MNI},nFA,8,10,0);
+movefile(prepostfixSub('wwsr', '', imgs.Lesion),lesionname_DKI);
+end
+
 
 function [p,n,x] = fsl_filepartsSub(imgname)
 [p, n, x] = fileparts(imgname);
