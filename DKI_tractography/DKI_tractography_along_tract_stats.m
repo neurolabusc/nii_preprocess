@@ -8,28 +8,31 @@ end
 %create gm-wm interface for seeding purposes 
 if ~exist([p '/5tt_' n x],'file')
     fprintf('Running mrtrix 5ttgen and 5tt2gmwmi to %s\n', n); 
-command=['5ttgen fsl ' p '/wwb' n x ' ' p '/5tt_' n x ' -force -quiet']; % need segmentation of T1 in diffusion space, this step could probably be optimized
+command=['5ttgen fsl ' p '/wb' n x ' ' p '/w5tt_' n x ' -force -quiet'];
 system(command)
-command=['5tt2gmwmi ' p '/5tt_' n x ' ' p '/gmwmi_' n x ' -force -quiet'];
+command=['5tt2gmwmi ' p '/5tt_' n x ' ' p '/wgmwmi_' n x ' -force -quiet'];
 system(command)
-spm_reslice({[p '/wwb' n x],[p '/gmwmi_' n x]}) % get in same space as wwbT1 (not sure why it's not in that space to begin with?) 
-
+[p, n_DKI, x] = fileparts(imgs.DKI);
+nfa=[p '/ns' n_DKI 'du_fax' x];
+oldNormSub({[ p '/wb' n x],[p '/w5tt_' n x],[p '/wgmwmi_' n x]},nfa,8,10,0);
+movefile([p '/ww5tt_' n x],[p '/5tt_' n x]);
+movefile([p '/wwgmwmi_' n x],[p '/gmwmi_' n x]);
 else
     fprintf('Skipping generating WM-GM interface: found %s\n', ['gmwmi_' n x]);
 end
 
 %%
 % threshold gmwm interface at 50% chance 
-gmwm=spm_read_vols(spm_vol([p '/rgmwmi_' n x]));
-gmwm=gmwm>0.5; % threshold was picked arbitrary, could likely be optimized 
+gmwm=spm_read_vols(spm_vol([p '/gmwmi_' n x]));
+gmwm=gmwm>0.2; % threshold was picked arbitrary, could likely be optimized 
 
 if strcmpi(atlas,'jhu')
     atlasext = '_roi';
     [p, n, x] = fileparts(imgs.DKI);
     hdr=spm_vol([ p '/' n  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
-    %index_ROI_no_empty=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
-    index_ROI=[1:max(ROI(:))];
+    index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
+   %index_ROI=[1:max(ROI(:))];
 else
     atlasext = ['_roi_' atlas];
     [p, n, x] = fileparts(imgs.DKI);
@@ -280,4 +283,29 @@ end
 track_mrtrix_tck.count=counter;
 track_mrtrix_tck.total_count=counter;
 write_mrtrix_tracks(track_mrtrix_tck,[p '/all_' atlas '.tck']);
+
+function oldNormSub(src, tar, smoref, reg, interp)
+%coregister T2 to match T1 image, apply to lesion
+if isempty(src) || isempty(tar), return; end;
+if ~exist('smoref','var'), smoref = 0; end;
+if ~exist('reg','var'), reg = 1; end;
+if ~exist('interp','var'), interp = 1; end;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source = src(1);
+matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
+matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = src(:);
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.template = {tar};
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.weight = '';
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smosrc = 8;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.smoref = smoref; % <-- !!!
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.regtype = 'mni';
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.cutoff = 25;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.nits = 16;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.eoptions.reg = reg;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.preserve = 0;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.bb = [nan nan nan; nan nan nan];%[-78 -112 -70; 78 76 85];
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.vox = [nan nan nan];%[1 1 1];
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.interp = interp;
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.wrap = [0 0 0];
+matlabbatch{1}.spm.tools.oldnorm.estwrite.roptions.prefix = 'w';
+spm_jobman('run',matlabbatch);
 
