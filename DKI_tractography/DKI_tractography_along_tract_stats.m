@@ -10,7 +10,7 @@ if ~exist([p '/5tt_' n x],'file')
     fprintf('Running mrtrix 5ttgen and 5tt2gmwmi to %s\n', n); 
 command=['5ttgen fsl ' p '/wb' n x ' ' p '/w5tt_' n x ' -force -quiet'];
 system(command)
-command=['5tt2gmwmi ' p '/5tt_' n x ' ' p '/wgmwmi_' n x ' -force -quiet'];
+command=['5tt2gmwmi ' p '/w5tt_' n x ' ' p '/wgmwmi_' n x ' -force -quiet'];
 system(command)
 [p, n_DKI, x] = fileparts(imgs.DKI);
 nfa=[p '/ns' n_DKI 'du_FAx' x];
