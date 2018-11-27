@@ -24,7 +24,7 @@ end
 %%
 % threshold gmwm interface at 50% chance 
 gmwm=spm_read_vols(spm_vol([p '/gmwmi_' n x]));
-gmwm=gmwm>0.2; % threshold was picked arbitrary, could likely be optimized 
+gmwm=gmwm>0; % threshold was picked arbitrary, could likely be optimized 
 
 if strcmpi(atlas,'jhu')
     atlasext = '_roi';
