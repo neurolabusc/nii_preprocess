@@ -45,9 +45,9 @@ load(bval_nam)
 load(bvec_nam)
 [pth,nam] = filepartsSub(bval_nam);
 
-if length(eval(nam))==99
+if exist('DTI_99_DTI_dir42_AP_4') & (length(DTI_99_DTI_dir42_AP_4)==99)
 n_flag=1;
-b0i=find([eval(nam)]==5);
+b0i=find(DTI_99_DTI_dir42_AP_4==5);
 b1000i=find(abs([DTI_99_DTI_dir42_AP_4]-1000)<100); % b=1000 fluctuates from 990-1010
 b2000i=find(abs([DTI_99_DTI_dir42_AP_4]-2000)<100);
 b01i=b0i(b0i<=(b1000i(end)+1));%b0s from the 1000s set
