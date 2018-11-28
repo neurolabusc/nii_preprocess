@@ -469,29 +469,49 @@ if ~exist(bvalnm, 'file')
 end
 if ~exist(mask, 'file') || ~exist(dti_u, 'file') || ~exist(bvalnm, 'file')|| ~exist(wbT1, 'file')
     fprintf('Skipping DKI preprocessing. Missing file(s): %s %s %s %s\n', mask, dti_u, bvalnm, wbT1);
-end;
+end
+
 bval=load(bvalnm);
 if max(bval(:)) < 1500
     fprintf('Skipping DKI preprocessing. Require B-values >1500. Max b-value: %d\n',max(bval(:)));
     return;
 end
-MK=dkifx2(dti_u, bvalnm, mask, true);
+param={'fa','md','dax','drad','mk','kax','krad','kfa'};
+DKI=dkifx2(dti_u, bvalnm, mask, true, param);
 MKmask=mask;
-%MKmask = prepostfixSub('', 'u_ldfDKI_MASK', DTI);
-%MK=prepostfixSub('', 'u_ldfDKI_MK', DTI);
-if ~exist(MK, 'file') || ~exist(MKmask, 'file')
-    fprintf('Serious error: no kurtosis images named %s %s\n', MK, MKmask);
-    return;
-end;
+
 if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
+if ~exist([DKI param{1} '_dki.nii'], 'file') || ~exist(MKmask, 'file')
+   fprintf('Serious error: no kurtosis images named %s %s\n', [DKI param{par} '_dki.nii'], MKmask);
+   return;
+end
+    
+nFA = rescaleSub([DKI param{1} '_dki.nii']);
+
+oldNormstring=cell(1,length(param)+1);
+oldNormstring{1}=nFA;
+for par=1:length(param)
+DKI_par=[DKI param{par} '_dki.nii'];
+oldNormstring(par+1)={DKI_par};
+end
+oldNormSub(oldNormstring,wbT1, 8, 8 );
+
+for par=1:length(param)
+DKI_par=[DKI param{par} '_dki.nii'];
 %normalize mean kurtosis to match normalized, brain extracted T1
-wMK = prepostfixSub('w', '', MK);
-oldNormSub( {MK}, wbT1, 8, 8 );
-nii_nii2mat(wMK, 'mk', matName);
+wDKI_par = prepostfixSub('w', '', DKI_par);
+nii_nii2mat(wDKI_par, [param{par} '_dki'], matName);
 %save note
 fid = fopen('dki.txt', 'a+');
 fprintf(fid, '%s\n', matName);
-fclose(fid);
+fclose(fid);        
+end
+
+
+%MKmask = prepostfixSub('', 'u_ldfDKI_MASK', DTI);
+%MK=prepostfixSub('', 'u_ldfDKI_MK', DTI);
+
+
 %end doDkiCoreSub()
 
 function doFaMdSub(imgs, matName)

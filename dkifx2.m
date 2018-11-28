@@ -1,4 +1,4 @@
-function MK_nam = dkifx2 (DWI_nam, bval_nam, Mask_nam, Smooth)
+function dki_name = dkifx2 (DWI_nam, bval_nam, Mask_nam, Smooth,param)
 % DWI_nam  : name of DWI file, either (img.nii or img.nii.gz)
 % bval_nam : b-value name (img.bval)
 % Mask_nam : (optional) name of masking image (mask.nii or mask.nii.gz)
@@ -46,6 +46,7 @@ load(bvec_nam)
 [pth,nam] = filepartsSub(bval_nam);
 
 if length(eval(nam))==99
+n_flag=1;
 b0i=find([eval(nam)]==5);
 b1000i=find(abs([DTI_99_DTI_dir42_AP_4]-1000)<100); % b=1000 fluctuates from 990-1010
 b2000i=find(abs([DTI_99_DTI_dir42_AP_4]-2000)<100);
@@ -84,8 +85,10 @@ end
     fprintf(fid,'\n');
     fprintf(fid,'%18.15f ',DTI_99_DTI_dir42_AP_4du(3,[1,b1000i,b2000i])); 
     fclose(fid); 
-
+else
+    n_flag=0; %no normalization
 end
+if n_flag, pth_n=['dun']; else pth_n=['du'], end
 
 %smooth data (optional)
 sDWI_nam = DWI_nam;
@@ -123,29 +126,22 @@ fprintf('dwi2tensor %g seconds\n', toc(start) );
 hdr = hdrT(1);
 imgM = any(imgT,4)+any(imgK,4);
 imgM(imgM > 0) = 1;
-MK_nam = fullfile(p, ['s', n, 'du_MKmask.nii']);
+MK_nam = fullfile(p, ['s', n, pth_n '_MKmask.nii']); %this naming convention would be wrong if no smoothing is done 
 save_volSub(MK_nam, hdr, imgM);
 imgT = reshape(imgT,[],6)';
 imgK = reshape(imgK,[],15)';
 %(6 x nvox) and KT is kurtosis tensor (15 x nvox)
-[imgMK,param] = estimate_parameters(imgT,imgK,{'mk'});
-%save MK map
-imgMK = reshape(imgMK, hdr.dim(1), hdr.dim(2), hdr.dim(3));
+[imgX,~] = estimate_parameters(imgT,imgK,param);
 
-imgMK(((imgM(:) > 0) .* (imgMK(:) == 0)) > 0) = nan; %make all MK = zero values = NaN
-imgMK(isnan(imgMK(:))) = nan; %make all air NaN [optional]
-
-MK_nam = fullfile(p, ['s', n, 'du_MK.nii']);
-save_volSub(MK_nam, hdr, imgMK)
-% MD
-[imgMD,param] = estimate_parameters(imgT,imgK,{'md'});
-%save MK map
-imgMD = reshape(imgMD, hdr.dim(1), hdr.dim(2), hdr.dim(3));
-imgMD(((imgM(:) > 0) .* (imgMD(:) == 0)) > 0) = nan; %make all MK = zero values = NaN
-imgMD(isnan(imgMD(:))) = nan; %make all air NaN [optional]
-MD_nam = fullfile(p, ['s', n, 'du_MD.nii']);
-save_volSub(MD_nam, hdr, imgMD)
-
+for par=1:length(param)
+%save DKI parametric maps
+imgX_rs = reshape(imgX(par,:), hdr.dim(1), hdr.dim(2), hdr.dim(3));
+imgX_rs(((imgM(:) > 0) .* (imgX_rs(:) == 0)) > 0) = nan; %make all MK = zero values = NaN
+imgX_rs(isnan(imgX_rs(:))) = nan; %make all air NaN [optional]
+imgX_nam = fullfile(p, ['s', n, pth_n '_' param{par} '_dki.nii']);  %this naming convention would be wrong if no smoothing is done  
+save_volSub(imgX_nam, hdr, imgX_rs)
+end
+dki_name=fullfile(p, ['s', n, pth_n, '_']);
 if ~isDeleteTempImages, return; end; %next lines delete temp files
 delete(dt);
 delete(dkt);
