@@ -1,5 +1,6 @@
 %% calculate along tract measurements of MD/FA/MK between all pairs of a provided atlas (in diffusion space) 
-function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes)
+function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes,scalar_maps)
+global dwi_name
 [p, n, x] = fileparts(imgs.T1);
 if exist([p '/scalars_mean_' atlas '.mat'],'file')
     fprintf('Skipping DKI tractography with atlas: %s\n', atlas); 
@@ -12,8 +13,8 @@ command=['5ttgen fsl ' p '/wb' n x ' ' p '/w5tt_' n x ' -force -quiet'];
 system(command)
 command=['5tt2gmwmi ' p '/w5tt_' n x ' ' p '/wgmwmi_' n x ' -force -quiet'];
 system(command)
-[p, n_DKI, x] = fileparts(imgs.DKI);
-nfa=[p '/ns' n_DKI 'du_FAx' x];
+[p, n , x] = fileparts(imgs.DKI);
+nfa=[p '/n' dwi_name '_fa_dki' x];
 oldNormSub({[ p '/wb' n x],[p '/w5tt_' n x],[p '/wgmwmi_' n x]},nfa,8,10,0);
 movefile([p '/ww5tt_' n x],[p '/5tt_' n x]);
 movefile([p '/wwgmwmi_' n x],[p '/gmwmi_' n x]);
@@ -28,14 +29,12 @@ gmwm=gmwm>0; % threshold was picked arbitrary, could likely be optimized
 
 if strcmpi(atlas,'jhu')
     atlasext = '_roi';
-    [p, n, x] = fileparts(imgs.DKI);
     hdr=spm_vol([ p '/' n  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
    %index_ROI=[1:max(ROI(:))];
 else
     atlasext = ['_roi_' atlas];
-    [p, n, x] = fileparts(imgs.DKI);
     hdr=spm_vol([ p '/' n  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=[1:max(ROI(:))]; % if JHU do only language specific and domain general ROIs  
@@ -53,7 +52,6 @@ end
 
 
 %%
-scalar_maps={'du_FAx','du_MD','du_MK'}; % extension of parametric maps 
 
 % initialize 
 if mod(nb_nodes,2)==0, nb_nodes=nb_nodes+1;end % when using tie at center you need uneven number of points
@@ -195,7 +193,7 @@ if (total_tracks_temp(j)~=0) && (total_tracks_temp(j)>5) % do along tract measur
 
     for sc_map=1:length(scalar_maps) 
     % SCALAR MAPS 
-    hdr=spm_vol([p '/s' n  scalar_maps{sc_map} '.nii']);
+    hdr=spm_vol([p '/' dwi_name '_' scalar_maps{sc_map} '_dki.nii']);
     map=spm_read_vols(hdr);
     if sc_map==2, map=map*1000;end % convert MD to more conventional um2/ms 
 
@@ -246,8 +244,12 @@ end
 
 % save along tract stats as a structure, note that this is written
 % specifically for three maps change this when adding metrics 
-scalar_mean_struc=struct(scalar_maps{1},scalar_mean_final(:,:,:,1),scalar_maps{2},scalar_mean_final(:,:,:,2),scalar_maps{3},scalar_mean_final(:,:,:,3));
-scalar_sd_struc=struct(scalar_maps{1},scalar_sd(:,:,:,1),scalar_maps{2},scalar_sd(:,:,:,2),scalar_maps{3},scalar_sd(:,:,:,3));
+for par = 1:length(scalar_maps)
+scalar_mean_struc.(scalar_maps{par}) = scalar_mean_final(:,:,:,par);
+scalar_sd_struc.(scalar_maps{par}) = scalar_sd_final(:,:,:,par);
+%scalar_mean_struc=struct(scalar_maps{1},scalar_mean_final(:,:,:,1),scalar_maps{2},scalar_mean_final(:,:,:,2),scalar_maps{3},scalar_mean_final(:,:,:,3));
+%scalar_sd_struc=struct(scalar_maps{1},scalar_sd(:,:,:,1),scalar_maps{2},scalar_sd(:,:,:,2),scalar_maps{3},scalar_sd(:,:,:,3));
+end
 
 save([p '/scalars_mean_' atlas '.mat'],'scalar_mean_struc');
 save([p '/scalars_sd_' atlas '.mat'],'scalar_sd_struc');

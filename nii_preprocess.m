@@ -111,10 +111,13 @@ if ~exist(pth,'file'), pth = ''; end;
 %printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
 nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (spm_clf) show results - except DTI
 diary off
+clear global dwi_name
 %nii_preprocess()
 
 function doDkiTractSub(imgs,matName,dtiDir,atlas)
+global dwi_name
 dki = imgs.DKI; 
+[p,~]=fileparts(dki);
 if ~exist('atlas','var'),
     atlas = 'jhu';
 end
@@ -126,9 +129,9 @@ else
 end
 
  if ~exist(prepostfixSub('',['_roi' atlasext],dki)), doDkiWarpSub(imgs, atlas), end
-dki_dt=prepostfixSub('s', 'du_DT', dki);
-dki_kt=prepostfixSub('s', 'du_DK', dki);
-dki_fa=prepostfixSub('s', 'du_FAx', dki);
+dki_dt=fullfile(p,[dwi_name '_DT.nii']);
+dki_kt=fullfile(p,[dwi_name '_DK.nii']);
+dki_fa=fullfile(p,[dwi_name '_fa_dki.nii']);
 
 if ~exist(dki_kt,'file')
     fprintf('Can not find tensors %s\n',dki_kt);
@@ -150,7 +153,8 @@ fclose(fid);
 fclose(fidout);
 
 kODF_nii_preprocess(fullfile(dtiDir,'ft_parameters_subj.txt'),dki_dt,dki_kt,dki_fa)
-DKI_tractography_along_tract_stats(imgs,atlas,100) % devide tracts in 100 nodes 
+param={'fa','md','dax','drad','mk','kax','krad','kfa'}; % calculate along tract stats of these metrics 
+DKI_tractography_along_tract_stats(imgs,atlas,100,param) % devide tracts in 100 nodes 
 
 
 function addLimeVersionSub(matName)
@@ -406,19 +410,22 @@ spm_write_vol(hdr,img);
 %end rescaleSub()
 
 function doDkiSub(imgs, matName, isDki)
+global dwi_name
 if exist('isDki','var') && (isDki)
     if ~isfield(imgs,'DKI'), return; end;
     if isempty(imgs.DKI), return; end; %nothing to do!
     global ForceDTI;
-    if isempty(ForceDTI) && isFieldSub(matName, 'mk')
-        fprintf('Skipping MK estimates: already computed\n');
+    if isempty(ForceDTI) && isFieldSub(matName, 'mk_dki')
+        fprintf('Skipping MK estimates: already computed\n')
+        [~,n,~]=filepartsSub(imgs.DKI);
+        if exist(prepostfixSub('s','du',imgs.DKI),'file'), dwi_name=['/s' n 'du']; else dwi_name=['/s' n 'dun']; end
         return;
     end; %stats already exist
-    
     %preprocess - denoise
-dki_d=prepostfixSub('', 'd', imgs.DKI);
+    dwi_name='d';
+dki_d=prepostfixSub('', dwi_name, imgs.DKI);
 if exist(imgs.DKIrev)
-    dti_dr=prepostfixSub('', 'd', imgs.DKI);
+    dti_dr=prepostfixSub('', dwi_name, imgs.DKI);
 end;
 if isempty(ForceDTI) && exist(dki_d, 'file')
    fprintf('Skipping DTI denoising: found %s\n', dki_d);
@@ -445,6 +452,7 @@ end;
     %end
     command=sprintf('%s "%s"',command, dki_d);
     doFslCmd (command);
+    dwi_name='du';
     doDkiCoreSub(imgs.T1, imgs.DKI, matName)
 else
     doDkiCoreSub(imgs.T1, imgs.DTI, matName);
@@ -452,6 +460,7 @@ end
 %end doDkiSub()
 
 function doDkiCoreSub(T1, DTI, matName)
+global dwi_name
 if isempty(T1) || isempty(DTI), return; end; %required
 if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
 wbT1 = prefixSub('wb',T1); %warped brain extracted image
@@ -461,7 +470,7 @@ mask = unGzSub (mask);
 if ~exist(mask,'file'),  error('unable to find %s\n', mask); return; end;
 %MKfa=prepostfixSub('', 'd_FA', DTI);
 %if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
-dti_u=prepostfixSub('', 'du', DTI);
+dti_u=prepostfixSub('', dwi_name, DTI);
 [pth,nam] = filepartsSub(DTI);
 bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
 if ~exist(bvalnm, 'file')
@@ -477,27 +486,27 @@ if max(bval(:)) < 1500
     return;
 end
 param={'fa','md','dax','drad','mk','kax','krad','kfa'};
-DKI=dkifx2(dti_u, bvalnm, mask, true, param);
+dkifx2(dti_u, bvalnm, mask, true, param);
 MKmask=mask;
 
 if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
-if ~exist([DKI param{1} '_dki.nii'], 'file') || ~exist(MKmask, 'file')
-   fprintf('Serious error: no kurtosis images named %s %s\n', [DKI param{par} '_dki.nii'], MKmask);
+if ~exist([dwi_name '_' param{1} '_dki.nii'], 'file') || ~exist(MKmask, 'file')
+   fprintf('Serious error: no kurtosis images named %s %s\n', [dwi_name '_' param{1} '_dki.nii'], MKmask);
    return;
 end
     
-nFA = rescaleSub([DKI param{1} '_dki.nii']);
+nFA = rescaleSub([dwi_name '_' param{1} '_dki.nii']);
 
 oldNormstring=cell(1,length(param)+1);
 oldNormstring{1}=nFA;
 for par=1:length(param)
-DKI_par=[DKI param{par} '_dki.nii'];
+DKI_par=[dwi_name '_' param{par} '_dki.nii'];
 oldNormstring(par+1)={DKI_par};
 end
 oldNormSub(oldNormstring,wbT1, 8, 8 );
 
 for par=1:length(param)
-DKI_par=[DKI param{par} '_dki.nii'];
+DKI_par=[dwi_name '_' param{par} '_dki.nii'];
 %normalize mean kurtosis to match normalized, brain extracted T1
 wDKI_par = prepostfixSub('w', '', DKI_par);
 nii_nii2mat(wDKI_par, [param{par} '_dki'], matName);
@@ -954,7 +963,7 @@ movefile(wroiname, roiname);
 %end doFaMdSub()
 
 function doDkiWarpSub(imgs, atlas)
-
+global dwi_name
 if isempty(imgs.T1) || isempty(imgs.DKI), return; end; %required
 if ~exist('atlas','var'), atlas = 'jhu'; end;
 if strcmpi(atlas,'jhu')
@@ -963,7 +972,8 @@ else
    atlasext = ['_roi_' atlas];
 end
 T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
-MKFA = prepostfixSub('s', 'du_FAx', imgs.DKI);
+[p,~]=fileparts(imgs.DKI);
+MKFA = fullfile(p,[dwi_name '_fa_dki.nii']);
 %MKMD = prepostfixSub('', 'd_MD', imgs.DKI);
 %MK = prepostfixSub('', 'd_MK', imgs.DKI);
 
