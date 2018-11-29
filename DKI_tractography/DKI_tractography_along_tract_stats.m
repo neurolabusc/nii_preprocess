@@ -13,7 +13,7 @@ command=['5ttgen fsl ' p '/wb' n x ' ' p '/w5tt_' n x ' -force -quiet'];
 system(command)
 command=['5tt2gmwmi ' p '/w5tt_' n x ' ' p '/wgmwmi_' n x ' -force -quiet'];
 system(command)
-[p, n , x] = fileparts(imgs.DKI);
+[p, n_dki , x] = fileparts(imgs.DKI);
 nfa=[p '/n' dwi_name '_fa_dki' x];
 oldNormSub({[ p '/wb' n x],[p '/w5tt_' n x],[p '/wgmwmi_' n x]},nfa,8,10,0);
 movefile([p '/ww5tt_' n x],[p '/5tt_' n x]);
@@ -29,13 +29,13 @@ gmwm=gmwm>0; % threshold was picked arbitrary, could likely be optimized
 
 if strcmpi(atlas,'jhu')
     atlasext = '_roi';
-    hdr=spm_vol([ p '/' n  atlasext x]);
+    hdr=spm_vol([ p '/' n_dki  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
    %index_ROI=[1:max(ROI(:))];
 else
     atlasext = ['_roi_' atlas];
-    hdr=spm_vol([ p '/' n  atlasext x]);
+    hdr=spm_vol([ p '/' n_dki  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=[1:max(ROI(:))]; % if JHU do only language specific and domain general ROIs  
     
@@ -107,7 +107,7 @@ parfor i=1:length(index_ROI_no_empty)
     for j=i+1:length(index_ROI_no_empty) % calculate only upper diagonal matrix 
         fprintf('%s: ROI %d to ROI %d\t',atlas,index_ROI_no_empty(i),index_ROI_no_empty(j));
 
-        hdr_loop=spm_vol([ p '/' n  atlasext x]);            
+        hdr_loop=spm_vol([ p '/' n_dki atlasext x]);            
         seed=(ROI==index_ROI_no_empty(i)) & (gmwm>0); hdr_loop.fname=[p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii']; spm_write_vol(hdr_loop,seed>0); % seed ROI 
         include=(ROI==index_ROI_no_empty(j))& (gmwm>0); hdr_loop.fname=[p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii']; spm_write_vol(hdr_loop,include>0); % end ROI
         
