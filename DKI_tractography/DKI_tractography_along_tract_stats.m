@@ -1,7 +1,9 @@
 %% calculate along tract measurements of MD/FA/MK between all pairs of a provided atlas (in diffusion space) 
 function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes,scalar_maps)
 global dwi_name
-[p, n, x] = fileparts(imgs.T1);
+[p, n, ~] = fileparts(imgs.T1);
+[p_dki, n_dki , x] = fileparts(imgs.DKI);
+
 if exist([p '/scalars_mean_' atlas '.mat'],'file')
     fprintf('Skipping DKI tractography with atlas: %s\n', atlas); 
     return
@@ -13,7 +15,6 @@ command=['5ttgen fsl ' p '/wb' n x ' ' p '/w5tt_' n x ' -force -quiet'];
 system(command)
 command=['5tt2gmwmi ' p '/w5tt_' n x ' ' p '/wgmwmi_' n x ' -force -quiet'];
 system(command)
-[p, n_dki , x] = fileparts(imgs.DKI);
 nfa=[p '/n' dwi_name '_fa_dki' x];
 oldNormSub({[ p '/wb' n x],[p '/w5tt_' n x],[p '/wgmwmi_' n x]},nfa,8,10,0);
 movefile([p '/ww5tt_' n x],[p '/5tt_' n x]);
@@ -29,13 +30,13 @@ gmwm=gmwm>0; % threshold was picked arbitrary, could likely be optimized
 
 if strcmpi(atlas,'jhu')
     atlasext = '_roi';
-    hdr=spm_vol([ p '/' n_dki  atlasext x]);
+    hdr=spm_vol([ p_dki '/' n_dki  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
-   %index_ROI=[1:max(ROI(:))];
+    %index_ROI=[1:max(ROI(:))];
 else
     atlasext = ['_roi_' atlas];
-    hdr=spm_vol([ p '/' n_dki  atlasext x]);
+    hdr=spm_vol([ p_dki '/' n_dki  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=[1:max(ROI(:))]; % if JHU do only language specific and domain general ROIs  
     
@@ -86,7 +87,6 @@ dim=hdr.dim;
 mkdir([p '/temp']);
 
 
-
 parfor i=1:length(index_ROI_no_empty)
 
     track_mean_mrtrix_temp=zeros(3,nb_nodes, length(index_ROI_no_empty));
@@ -107,7 +107,7 @@ parfor i=1:length(index_ROI_no_empty)
     for j=i+1:length(index_ROI_no_empty) % calculate only upper diagonal matrix 
         fprintf('%s: ROI %d to ROI %d\t',atlas,index_ROI_no_empty(i),index_ROI_no_empty(j));
 
-        hdr_loop=spm_vol([ p '/' n_dki atlasext x]);            
+        hdr_loop=spm_vol([ p_dki '/' n_dki atlasext x]);            
         seed=(ROI==index_ROI_no_empty(i)) & (gmwm>0); hdr_loop.fname=[p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii']; spm_write_vol(hdr_loop,seed>0); % seed ROI 
         include=(ROI==index_ROI_no_empty(j))& (gmwm>0); hdr_loop.fname=[p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii']; spm_write_vol(hdr_loop,include>0); % end ROI
         
@@ -123,13 +123,12 @@ command=['tckedit ' p '/temp/seed_include_' num2str(index_ROI_no_empty(i)) '_' n
 system(command);
 %% Calculate along tract metrics (cite John Colby work: https://www.sciencedirect.com/science/article/pii/S1053811911012833?via%3Dihub ) 
 
-tracks_trk=struct;
-
+tracks_trk = struct;
 tracks = read_mrtrix_tracks ([ p '/temp/combined_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck']); % tracks from mrtrix are in world coordinates (voxels) 
 tracks_mm=tracks; % initialize the matrix needed to transform tracks from voxels to mm 
 total_tracks_temp(j)=length(tracks.data); % calculate how many tracts were found between the two ROIs 
 fprintf('Total Tracks: %d\n', total_tracks_temp(j));
- 
+delete([p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii'],[p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii'],[p '/temp/seed_include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck'],[p '/temp/include_seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck'],[p '/temp/combined_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck']); 
 if (total_tracks_temp(j)~=0) && (total_tracks_temp(j)>5) % do along tract measurements if there are more than 5 streamlines between ROIs 
 
         for nb_tracks=1:length(tracks.data)
@@ -259,9 +258,25 @@ save([p '/total_tracks_' atlas '.mat'],'total_tracks_final');
 save([p '/track_mrtrix_final_' atlas '.mat'],'track_mrtrix_final');
 save([p '/track_mean_mrtrix_final_' atlas '.mat'],'track_mean_mrtrix_final');
 
+% initialize header ( note if you change the tractography parameters this
+% needs to be changed too)
+track_mean_mrtrix_tck.init_threshold='0.1';
+track_mean_mrtrix_tck.max_angle='60';
+track_mean_mrtrix_tck.max_num_seeds= '10000';
+track_mean_mrtrix_tck.max_num_tracks='10000';
+track_mean_mrtrix_tck.max_seed_attempts='1000';
+track_mean_mrtrix_tck.method='SDStream';
+track_mean_mrtrix_tck.mrtrix_version='0_RC3-100-g16090b5b'; % check this
+track_mean_mrtrix_tck.rk4='0';
+track_mean_mrtrix_tck.sh_precomputed='1';
+track_mean_mrtrix_tck.source= [p '/SH_coeff.nii'];
+track_mean_mrtrix_tck.stepsize=num2str(pixel_size/10);
+track_mean_mrtrix_tck.stop_on_all_include='1';
+track_mean_mrtrix_tck.threshold='0.1';
+track_mean_mrtrix_tck.timestamp='';
+track_mean_mrtrix_tck.unidirectional = '1';
+track_mean_mrtrix_tck.datatype='Float32LE';
 
-tracks = read_mrtrix_tracks ([ p '/temp/combined_1_9.tck']); % tracks from mrtrix are in world coordinates (voxels) 
-track_mean_mrtrix_tck=tracks;
 for i=1:length(index_ROI_no_empty)
     for j=1:length(index_ROI_no_empty)
 track_mean_mrtrix_tck.data{(i-1)*length(index_ROI_no_empty)+j}=track_mean_mrtrix_final(:,:,index_ROI_no_empty(i),index_ROI_no_empty(j))';
@@ -271,8 +286,6 @@ track_mean_mrtrix_tck.count=length(index_ROI_no_empty)*length(index_ROI_no_empty
 track_mean_mrtrix_tck.total_count=length(index_ROI_no_empty)*length(index_ROI_no_empty);
 write_mrtrix_tracks(track_mean_mrtrix_tck,[p '/mean_all_' atlas '.tck']);
 
-tracks = read_mrtrix_tracks ([ p '/temp/combined_1_9.tck']); % tracks from mrtrix are in world coordinates (voxels) 
-track_mrtrix_tck=tracks;
 counter=0;
 for i=1:length(index_ROI_no_empty)
     for j=1:length(index_ROI_no_empty)
