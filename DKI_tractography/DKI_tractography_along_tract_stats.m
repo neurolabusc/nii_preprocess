@@ -273,32 +273,47 @@ track_mean_mrtrix_tck.source= [p '/SH_coeff.nii'];
 track_mean_mrtrix_tck.stepsize=num2str(pixel_size/10);
 track_mean_mrtrix_tck.stop_on_all_include='1';
 track_mean_mrtrix_tck.threshold='0.1';
-track_mean_mrtrix_tck.timestamp='';
+track_mean_mrtrix_tck.timestamp='1';
 track_mean_mrtrix_tck.unidirectional = '1';
 track_mean_mrtrix_tck.datatype='Float32LE';
-
+track_mean_mrtrix_tsf=track_mean_mrtrix_tck;
+counter2=1;
 for i=1:length(index_ROI_no_empty)
-    for j=1:length(index_ROI_no_empty)
+    for j=i+1:length(index_ROI_no_empty)
 track_mean_mrtrix_tck.data{(i-1)*length(index_ROI_no_empty)+j}=track_mean_mrtrix_final(:,:,index_ROI_no_empty(i),index_ROI_no_empty(j))';
+track_mean_mrtrix_tsf.data{(i-1)*length(index_ROI_no_empty)+j}=counter2*ones(101,1);
+counter2=counter2+1;
     end
 end
 track_mean_mrtrix_tck.count=length(index_ROI_no_empty)*length(index_ROI_no_empty);
 track_mean_mrtrix_tck.total_count=length(index_ROI_no_empty)*length(index_ROI_no_empty);
 write_mrtrix_tracks(track_mean_mrtrix_tck,[p '/mean_all_' atlas '.tck']);
+track_mean_mrtrix_tsf.count=length(index_ROI_no_empty)*length(index_ROI_no_empty);
+track_mean_mrtrix_tsf.total_count=length(index_ROI_no_empty)*length(index_ROI_no_empty);
+write_mrtrix_tsf(track_mean_mrtrix_tsf,[p '/mean_all_' atlas '.tsf']);
+
+
+
+track_mrtrix_tck=track_mean_mrtrix_tck;
+track_mrtrix_tsf=track_mean_mrtrix_tck;
+
 
 counter=0;
+counter2=1;
 for i=1:length(index_ROI_no_empty)
-    for j=1:length(index_ROI_no_empty)
+    for j=i+1:length(index_ROI_no_empty)
         for node=1:total_tracks_final(index_ROI_no_empty(i),index_ROI_no_empty(j))
         track_mrtrix_tck.data{node+counter}=track_mrtrix_final{index_ROI_no_empty(j),node,index_ROI_no_empty(i)};
+        track_mrtrix_tsf.data{node+counter}=counter2*ones(101,1);
         end
        counter=counter+total_tracks_final(index_ROI_no_empty(i),index_ROI_no_empty(j));
+       counter2=counter2+1;
     end
 end
 track_mrtrix_tck.count=counter;
 track_mrtrix_tck.total_count=counter;
 write_mrtrix_tracks(track_mrtrix_tck,[p '/all_' atlas '.tck']);
-
+write_mrtrix_tsf(track_mrtrix_tsf,[p '/all_' atlas '.tsf']);
 function oldNormSub(src, tar, smoref, reg, interp)
 %coregister T2 to match T1 image, apply to lesion
 if isempty(src) || isempty(tar), return; end;

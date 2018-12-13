@@ -418,7 +418,7 @@ if exist('isDki','var') && (isDki)
     if isempty(ForceDTI) && isFieldSub(matName, 'mk_dki')
         fprintf('Skipping MK estimates: already computed\n')
         [~,n,~]=filepartsSub(imgs.DKI);
-        if exist(prepostfixSub('s','du',imgs.DKI),'file'), dwi_name=['/s' n 'du']; else dwi_name=['/s' n 'dun']; end
+        if exist(prepostfixSub('s','du',imgs.DKI),'file'), dwi_name=['s' n 'du']; else dwi_name=['/s' n 'dun']; end
         return;
     end; %stats already exist
     %preprocess - denoise
@@ -495,18 +495,18 @@ if ~exist([dwi_name '_' param{1} '_dki.nii'], 'file') || ~exist(MKmask, 'file')
    return;
 end
     
-nFA = rescaleSub([dwi_name '_' param{1} '_dki.nii']);
+nFA = rescaleSub([pth '/' dwi_name '_' param{1} '_dki.nii']);
 
 oldNormstring=cell(1,length(param)+1);
 oldNormstring{1}=nFA;
 for par=1:length(param)
-DKI_par=[dwi_name '_' param{par} '_dki.nii'];
+DKI_par=[pth '/' dwi_name '_' param{par} '_dki.nii'];
 oldNormstring(par+1)={DKI_par};
 end
 oldNormSub(oldNormstring,wbT1, 8, 8 );
 
 for par=1:length(param)
-DKI_par=[dwi_name '_' param{par} '_dki.nii'];
+DKI_par=[pth '/' dwi_name '_' param{par} '_dki.nii'];
 %normalize mean kurtosis to match normalized, brain extracted T1
 wDKI_par = prepostfixSub('w', '', DKI_par);
 nii_nii2mat(wDKI_par, [param{par} '_dki'], matName);
