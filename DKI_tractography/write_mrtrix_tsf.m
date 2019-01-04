@@ -26,7 +26,7 @@ for i=1:size(names)
   fprintf (f, '%s: %s\n', names{i}, getfield(tsf, names{i}));
 end
 data_offset = ftell (f) + 20;
-data_offset=data_offset+mod(data_offset,4);
+data_offset=data_offset+mod((4-mod(data_offset,4)),4);
 fprintf (f, 'file: . %d\nEND\n', data_offset);
 
 fwrite (f, zeros(data_offset-ftell(f),1), 'uint8');
