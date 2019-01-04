@@ -41,7 +41,7 @@ else
     atlasext = ['_roi_' atlas];
     hdr=spm_vol([ p_dki '/' n_dki  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
-    index_ROI=[1:max(ROI(:))]; % if JHU do only language specific and domain general ROIs  
+    index_ROI=(1:max(ROI(:))); % if JHU do only language specific and domain general ROIs  
     
 end
 
@@ -280,7 +280,7 @@ track_mean_mrtrix_tck.max_num_seeds= '10000';
 track_mean_mrtrix_tck.max_num_tracks='10000';
 track_mean_mrtrix_tck.max_seed_attempts='1000';
 track_mean_mrtrix_tck.method='SDStream';
-track_mean_mrtrix_tck.mrtrix_version='0_RC3-100-g16090b5b'; % check this
+track_mean_mrtrix_tck.mrtrix_version='3.0_RC3-100-g16090b5b'; % check this
 track_mean_mrtrix_tck.rk4='0';
 track_mean_mrtrix_tck.sh_precomputed='1';
 track_mean_mrtrix_tck.source= [p '/SH_coeff.nii'];
@@ -325,10 +325,10 @@ write_mrtrix_tsf(track_mrtrix_tsf,[p '/all_' atlas ext '.tsf']);
 
 function oldNormSub(src, tar, smoref, reg, interp)
 %coregister T2 to match T1 image, apply to lesion
-if isempty(src) || isempty(tar), return; end;
-if ~exist('smoref','var'), smoref = 0; end;
-if ~exist('reg','var'), reg = 1; end;
-if ~exist('interp','var'), interp = 1; end;
+if isempty(src) || isempty(tar), return; end
+if ~exist('smoref','var'), smoref = 0; end
+if ~exist('reg','var'), reg = 1; end
+if ~exist('interp','var'), interp = 1; end
 matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.source = src(1);
 matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.wtsrc = '';
 matlabbatch{1}.spm.tools.oldnorm.estwrite.subj.resample = src(:);
