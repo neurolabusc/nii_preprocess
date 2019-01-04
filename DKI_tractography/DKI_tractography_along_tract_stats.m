@@ -1,10 +1,13 @@
 %% calculate along tract measurements of MD/FA/MK between all pairs of a provided atlas (in diffusion space) 
 function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes,scalar_maps)
 global dwi_name
+mask_lesion=1;
 [p, n, ~] = fileparts(imgs.T1);
 [p_dki, n_dki , x] = fileparts(imgs.DKI);
+[p_lesion, n_lesion , x] = fileparts(imgs.Lesion);
 
-if exist([p '/scalars_mean_' atlas '.mat'],'file')
+
+if exist([p '/scalars_mean_' atlas '.mat'],'file') || exist([p '/scalars_mean_' atlas '_excl.mat'],'file')
     fprintf('Skipping DKI tractography with atlas: %s\n', atlas); 
     return
 end
@@ -40,6 +43,20 @@ else
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=[1:max(ROI(:))]; % if JHU do only language specific and domain general ROIs  
     
+end
+
+if mask_lesion && exist([p_lesion '/exclude' x],file)
+    nfa=[p '/n' dwi_name '_fa_dki' x];
+    copyfile([p '/wb' n x],[p '/Twb' n x]);
+    oldNormSub({[ p '/b' n x],[p_lesion '/exclude' x]},nfa,8,10,0);
+    copyfile([p '/Twb' n x],[p '/wb' n x]); % do not overwrite original wbT1
+    movefile([p '/wexclude' x],[p '/DKI_exclude' x]);
+    lesion = ['-exclude ' p_dki '/DKI_exclude.nii'];
+    ext=['_excl'];
+else 
+    lesion='';
+    ext='';
+    fprintf('Warning: no voxels are excluded from tractography. If this is unexpected, make sure exclude.nii is in the same folder as imgs.Lesion')
 end
 
 %delete empty ROIs
@@ -113,10 +130,10 @@ parfor i=1:length(index_ROI_no_empty)
         
 %% Run MRtrix tractography - deterministic, dODF based, angular threshold 60, FA>0.1
 % seed to end
-command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii -cutoff 0.1 -include ' p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii ' p '/SH_coeff.nii ' p '/temp/seed_include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
+command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii -cutoff 0.1 -include ' p '/temp/include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii ' lesion ' ' p '/SH_coeff.nii ' p '/temp/seed_include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
 system(command);
 % end to seed 
-command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii -cutoff 0.1 -include ' p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii ' p '/SH_coeff.nii ' p '/temp/include_seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
+command=['tckgen -algorithm SD_STREAM -seed_image ' p '/temp/include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii -cutoff 0.1 -include ' p '/temp/seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii ' lesion ' ' p '/SH_coeff.nii ' p '/temp/include_seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck -seeds 10000 -select 10000 -angle 60 -stop -force -seed_unidirectional -quiet'];
 system(command);
 % combine both results into one .tck 
 command=['tckedit ' p '/temp/seed_include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck ' p '/temp/include_seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck ' p '/temp/combined_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck -force -quiet'];
