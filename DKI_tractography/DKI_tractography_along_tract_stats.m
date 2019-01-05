@@ -3,8 +3,8 @@ function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes,scalar_maps)
 global dwi_name
 mask_lesion=1;
 [p, n, ~] = fileparts(imgs.T1);
-[p_dki, n_dki , x] = fileparts(imgs.DKI);
-[p_lesion, n_lesion , x] = fileparts(imgs.Lesion);
+[p_dki, n_dki , ~] = fileparts(imgs.DKI);
+[p_lesion, ~ , x] = fileparts(imgs.Lesion);
 
 
 if exist([p '/scalars_mean_' atlas '.mat'],'file') || exist([p '/scalars_mean_' atlas '_excl.mat'],'file')
@@ -52,7 +52,7 @@ if mask_lesion && exist([p_lesion '/exclude' x],file)
     copyfile([p '/Twb' n x],[p '/wb' n x]); % do not overwrite original wbT1
     movefile([p '/wexclude' x],[p '/DKI_exclude' x]);
     lesion = ['-exclude ' p_dki '/DKI_exclude.nii'];
-    ext=['_excl'];
+    ext='_excl';
 else 
     lesion='';
     ext='';
@@ -63,13 +63,13 @@ end
 count=1;
 for i=1:length(index_ROI)
 if sum(sum(sum((ROI==index_ROI(i)) & (gmwm>0))))
-   index_ROI_no_empty(count)=index_ROI(i);
+   temp(count)=i;
    count=count+1;
 end
 end
-
-combinations=nchoosek(index_ROI_no_empty,2);
-
+index_ROI=index_ROI(temp);
+combinations=nchoosek(index_ROI,2);
+clear temp count 
 %%
 
 % initialize 
@@ -134,7 +134,7 @@ system(command);
 command=['tckedit ' p '/temp/seed_include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck ' p '/temp/include_seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck ' p '/temp/combined_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck -force -quiet'];
 system(command);
         
-%% Calculate along tract metrics (cite John Colby work: https://www.sciencedirect.com/science/article/pii/S1053811911012833?via%3Dihub ) 
+%% Calculate along tract metrics (cite John Colby work: https://www.sciencedirect.com/science/article/pii/S1053811911012833?via%3Dihub and mrDiffusion) 
 
 tracks_trk = struct;
 tracks = read_mrtrix_tracks ([ p '/temp/combined_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck']); % tracks from mrtrix are in world coordinates (voxels) 
@@ -142,7 +142,6 @@ delete([p '/temp/seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)
 tracks_mm=tracks; % initialize the matrix needed to transform tracks from voxels to mm 
 total_tracks(i)=length(tracks.data); % calculate how many tracts were found between the two ROIs 
 fprintf('Total Tracks: %d\n', total_tracks(i));
-%delete([p '/temp/seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii'],[p '/temp/include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.nii'],[p '/temp/seed_include_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck'],[p '/temp/include_seed_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck'],[p '/temp/combined_' num2str(index_ROI_no_empty(i)) '_' num2str(index_ROI_no_empty(j)) '.tck']); 
 if (total_tracks(i)~=0) && (total_tracks(i)>5) % do along tract measurements if there are more than 5 streamlines between ROIs 
 
         for nb_tracks=1:length(tracks.data)
@@ -261,10 +260,9 @@ end
 for par = 1:length(scalar_maps)
 scalar_mean_struc.(scalar_maps{par}) = scalar_mean_final(:,:,:,par);
 scalar_sd_struc.(scalar_maps{par}) = scalar_sd_final(:,:,:,par);
-%scalar_mean_struc=struct(scalar_maps{1},scalar_mean_final(:,:,:,1),scalar_maps{2},scalar_mean_final(:,:,:,2),scalar_maps{3},scalar_mean_final(:,:,:,3));
-%scalar_sd_struc=struct(scalar_maps{1},scalar_sd(:,:,:,1),scalar_maps{2},scalar_sd(:,:,:,2),scalar_maps{3},scalar_sd(:,:,:,3));
 end
 track_mrtrix=track_mrtrix(~cellfun('isempty',track_mrtrix));
+
 save([p '/scalars_mean_' atlas ext '.mat'],'scalar_mean_struc');
 save([p '/scalars_sd_' atlas ext '.mat'],'scalar_sd_struc');
 save([p '/mean_' atlas ext '.mat'],'meanInt_final') %mean tract values (FA,MD,MK)
@@ -281,7 +279,7 @@ track_mean_mrtrix_tck.max_num_seeds= '10000';
 track_mean_mrtrix_tck.max_num_tracks='10000';
 track_mean_mrtrix_tck.max_seed_attempts='1000';
 track_mean_mrtrix_tck.method='SDStream';
-track_mean_mrtrix_tck.mrtrix_version='3.0_RC3-100-g16090b5b'; % check this
+track_mean_mrtrix_tck.mrtrix_version='3.0_RC3-100-g16090b5b'; % check version
 track_mean_mrtrix_tck.rk4='0';
 track_mean_mrtrix_tck.sh_precomputed='1';
 track_mean_mrtrix_tck.source= [p '/SH_coeff.nii'];
