@@ -138,6 +138,7 @@ system(command);
 
 tracks_trk = struct;
 tracks = read_mrtrix_tracks ([ p '/temp/combined_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck']); % tracks from mrtrix are in world coordinates (voxels) 
+delete([p '/temp/seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii'],[p '/temp/include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii'],[p '/temp/seed_include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck'],[p '/temp/include_seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck'],[p '/temp/combined_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck']);
 tracks_mm=tracks; % initialize the matrix needed to transform tracks from voxels to mm 
 total_tracks(i)=length(tracks.data); % calculate how many tracts were found between the two ROIs 
 fprintf('Total Tracks: %d\n', total_tracks(i));
