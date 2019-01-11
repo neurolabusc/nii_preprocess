@@ -2,9 +2,9 @@
 function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes,scalar_maps)
 global dwi_name
 mask_lesion=1;
-[p, n, ~] = fileparts(imgs.T1);
+[p, n, x] = fileparts(imgs.T1);
 [p_dki, n_dki , ~] = fileparts(imgs.DKI);
-[p_lesion, ~ , x] = fileparts(imgs.Lesion);
+if exist(imgs.Lesion,'var'), [p_lesion, ~ , ~] = fileparts(imgs.Lesion); , else mask_lesion=0; end;
 
 
 if exist([p '/scalars_mean_' atlas '.mat'],'file') || exist([p '/scalars_mean_' atlas '_excl.mat'],'file')
