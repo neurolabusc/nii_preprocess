@@ -129,7 +129,7 @@ counter=0;
 for i=1:length(combinations)
         for node=1:total_tracks(i)
         track_mrtrix_tck.data{node+counter}=track_mrtrix(i).data{node};
-        track_mrtrix_tsf.data{node+counter}=i*ones(nb_nodes,1);
+        track_mrtrix_tsf.data{node+counter}=i*ones(size(track_mrtrix(i).data{node},1),1);
         end
        counter=counter+total_tracks(i);
 end
@@ -164,6 +164,8 @@ header=struct;
 header.voxel_size=pixel_size;
 header.dim=dim;
 header.n_scalars=0;
+
+tracks_trk=repmat(struct,1,length(track_mrtrix_tck.data)); %initialize
 
         for nb_tracks=1:length(track_mrtrix_tck.data)
         int=transform\[track_mrtrix_tck.data{nb_tracks} ones(length(track_mrtrix_tck.data{nb_tracks}),1)]'; % transform to image space
