@@ -1,11 +1,15 @@
 %% calculate along tract measurements of MD/FA/MK between all pairs of a provided atlas (in diffusion space) 
-function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes,scalar_maps)
+function DKI_tractography_along_tract_stats(imgs,atlas,nb_nodes,scalar_maps,atlas_maps)
 global dwi_name
+if nargin<5
+atlas_maps={'Inferior_Occipito_Frontal_Fasciculus_Left','Inferior_Longitudinal_Fasciculus_Left','Long_Segment_Left','Anterior_Segment_Left','Posterior_Segment_Left','Uncinate_Left'};
+end
+
 mask_lesion=1;
 [p, n, x] = fileparts(imgs.T1);
 [p_dki, n_dki , ~] = fileparts(imgs.DKI);
 if exist(imgs.Lesion), [p_lesion, ~ , ~] = fileparts(imgs.Lesion);  else mask_lesion=0; end
-atlas_path='/Users/Emilie/Box Sync/PhD_Projects/Recovery_Aphasia/atlas/Catani_atlas'; % make this a variable somewhere 
+atlas_path = fullfile(fileparts(which('nii_preprocess')), 'catani_atlas');
 
 
 if exist([p '/scalars_mean_' atlas '.mat'],'file') || exist([p '/scalars_mean_' atlas '_excl.mat'],'file')
@@ -149,16 +153,20 @@ write_mrtrix_tsf(track_mrtrix_tsf,[p '/all_' atlas ext '.tsf']);
 
 %% segmentation 
 if exist('nfa','var'), else nfa=[p '/n' dwi_name '_fa_dki' x]; end
-    
-oldNormSub({[ p '/wb' n x],[atlas_path '/Inferior_Occipito_Frontal_Fasciculus_Left' x],[atlas_path '/Inferior_Longitudinal_Fasciculus_Left' x],[atlas_path '/Anterior_Segment_Left' x],[atlas_path '/Posterior_Segment_Left' x],[atlas_path '/Long_Segment_Left' x],[atlas_path '/Uncinate_Left' x]},nfa,8,10,0);
-movefile([atlas_path '/wInferior_Occipito_Frontal_Fasciculus_Left' x],[p '/IFOF' x]);
-movefile([atlas_path '/wInferior_Longitudinal_Fasciculus_Left' x],[p '/ILF' x]);
-movefile([atlas_path '/wAnterior_Segment_Left' x],[p '/Arc1' x]);
-movefile([atlas_path '/wLong_Segment_Left' x],[p '/Arc2' x]);
-movefile([atlas_path '/wPosterior_Segment_Left' x],[p '/Arc3' x]);
-movefile([atlas_path '/wUncinate_Left' x],[p '/UNC' x]);
-atlas_maps={'IFOF','ILF','Arc1','Arc2','Arc3','UNC'};
 
+% transform atlas from mni space to native diffusion space 
+oldNormstring=cell(1,length(atlas_maps)+1);
+oldNormstring{1}=[ p '/wb' n x];
+for par=1:length(atlas_maps)
+atlas_par=[atlas_path '/' atlas_maps{par} x];
+oldNormstring(par+1)={atlas_par};
+end
+oldNormSub(oldNormstring,nfa, 8, 10,0 );
+
+for par=1:length(atlas_maps)
+movefile([atlas_path '/w' atlas_maps{par} x],[p '/' atlas_maps{par} x]);
+end
+if ~exist('track_mrtrix_tck','var'), track_mrtrix_tck=read_mrtrix_tracks([p '/all_' atlas ext '.tck']);, end
 tracks_mm=track_mrtrix_tck; % initialize the matrix needed to transform tracks from voxels to mm 
 total_tracks_int=length(tracks_mm.data); % calculate how many tracts were found between the two ROIs 
 
@@ -177,28 +185,23 @@ header.n_scalars=0;
         tracks_trk(nb_tracks).nPoints=length(tracks_mm.data{nb_tracks});
         end
         
-%  interpolated_trk=trk_interp(tracks_trk,100,[],0); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option 
-%  tracks_interp     = trk_flip(header, interpolated_trk, [1 1 1]);
-%  tracks_interp_str = trk_restruc(tracks_interp);
-% 
-hdr=spm_vol([p '/' atlas_maps{1} '.nii']);
-map=double(spm_read_vols(hdr)>0);
-m_test(:,1) = trk_add_sc_Emilie(header, tracks_interp_str, map, atlas_maps{1});
-for sc_map=2:length(atlas_maps) 
+for sc_map=1:length(atlas_maps) 
         hdr=spm_vol([p '/' atlas_maps{sc_map} '.nii']);
         map=double(spm_read_vols(hdr)>0);
-        m_test(:,sc_map) = trk_add_sc_Emilie(header, tracks_interp_str, map, atlas_maps{sc_map});
+        m_int(:,sc_map) = trk_atlas(header, tracks_trk, map, atlas_maps{sc_map});
 end 
 
-[m,index]=max(m_test,[],2);
+[m,index]=max(m_int,[],2);
 
 
 index_help=(1:1:total_tracks_int);
 
-% clean IFOF 
-        IFOF_index=(m~=0)&(index==1) & (m>0.5);
-        tracks_IFOF=tracks_trk(IFOF_index);
-        interpolated_trk=trk_interp(tracks_IFOF,101,[],1); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option 
+% clean atlas bundles 
+for atl=1:length(atlas_maps)
+        atlas_index=(m~=0)&(index==atl) & (m>0.5); % voting system, more than 50% needs to be part of the atlas
+        if sum(atlas_index)> 10
+        tracks_atlas=tracks_trk(atlas_index);
+        interpolated_trk=trk_interp(tracks_atlas,101,[],1); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option 
         tracks_interp     = trk_flip(header, interpolated_trk, [1 1 1]);
         track_mean=mean(tracks_interp,3);
         clear weights weights_param        
@@ -216,249 +219,54 @@ index_help=(1:1:total_tracks_int);
         weights_param(node,:)=mvnpdf(squeeze(tracks_interp(node,:,:))',mu,sigma)';     
         end
         
-        index_keep=(sum(weights<3)==101); % remove tracks that are more than 4 standard deviations away from tract mean 
-        lengths=trk_length(tracks_IFOF);
+        index_keep=(sum(weights<3)==101); % remove tracks that are more than 3 standard deviations away from tract mean 
+        lengths=trk_length(tracks_atlas);%calculate the lengths of all tracks 
         
-       int=index_help(IFOF_index);
-       tracks_IFOF=track_mrtrix_tck;
-       tracks_IFOF.data=track_mrtrix_tck.data(int( (index_keep) & (lengths>prctile(lengths,50)) ));
-       tracks_IFOF.total_count=sum(IFOF_index);
-      write_mrtrix_tracks(tracks_IFOF,[p '/IFOF.tck']);
+       int=index_help(atlas_index);
+       tracks_atlas=track_mrtrix_tck;
+       tracks_atlas.data=track_mrtrix_tck.data(int( (index_keep) & (lengths>prctile(lengths,50)) ));
+       tracks_atlas.total_count=sum(int( (index_keep) & (lengths>prctile(lengths,50)) ));
+       write_mrtrix_tracks(tracks_atlas,[p '/' atlas_maps{atl} '.tck']);
        
-       %trk
+       % save indices for a .trk
        int2=zeros(1,total_tracks_int);
-       int2(int( (index_keep) & (lengths>prctile(lengths,50)) ))=1;
-       IFOF_index=int2;
-%ILF       
-       ILF_index=(m~=0)&(index==2) & (m>0.5);
-       tracks_ILF=tracks_trk(ILF_index);
-        interpolated_trk=trk_interp(tracks_ILF,101,[],1); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option 
-        tracks_interp     = trk_flip(header, interpolated_trk, [1 1 1]);
-        track_mean=mean(tracks_interp,3);
-        clear weights weights_param        
-        for node=1:101
-        int=tril(cov(permute(tracks_interp(node,:,:),[3 2 1])));
-        cov_matrix=int([1:3 5:6 9]');
-        sigma=[cov_matrix(1:3)'
-               0 cov_matrix(4:5)'
-               0 0 cov_matrix(6)'];
-        sigma=sigma+sigma'-diag(diag(sigma));
-        mu=track_mean(node,:);
-        d=bsxfun(@minus,squeeze(tracks_interp(node,:,:))',mu);
-        % mahalanobis distance of each point on each fiber from the tract core  
-        weights(node,:)=sqrt(dot(d/(sigma),d,2))';
-        weights_param(node,:)=mvnpdf(squeeze(tracks_interp(node,:,:))',mu,sigma)';     
-        end
-        
-        index_keep=(sum(weights<3)==101); % remove tracks that are more than 4 standard deviations away from tract mean 
-        lengths=trk_length(tracks_ILF);
-        
-       int=index_help(ILF_index);
-       tracks_ILF=track_mrtrix_tck;
-       tracks_ILF.data=track_mrtrix_tck.data(int( (index_keep) & (lengths>prctile(lengths,50)) ));
-       tracks_ILF.total_count=sum(ILF_index);
-      write_mrtrix_tracks(tracks_ILF,[p '/ILF.tck']);
-       %trk
-       int2=zeros(1,total_tracks_int);
-       int2(int( (index_keep) & (lengths>prctile(lengths,50)) ))=1;
-       ILF_index=int2;
+       int2(int((index_keep) & (lengths>prctile(lengths,50))))=1;
+       atl_index_final(:,atl)=int2;
+        elseif sum(atlas_index)~=0
+       tracks_atlas=track_mrtrix_tck;
+       tracks_atlas.data=track_mrtrix_tck.data(atlas_index);
+       tracks_atlas.total_count=sum(atlas_index);
+       write_mrtrix_tracks(tracks_atlas,[p '/' atlas_maps{atl} '.tck']);
        
-%ARC1       
-       Arc1_index=(m~=0)&(index==3) & (m>0.5);
-       tracks_Arc1=tracks_trk(Arc1_index);
-        interpolated_trk=trk_interp(tracks_Arc1,101,[],1); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option
-        tracks_interp     = trk_flip(header, interpolated_trk, [1 1 1]);
-        track_mean=mean(tracks_interp,3);
-        clear weights weights_param
-        for node=1:101
-        int=tril(cov(permute(tracks_interp(node,:,:),[3 2 1])));
-        cov_matrix=int([1:3 5:6 9]');
-        sigma=[cov_matrix(1:3)'
-               0 cov_matrix(4:5)'
-               0 0 cov_matrix(6)'];
-        sigma=sigma+sigma'-diag(diag(sigma));
-        mu=track_mean(node,:);
-        d=bsxfun(@minus,squeeze(tracks_interp(node,:,:))',mu);
-        % mahalanobis distance of each point on each fiber from the tract core
-        weights(node,:)=sqrt(dot(d/(sigma),d,2))';
-        weights_param(node,:)=mvnpdf(squeeze(tracks_interp(node,:,:))',mu,sigma)';
-        end
-
-        index_keep=(sum(weights<3)==101); % remove tracks that are more than 4 standard deviations away from tract mean
-        lengths=trk_length(tracks_Arc1);
-
-       int=index_help(Arc1_index);
-       tracks_Arc1=track_mrtrix_tck;
-       tracks_Arc1.data=track_mrtrix_tck.data(int( (index_keep) & (lengths>prctile(lengths,50)) ));
-      tracks_Arc1.total_count=sum(Arc1_index);
-      write_mrtrix_tracks(tracks_Arc1,[p '/Arc1.tck']);
-              %trk
-       int2=zeros(1,total_tracks_int);
-       int2(int( (index_keep) & (lengths>prctile(lengths,50)) ))=1;
-       Arc1_index=int2;
-%ARC2       
-       Arc2_index=(m~=0)&(index==4) & (m>0.5);
-       tracks_Arc2=tracks_trk(Arc2_index);
-        interpolated_trk=trk_interp(tracks_Arc2,101,[],1); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option 
-        tracks_interp     = trk_flip(header, interpolated_trk, [1 1 1]);
-        track_mean=mean(tracks_interp,3);
-        clear weights weights_param        
-        for node=1:101
-        int=tril(cov(permute(tracks_interp(node,:,:),[3 2 1])));
-        cov_matrix=int([1:3 5:6 9]');
-        sigma=[cov_matrix(1:3)'
-               0 cov_matrix(4:5)'
-               0 0 cov_matrix(6)'];
-        sigma=sigma+sigma'-diag(diag(sigma));
-        mu=track_mean(node,:);
-        d=bsxfun(@minus,squeeze(tracks_interp(node,:,:))',mu);
-        % mahalanobis distance of each point on each fiber from the tract core  
-        weights(node,:)=sqrt(dot(d/(sigma),d,2))';
-        weights_param(node,:)=mvnpdf(squeeze(tracks_interp(node,:,:))',mu,sigma)';     
+       % save indices for a .trk
+       atl_index_final(:,atl)=atlas_index; 
         end
         
-        index_keep=(sum(weights<3)==101); % remove tracks that are more than 4 standard deviations away from tract mean 
-        lengths=trk_length(tracks_Arc2);
-        
-       int=index_help(Arc2_index);
-       tracks_Arc2=track_mrtrix_tck;
-       tracks_Arc2.data=track_mrtrix_tck.data(int( (index_keep) & (lengths>prctile(lengths,50)) ));
-      tracks_Arc2.total_count=sum(Arc2_index);
-      write_mrtrix_tracks(tracks_Arc2,[p '/Arc2.tck']);
-       
-              %trk
-       int2=zeros(1,total_tracks_int);
-       int2(int( (index_keep) & (lengths>prctile(lengths,50)) ))=1;
-       Arc2_index=int2;
-       
-%ARC3       
-       Arc3_index=(m~=0)&(index==5) & (m>0.5);
-       tracks_Arc3=tracks_trk(Arc3_index);
-        interpolated_trk=trk_interp(tracks_Arc3,101,[],1); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option 
-        tracks_interp     = trk_flip(header, interpolated_trk, [1 1 1]);
-        track_mean=mean(tracks_interp,3);
-        clear weights weights_param        
-        for node=1:101
-        int=tril(cov(permute(tracks_interp(node,:,:),[3 2 1])));
-        cov_matrix=int([1:3 5:6 9]');
-        sigma=[cov_matrix(1:3)'
-               0 cov_matrix(4:5)'
-               0 0 cov_matrix(6)'];
-        sigma=sigma+sigma'-diag(diag(sigma));
-        mu=track_mean(node,:);
-        d=bsxfun(@minus,squeeze(tracks_interp(node,:,:))',mu);
-        % mahalanobis distance of each point on each fiber from the tract core  
-        weights(node,:)=sqrt(dot(d/(sigma),d,2))';
-        weights_param(node,:)=mvnpdf(squeeze(tracks_interp(node,:,:))',mu,sigma)';     
-        end
-        
-        index_keep=(sum(weights<3)==101); % remove tracks that are more than 4 standard deviations away from tract mean 
-        lengths=trk_length(tracks_Arc3);
-        
-       int=index_help(Arc3_index);
-       tracks_Arc3=track_mrtrix_tck;
-       tracks_Arc3.data=track_mrtrix_tck.data(int( (index_keep) & (lengths>prctile(lengths,50)) ));
-       tracks_Arc3.total_count=sum(Arc3_index);
-       write_mrtrix_tracks(tracks_Arc3,[p '/Arc3.tck']);  
-              %trk
-       int2=zeros(1,total_tracks_int);
-       int2(int( (index_keep) & (lengths>prctile(lengths,50)) ))=1;
-       Arc3_index=int2;
-%UNC       
-      UNC_index=(m~=0)&(index==6) & (m>0.5);
-       tracks_UNC=tracks_trk(UNC_index);
-        interpolated_trk=trk_interp(tracks_UNC,101,[],1); % interpolate tracts into 100 nodes, will make the number of nodes uneven because of the tie at center option 
-        tracks_interp     = trk_flip(header, interpolated_trk, [1 1 1]);
-        track_mean=mean(tracks_interp,3);
-        clear weights weights_param        
-        for node=1:101
-        int=tril(cov(permute(tracks_interp(node,:,:),[3 2 1])));
-        cov_matrix=int([1:3 5:6 9]');
-        sigma=[cov_matrix(1:3)'
-               0 cov_matrix(4:5)'
-               0 0 cov_matrix(6)'];
-        sigma=sigma+sigma'-diag(diag(sigma));
-        mu=track_mean(node,:);
-        d=bsxfun(@minus,squeeze(tracks_interp(node,:,:))',mu);
-        % mahalanobis distance of each point on each fiber from the tract core  
-        weights(node,:)=sqrt(dot(d/(sigma),d,2))';
-        weights_param(node,:)=mvnpdf(squeeze(tracks_interp(node,:,:))',mu,sigma)';     
-        end
-        
-        index_keep=(sum(weights<3)==101); % remove tracks that are more than 4 standard deviations away from tract mean 
-        lengths=trk_length(tracks_UNC);
-        
-       int=index_help(UNC_index);
-       tracks_UNC=track_mrtrix_tck;
-       tracks_UNC.data=track_mrtrix_tck.data(int( (index_keep) & (lengths>prctile(lengths,50)) ));
-      tracks_UNC.total_count=sum(UNC_index);
-      write_mrtrix_tracks(tracks_UNC,[p '/UNC.tck']);         
-      
-        %trk
-       int2=zeros(1,total_tracks_int);
-       int2(int( (index_keep) & (lengths>prctile(lengths,50)) ))=1;
-       UNC_index=int2;
-
-track_density_IFOF=zeros(dim);
-track_density_ILF=zeros(dim);
-track_density_Arc1=zeros(dim);
-track_density_Arc2=zeros(dim);
-track_density_Arc3=zeros(dim);
-track_density_UNC=zeros(dim);
-
-% save trk        
-for i=1:length(tracks_trk)
-if IFOF_index(i)==1
-tracks_trk(i).matrix(:,4)=ones(1,length(tracks_trk(i).matrix));
-vox=ceil(tracks_trk(i).matrix(:,1:3)./repmat(header.voxel_size, tracks_trk(i).nPoints,1));
-[~,ind]=unique(vox,'rows');
-track_density_IFOF(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))=track_density_IFOF(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))+1;
-elseif ILF_index(i)==1
-tracks_trk(i).matrix(:,4)=2*ones(1,length(tracks_trk(i).matrix));    
-vox=ceil(tracks_trk(i).matrix(:,1:3)./repmat(header.voxel_size, tracks_trk(i).nPoints,1));
-[~,ind]=unique(vox,'rows');
-track_density_ILF(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))=track_density_ILF(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))+1;
-elseif Arc1_index(i)==1
-tracks_trk(i).matrix(:,4)=3*ones(1,length(tracks_trk(i).matrix));
-vox=ceil(tracks_trk(i).matrix(:,1:3)./repmat(header.voxel_size, tracks_trk(i).nPoints,1));
-[~,ind]=unique(vox,'rows');
-track_density_Arc1(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))=track_density_Arc1(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))+1;
-elseif Arc2_index(i)==1
-tracks_trk(i).matrix(:,4)=4*ones(1,length(tracks_trk(i).matrix));   
-vox=ceil(tracks_trk(i).matrix(:,1:3)./repmat(header.voxel_size, tracks_trk(i).nPoints,1));
-[~,ind]=unique(vox,'rows');
-track_density_Arc2(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))=track_density_Arc2(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))+1;
-elseif Arc3_index(i)==1
- tracks_trk(i).matrix(:,4)=5*ones(1,length(tracks_trk(i).matrix));  
- [~,ind]=unique(vox,'rows');
- track_density_Arc3(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))=track_density_Arc3(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))+1;
-
-elseif UNC_index(i)==1
-tracks_trk(i).matrix(:,4)=6*ones(1,length(tracks_trk(i).matrix));
-vox=ceil(tracks_trk(i).matrix(:,1:3)./repmat(header.voxel_size, tracks_trk(i).nPoints,1));
-[~,ind]=unique(vox,'rows');
-track_density_UNC(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))=track_density_UNC(sub2ind(dim,vox(ind,1),vox(ind,2),vox(ind,3)))+1;
-else
-delete(i)=1;         
 end
-end
-tracks_trk(delete>0)=[];
 
+
+track_density=zeros(dim(1),dim(2),dim(3),length(atlas_maps));
+
+    for i=1:length(tracks_trk)
+        if find(atl_index_final(i,:))
+    tracks_trk(i).matrix(:,4)=find(atl_index_final(i,:))*ones(1,length(tracks_trk(i).matrix));
+    vox=ceil(tracks_trk(i).matrix(:,1:3)./repmat(header.voxel_size, tracks_trk(i).nPoints,1));
+    [~,ind]=unique(vox,'rows');
+    track_density(sub2ind([dim(1),dim(2),dim(3),length(atlas_maps)],vox(ind,1),vox(ind,2),vox(ind,3),repmat(find(atl_index_final(i,:)),[length(ind),1])))=track_density(sub2ind([dim(1),dim(2),dim(3),length(atlas_maps)],vox(ind,1),vox(ind,2),vox(ind,3),repmat(find(atl_index_final(i,:)),[length(ind),1])))+1;
+        else 
+            delete_index(i)=1;
+        end
+    end
+ 
+tracks_trk(delete_index>0)=[];
+
+for atl=1:length(atlas_maps)
 hdr.dt=[8 0];
-hdr.fname=[p '/IFOF_TD.nii'];
-spm_write_vol(hdr,track_density_IFOF);
-hdr.fname=[p '/ILF_TD.nii'];
-spm_write_vol(hdr,track_density_ILF);
-hdr.fname=[p '/Arc1_TD.nii'];
-spm_write_vol(hdr,track_density_Arc1);
-hdr.fname=[p '/Arc2_TD.nii'];
-spm_write_vol(hdr,track_density_Arc2);
-hdr.fname=[p '/Arc3_TD.nii'];
-spm_write_vol(hdr,track_density_Arc3);
-hdr.fname=[p '/UNC_TD.nii'];
-spm_write_vol(hdr,track_density_UNC);
+hdr.fname=[p '/' atlas_maps{atl} '_TD.nii'];
+spm_write_vol(hdr,track_density(:,:,:,atl));
+end
 
-
+% convert Trck Density maps to MNI space 
 oldNormstring=cell(1,length(atlas_maps)+1);
 oldNormstring{1}=nfa;
 for par=1:length(atlas_maps)
@@ -467,6 +275,7 @@ oldNormstring(par+1)={DKI_par};
 end
 oldNormSub(oldNormstring,[ p '/wb' n x], 8, 8 );
 
+% mask Track density maps with different scalar maps 
 mkdir([p '/niistat_inputs/'])
 for par=1:length(scalar_maps)
 hdr=spm_vol([p '/w' dwi_name '_' scalar_maps{par} '_dki' x]);
@@ -475,11 +284,12 @@ vol=spm_read_vols(hdr);
  hdr=spm_vol([p '/w'  atlas_maps{td} '_TD' x]);
  track=spm_read_vols(hdr);
  combined=(track>0).*vol;
- hdr.fname=[p '/w' atlas_maps{td} '_' scalar_maps{par} x ];
+ hdr.fname=[p '/niistat_inputs/w' atlas_maps{td} '_' scalar_maps{par} x ];
  spm_write_vol(hdr,combined);
  end
 end
 
+% save language tracks in MNI space for surface 
 copyfile(nfa,[p '/int.nii'])
 m_coreg=coreg_DKI(nfa,[p '/wb' n '.nii'],[p '/int.nii'],p);    
 transform2=spm_vol([p '/wb' n '.nii']);
@@ -509,6 +319,7 @@ header_sc.n_scalars=1;
 header_sc.dim= header.dim;
 header_sc.voxel_size=header.voxel_size;
 trk_write(header_sc,tracks_trk,[p '/Language_tracks_MNI.trk'])
+
  
 function oldNormSub(src, tar, smoref, reg, interp)
 %coregister T2 to match T1 image, apply to lesion
