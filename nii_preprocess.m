@@ -155,7 +155,7 @@ fclose(fidout);
 
 kODF_nii_preprocess(fullfile(dtiDir,'ft_parameters_subj.txt'),dki_dt,dki_kt,dki_fa)
 param={'fa','md','dax','drad','mk','kax','krad','kfa'}; % calculate along tract stats of these metrics 
-DKI_tractography_along_tract_stats(imgs,atlas,100,param) % devide tracts in 100 nodes 
+DKI_tractography_along_tract_stats_2(imgs,atlas,100,param) % devide tracts in 100 nodes 
 
 
 function addLimeVersionSub(matName)
