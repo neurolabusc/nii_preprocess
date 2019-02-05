@@ -4,7 +4,7 @@ global dwi_name
 mask_lesion=1;
 [p, n, x] = fileparts(imgs.T1);
 [p_dki, n_dki , ~] = fileparts(imgs.DKI);
-if exist(imgs.Lesion,'var'), [p_lesion, ~ , ~] = fileparts(imgs.Lesion);  else mask_lesion=0; end
+if exist(imgs.Lesion), [p_lesion, ~ , ~] = fileparts(imgs.Lesion);  else mask_lesion=0; end
 atlas_path='/Users/Emilie/Box Sync/PhD_Projects/Recovery_Aphasia/atlas/Catani_atlas'; % make this a variable somewhere 
 
 
