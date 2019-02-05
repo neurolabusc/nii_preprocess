@@ -11,7 +11,6 @@ mask_lesion=1;
 if exist(imgs.Lesion), [p_lesion, ~ , ~] = fileparts(imgs.Lesion);  else mask_lesion=0; end
 atlas_path = fullfile(fileparts(which('nii_preprocess')), 'catani_atlas');
 
-
 if exist([p '/scalars_mean_' atlas '.mat'],'file') || exist([p '/scalars_mean_' atlas '_excl.mat'],'file')
     fprintf('Skipping DKI tractography with atlas: %s\n', atlas); 
     return
@@ -79,18 +78,13 @@ clear temp count
 %%
 
 % initialize 
-if mod(nb_nodes,2)==0, nb_nodes=nb_nodes+1;end % when using tie at center you need uneven number of points
-
 
 total_tracks=zeros(length(combinations),1);
 total_tracks_final=zeros(max(ROI(:)),max(ROI(:)));
 
-%track_mrtrix=cell(length(combinations),10000);
-
 pixel_size = abs(diag(hdr.mat))';
 pixel_size = pixel_size(1:3); 
 transform=hdr.mat; % transformation matrix used to calculate tranformation from world coordinate space to image space 
-
 dim=hdr.dim;
 
 mkdir([p '/temp']);
