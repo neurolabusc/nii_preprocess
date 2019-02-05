@@ -50,12 +50,12 @@ else
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=(1:max(ROI(:))); % if JHU do only language specific and domain general ROIs     
 end
-
-if mask_lesion && exist([p_lesion '/exclude' x],file)
+%made exclude mask in T1 space 
+if mask_lesion && exist([p_lesion '/exclude' x],'file')
     nfa=[p '/n' dwi_name '_fa_dki' x];
     copyfile([p '/wb' n x],[p '/Twb' n x]);
     oldNormSub({[ p '/b' n x],[p_lesion '/exclude' x]},nfa,8,10,0);
-    copyfile([p '/Twb' n x],[p '/wb' n x]); % do not overwrite original wbT1
+    copyfile([p '/Twb' n x],[p '/wb' n x]); % step included to not overwrite original wbT1
     movefile([p '/wexclude' x],[p '/DKI_exclude' x]);
     lesion = ['-exclude ' p_dki '/DKI_exclude.nii'];
     ext='_excl';
