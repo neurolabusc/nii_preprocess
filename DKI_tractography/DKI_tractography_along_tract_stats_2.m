@@ -10,11 +10,11 @@ mask_lesion=1;
 [p_dki, n_dki , ~] = fileparts(imgs.DKI);
 if exist(imgs.Lesion), [p_lesion, ~ , ~] = fileparts(imgs.Lesion);  else mask_lesion=0; end
 atlas_path = fullfile(fileparts(which('nii_preprocess')), 'catani_atlas');
-
-if exist([p '/scalars_mean_' atlas '.mat'],'file') || exist([p '/scalars_mean_' atlas '_excl.mat'],'file')
-    fprintf('Skipping DKI tractography with atlas: %s\n', atlas); 
-    return
-end
+% 
+% if exist([p '/scalars_mean_' atlas '.mat'],'file') || exist([p '/scalars_mean_' atlas '_excl.mat'],'file')
+%     fprintf('Skipping DKI tractography with atlas: %s\n', atlas); 
+%     return
+% end
 
 %create gm-wm interface for seeding purposes 
 if ~exist([p '/5tt_' n x],'file')
@@ -40,8 +40,8 @@ if strcmpi(atlas,'jhu')
     atlasext = '_roi';
     hdr=spm_vol([ p_dki '/' n_dki  atlasext x]);
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
-    %index_ROI=[1:2:93,96,97,99,113,115,167,182:2:188]; % left gray matter
-    index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
+    index_ROI=[1:2:93,96,97,99,113,115,167,182:2:188]; % left gray matter
+    %index_ROI=[7 11 15 31 35 37 39 184 186 1 9 13 25 27 29 49 69 71 41 43]; % uncomment for only language specific and domain general ROIs  
     %index_ROI=[1:max(ROI(:))];
 else
     atlasext = ['_roi_' atlas];
@@ -266,20 +266,20 @@ DKI_par=[p '/' atlas_maps{par} '_TD.nii'];
 oldNormstring(par+1)={DKI_par};
 end
 oldNormSub(oldNormstring,[ p '/wb' n x], 8, 8 );
-
-% mask Track density maps with different scalar maps 
-mkdir([p '/niistat_inputs/'])
-for par=1:length(scalar_maps)
-hdr=spm_vol([p '/w' dwi_name '_' scalar_maps{par} '_dki' x]);
-vol=spm_read_vols(hdr);
- for td=1:length(atlas_maps)
- hdr=spm_vol([p '/w'  atlas_maps{td} '_TD' x]);
- track=spm_read_vols(hdr);
- combined=(track>0).*vol;
- hdr.fname=[p '/niistat_inputs/w' atlas_maps{td} '_' scalar_maps{par} x ];
- spm_write_vol(hdr,combined);
- end
-end
+% 
+% % mask Track density maps with different scalar maps 
+% mkdir([p '/niistat_inputs/'])
+% for par=1:length(scalar_maps)
+% hdr=spm_vol([p '/w' dwi_name '_' scalar_maps{par} '_dki' x]);
+% vol=spm_read_vols(hdr);
+%  for td=1:length(atlas_maps)
+%  hdr=spm_vol([p '/w'  atlas_maps{td} '_TD' x]);
+%  track=spm_read_vols(hdr);
+%  combined=(track>0).*vol;
+%  hdr.fname=[p '/niistat_inputs/w' atlas_maps{td} '_' scalar_maps{par} x ];
+%  spm_write_vol(hdr,combined);
+%  end
+% end
 
 % save language tracks in MNI space for surface 
 copyfile(nfa,[p '/int.nii'])
