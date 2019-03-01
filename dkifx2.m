@@ -32,8 +32,8 @@ if ~exist('Mask_nam','var')  %Mask_nam not specified
 else
     if ~exist(Mask_nam, 'file'), error('Unable to find %s', Mask_nam); end;
 end
-[p,n] = fileparts(bval_nam);
-dwi_name= [n dwi_name];
+[p,n] = fileparts(DWI_nam(1:end-3)); % this was originally bval name but would give bugs if you had both PA and AP
+dwi_name= n;
 bvec_nam = fullfile(p, [dwi_name '.eddy_rotated_bvecs']);
 if ~exist(DWI_nam,'file'), error('Unable to find %s',DWI_nam); end;
 if ~exist(bvec_nam,'file'), error('Unable to find %s',bvec_nam); end;
@@ -46,7 +46,7 @@ load(bval_nam)
 load(bvec_nam)
 
 if exist('DTI_99_DTI_dir42_AP_4') & (length(DTI_99_DTI_dir42_AP_4)==99)
-dwi_name= [n dwi_name];
+dwi_name= [dwi_name 'n']; % add n for normalization 
 b0i=find(DTI_99_DTI_dir42_AP_4==5);
 b1000i=find(abs([DTI_99_DTI_dir42_AP_4]-1000)<100); % b=1000 fluctuates from 990-1010
 b2000i=find(abs([DTI_99_DTI_dir42_AP_4]-2000)<100);

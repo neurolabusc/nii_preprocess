@@ -426,7 +426,7 @@ if exist('isDki','var') && (isDki)
     dwi_name='d';
 dki_d=prepostfixSub('', dwi_name, imgs.DKI);
 if exist(imgs.DKIrev)
-    dti_dr=prepostfixSub('', dwi_name, imgs.DKI);
+    dki_dr=prepostfixSub('', dwi_name, imgs.DKI);
 end;
 if isempty(ForceDTI) && exist(dki_d, 'file')
    fprintf('Skipping DTI denoising: found %s\n', dki_d);
@@ -435,7 +435,7 @@ else
     degibbs = (mm > 1.9); %partial fourier used for HCP 1.5mm isotropic images
     dki_d = nii_dwidenoise (imgs.DKI, degibbs);
     if exist(imgs.DKIrev)
-        dti_dr = nii_dwidenoise (imgs.DKIrev, degibbs);
+        dki_dr = nii_dwidenoise (imgs.DKIrev, degibbs);
     end;
 end;
 
@@ -443,7 +443,7 @@ end;
     %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
     %if isEddyCuda7Sub()
     if HalfSphere(imgs.DKI)
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh']; %% needs to be changed to turn of dtifit 
+        command= [fileparts(which(mfilename)) filesep 'dki_1_eddy_cuda_half.sh'];  
     else
         command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh']; %% needs to be changed to turn of dtifit 
         %command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
@@ -451,7 +451,12 @@ end;
     %else
     %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
     %end
+     if isempty(imgs.DKIrev)
     command=sprintf('%s "%s"',command, dki_d);
+     else
+    command=sprintf('%s "%s" "%s"',command, dki_d, dki_dr);
+     end
+     
     doFslCmd (command);
     dwi_name='du';
     doDkiCoreSub(imgs.T1, imgs.DKI, matName)
@@ -473,7 +478,7 @@ if ~exist(mask,'file'),  error('unable to find %s\n', mask); return; end;
 %if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
 dti_u=prepostfixSub('', dwi_name, DTI);
 [pth,nam] = filepartsSub(DTI);
-bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
+bvalnm = fullfile(pth, [nam, 'dboth.bval']); %assume topup
 if ~exist(bvalnm, 'file')
     bvalnm = fullfile(pth, [nam, '.bval']);
 end
