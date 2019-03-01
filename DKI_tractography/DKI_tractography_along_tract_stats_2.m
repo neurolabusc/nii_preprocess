@@ -32,7 +32,7 @@ else
 end
 
 %%
-% threshold gmwm interface at 50% chance 
+% threshold gmwm interface at 0% chance 
 gmwm=spm_read_vols(spm_vol([p '/gmwmi_' n x]));
 gmwm=gmwm>0; % threshold was picked arbitrary, could likely be optimized 
 
@@ -107,8 +107,6 @@ system(command);
 command=['tckedit ' p '/temp/seed_include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck ' p '/temp/include_seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck ' p '/temp/combined_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck -force -quiet'];
 system(command);
         
-%% Calculate along tract metrics (cite John Colby work: https://www.sciencedirect.com/science/article/pii/S1053811911012833?via%3Dihub and mrDiffusion) 
-
 tracks = read_mrtrix_tracks ([ p '/temp/combined_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck']); % tracks from mrtrix are in world coordinates (voxels) 
 delete([p '/temp/seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii'],[p '/temp/include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.nii'],[p '/temp/seed_include_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck'],[p '/temp/include_seed_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck'],[p '/temp/combined_' num2str(combinations(i,1)) '_' num2str(combinations(i,2)) '.tck']);
 total_tracks(i)=length(tracks.data); % calculate how many tracts were found between the two ROIs 
@@ -266,20 +264,20 @@ DKI_par=[p '/' atlas_maps{par} '_TD.nii'];
 oldNormstring(par+1)={DKI_par};
 end
 oldNormSub(oldNormstring,[ p '/wb' n x], 8, 8 );
-% 
-% % mask Track density maps with different scalar maps 
-% mkdir([p '/niistat_inputs/'])
-% for par=1:length(scalar_maps)
-% hdr=spm_vol([p '/w' dwi_name '_' scalar_maps{par} '_dki' x]);
-% vol=spm_read_vols(hdr);
-%  for td=1:length(atlas_maps)
-%  hdr=spm_vol([p '/w'  atlas_maps{td} '_TD' x]);
-%  track=spm_read_vols(hdr);
-%  combined=(track>0).*vol;
-%  hdr.fname=[p '/niistat_inputs/w' atlas_maps{td} '_' scalar_maps{par} x ];
-%  spm_write_vol(hdr,combined);
-%  end
-% end
+
+% mask Track density maps with different scalar maps 
+mkdir([p '/niistat_inputs/'])
+for par=1:length(scalar_maps)
+hdr=spm_vol([p '/w' dwi_name '_' scalar_maps{par} '_dki' x]);
+vol=spm_read_vols(hdr);
+ for td=1:length(atlas_maps)
+ hdr=spm_vol([p '/w'  atlas_maps{td} '_TD' x]);
+ track=spm_read_vols(hdr);
+ combined=(track>0).*vol;
+ hdr.fname=[p '/niistat_inputs/w' atlas_maps{td} '_' scalar_maps{par} x ];
+ spm_write_vol(hdr,combined);
+ end
+end
 
 % save language tracks in MNI space for surface 
 copyfile(nfa,[p '/int.nii'])
