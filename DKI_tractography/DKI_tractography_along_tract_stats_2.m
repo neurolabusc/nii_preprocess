@@ -6,6 +6,7 @@ atlas_maps={'Inferior_Occipito_Frontal_Fasciculus_Left','Inferior_Longitudinal_F
 end
 
 mask_lesion=1;
+
 [p, n, x] = fileparts(imgs.T1);
 [p_dki, n_dki , ~] = fileparts(imgs.DKI);
 if exist(imgs.Lesion), [p_lesion, ~ , ~] = fileparts(imgs.Lesion);  else mask_lesion=0; end
@@ -49,7 +50,8 @@ else
     ROI=spm_read_vols(hdr);  % read in atlas ROIs in native diffusion space
     index_ROI=(1:max(ROI(:))); % if JHU do only language specific and domain general ROIs     
 end
-%made exclude mask in T1 space 
+%made exclude mask in T1 space , warp exclude.nii into native diffusion
+%space. 
 if mask_lesion && exist([p_lesion '/exclude' x],'file')
     nfa=[p '/n' dwi_name '_fa_dki' x];
     copyfile([p '/wb' n x],[p '/Twb' n x]);
@@ -140,7 +142,7 @@ track_mrtrix_tsf.count=num2str(1);
 track_mrtrix_tsf.total_count=num2str(counter);
 write_mrtrix_tsf(track_mrtrix_tsf,[p '/all_' atlas ext '.tsf']);
 else
-       fprintf('Skipping tractography: found %s\n', ['all_' atlas ext '.tck']);
+       fprintf('Skipping tractography: found %s\n', ['all_' atlas ext '.tck']); % dont do tractography if .tck is already created, but load in outputs for the rest of the script
        load([p '/total_tracks_' atlas ext '.mat']);
        track_mrtrix_tck=read_mrtrix_tracks([p '/all_' atlas ext '.tck']);
        total_tracks=zeros(1,length(combinations)+1); 
@@ -180,7 +182,7 @@ header.n_scalars=0;
 tracks_trk=repmat(struct,1,length(track_mrtrix_tck.data)); %initialize
 
         for nb_tracks=1:length(track_mrtrix_tck.data)
-        int=transform\[track_mrtrix_tck.data{nb_tracks} ones(length(track_mrtrix_tck.data{nb_tracks}),1)]'; % transform to image space
+        int=transform\[track_mrtrix_tck.data{nb_tracks} ones(length(track_mrtrix_tck.data{nb_tracks}),1)]'; % transform tracks to image space
         tracks_mm.data{nb_tracks}=int(1:3,:)'.*repmat(pixel_size,length(track_mrtrix_tck.data{nb_tracks}),1);  % convert to mm 
         end
 
@@ -189,13 +191,14 @@ tracks_trk=repmat(struct,1,length(track_mrtrix_tck.data)); %initialize
         tracks_trk(nb_tracks).nPoints=length(tracks_mm.data{nb_tracks});
         end
         
+% Calculate overlap between atlas and tracks: sample the atlas values at the coordinates of the tracks.         
 for sc_map=1:length(atlas_maps) 
         hdr=spm_vol([p '/' atlas_maps{sc_map} '.nii']);
         map=double(spm_read_vols(hdr)>0);
         m_int(:,sc_map) = trk_atlas(header, tracks_trk, map, atlas_maps{sc_map});
 end 
 
-[m,index]=max(m_int,[],2);
+[m,index]=max(m_int,[],2); % count with which atlas the .trk overlaped the most. 
 
 
 index_help=(1:1:total_tracks_int);
@@ -263,7 +266,7 @@ track_density=zeros(dim(1),dim(2),dim(3),length(atlas_maps));
     end
  
 tracks_trk(delete_index>0)=[];
-
+% save track density maps 
 for atl=1:length(atlas_maps)
 hdr.dt=[8 0];
 hdr.fname=[p '/' atlas_maps{atl} '_TD.nii'];
@@ -279,7 +282,7 @@ oldNormstring(par+1)={DKI_par};
 end
 oldNormSub(oldNormstring,[ p '/wb' n x], 8, 8 );
 
-% save language tracks in MNI space for surface 
+% save language tracks in MNI space for surfice 
 copyfile(nfa,[p '/int.nii'])
 m_coreg=coreg_DKI(nfa,[p '/wb' n '.nii'],[p '/int.nii'],p);    
 transform2=spm_vol([p '/wb' n '.nii']);
@@ -373,7 +376,7 @@ ROI2=(ROI==combinations(j,2))& (gmwm>0);
     int=all_index((sum(all==[1,0,0,1],2)==4)>0); 
     [~,B]=ismember(int,all_index_subset);
          
-    interpolated_trk_flip(:,:,B)=interpolated_trk(fliplr(1:end),:,B); % flip tracks that start in ROI1 
+    interpolated_trk_flip(:,:,B)=interpolated_trk(fliplr(1:end),:,B); % flip tracks that start in ROI1 , as such when we interpolate all tracts start at the same location 
    
     % write tracts
     track_mrtrix_tsf=track_mrtrix_tck;

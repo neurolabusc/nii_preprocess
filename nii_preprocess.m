@@ -138,6 +138,7 @@ if ~exist(dki_kt,'file')
     fprintf('Can not find tensors %s\n',dki_kt);
     return;
 end   
+% make parameters file for kODF_nii_preprocess 
 fid=fopen(fullfile(fileparts(mfilename('fullpath')),'DKI_tractography','ft_parameters.txt')); % original ft_parameters in nii_preprocess
 fout=fullfile(dtiDir,'ft_parameters_subj.txt'); % new ft_parameters 
 fidout=fopen(fout,'w');
