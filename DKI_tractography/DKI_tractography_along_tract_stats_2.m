@@ -141,6 +141,7 @@ write_mrtrix_tracks(track_mrtrix_tck,[p '/all_' atlas ext '.tck']);
 track_mrtrix_tsf.count=num2str(1);
 track_mrtrix_tsf.total_count=num2str(counter);
 write_mrtrix_tsf(track_mrtrix_tsf,[p '/all_' atlas ext '.tsf']);
+total_tracks=[0 ;total_tracks];
 else
        fprintf('Skipping tractography: found %s\n', ['all_' atlas ext '.tck']); % dont do tractography if .tck is already created, but load in outputs for the rest of the script
        load([p '/total_tracks_' atlas ext '.mat']);
