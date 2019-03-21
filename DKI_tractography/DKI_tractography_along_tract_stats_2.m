@@ -462,9 +462,9 @@ end
 total_tracks=[1,total_tracks];    % offset total_tracks with 1    
 
         for scal=1:length(scalar_maps)
-          command=['tcksample ' p '/along_tract_metrics/all.tck ' p '/sDKIdu_' scalar_maps{scal} '_dki.nii ' p '/along_tract_metrics/' scalar_maps{scal} '.txt -force']  ;
+          command=['tcksample ' p '/along_tract_metrics/all.tck ' p '/' dwi_name '_' scalar_maps{scal} '_dki.nii ' p '/along_tract_metrics/' scalar_maps{scal} '.txt -force']  ;
           [~,~]=system(command);
-          command=['tcksample ' p '/along_tract_metrics/all.tck ' p '/sDKIdu_' scalar_maps{scal} '_dki.nii ' p '/along_tract_metrics/' scalar_maps{scal} '.tsf -force']  ;
+          command=['tcksample ' p '/along_tract_metrics/all.tck ' p '/' dwi_name '_' scalar_maps{scal} '_dki.nii ' p '/along_tract_metrics/' scalar_maps{scal} '.tsf -force']  ;
           [~,~]=system(command);
 
           sample=load([p '/along_tract_metrics/' scalar_maps{scal} '.txt' ]);
