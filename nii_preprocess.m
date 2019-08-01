@@ -218,7 +218,7 @@ if ~exist(eT1,'file'), fprintf('doVBM unable to find %s\n', eT1); return; end; %
 global ForceVBM; %e.g. user can call "global ForceVBM;  ForceVBM = true;"
 
 %call nii_VBM, only needs eT1 as parameter
-nii_VBM(eT1);
+%nii_VBM(eT1);
 
 %add results to matName
 
