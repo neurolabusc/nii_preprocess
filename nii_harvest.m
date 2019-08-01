@@ -10,14 +10,14 @@ function nii_harvest (baseDir)
 %POLAR STUDY ONLY
 %outDir = '/media/research/POLAREXP/POLAR_Master_In';
 %baseDir = '/media/research/POLAREXP/POLAR_Master_Db'; %'/Root'
-outDir = '/media/research/POLAREXP/POLAR_Master_In';
-baseDir = '/media/research/POLAREXP/POLAR_Master_Db';
+%outDir = '/media/research/POLAREXP/POLAR_Master_In';
+%baseDir = '/media/research/POLAREXP/POLAR_Master_Db';
 
 
 
-%JILL STEWART ONLY
-%outDir = '/home/research/Desktop/JILL_STEWART/JILL_PILOT/Master_IN';
-%baseDir = '/home/research/Desktop/JILL_STEWART/JILL_PILOT/Master_DB';
+%Big Data Master Chief Backup
+outDir = '/media/coffee/BigData1/MasterChief_12-12-2018/Master_In';
+baseDir = '/media/coffee/BigData1/MasterChief_12-12-2018/Master_DB';
 
 %BRIE INTERPERSONAL CORRELATION ONLY
 %outDir = '/home/research/Desktop/BRIE_PILOT/Master_IN';
@@ -28,12 +28,13 @@ baseDir = '/media/research/POLAREXP/POLAR_Master_Db';
 % baseDir = '/home/research/DB';
 
 isExitAfterTable = false; % <- if true, only generates table, does not process data
-isPreprocess = true; % <- if true full processing, otherwise just cropping
+isPreprocess = false; % <- if true full processing, otherwise just cropping
 isReportDims = false; %if true, report dimensions of raw data
-reprocessRest = false;
+reprocessRest = true;
 reprocessfMRI = false;
 reprocessASL = false;
 reprocessDTI = false;
+reprocessVBM = false;
 
 %outDir = '/media/UBU/Master_In/';
 %baseDir = '/media/UBU/Master_DB/'; %'/Root'
@@ -51,7 +52,7 @@ subjDirs = sort(subjDirs);
 %subjDirs = subjDirs(86:98);  % 1-50 of Polar, rest on other box - RN
 %subjDirs = subjDirs(1); % temporary, for testing only!!! -- GY
 %subjDirs = { 'M10413'; 'M10463'}; 
-subjDirs = {'M10432'};
+%subjDirs = {'M10432'};
 
 modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
 modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
@@ -144,10 +145,12 @@ for s =  1: nSubj
     global ForceRest;
     global ForceASL;
     global ForceDTI;
+    global ForceVBM;
     ForcefMRI=[];
     ForceRest=[];
     ForceASL=[];
     ForceDTI =[];
+    ForceVBM = [];
     %666x - 
     %imgs(s).nii.fMRI.newImg = false;
     %imgs(s).nii.Rest.newImg = false;
@@ -171,6 +174,11 @@ for s =  1: nSubj
     end
     if reprocessASL && isfield(imgs(s).nii.ASL,'img')
         ForceASL = true;
+        anyNewImg = true;
+    end
+    
+     if reprocessVBM && isfield(imgs(s).nii.T1,'img')
+        ForceVBM = true;
         anyNewImg = true;
     end
     
@@ -311,6 +319,7 @@ end;
 if isfield(m,'fMRIave') && isfield(imgs.nii.fMRI, 'x')
     imgs.nii.fMRI.newImg = ~endsWithSub(m.fMRIave.hdr.fname, ['_',imgs.nii.fMRI.x,'.nii']);
 end;
+
 %for i = 1: numel(f)
 %    fprintf('%s %d\n', f{i}, imgs.nii.(f{i}).newImg);
 %end

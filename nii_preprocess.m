@@ -72,6 +72,9 @@ if true
     imgs = dofMRISub(imgs, matName);
     %666x <-
     
+    %666 VBM
+    imgs = doVBMSub(imgs, matName);   
+    
     tStart = timeSub(tStart,'fMRI');
     %warning('Skipping DTI');
     if true
@@ -202,6 +205,26 @@ ax  = axes('Position',[0.0 0.1 1.0 1.0],'Visible','off','Parent',fig);
 [~,n] = filepartsSub(fnm);
 text(pos(1)+0.0,pos(2)+0.01, n,'Parent',ax, 'FontSize',8, 'fontn','Arial', 'color','red');
 %end orthSub()
+
+
+%adding RNN 666 
+function imgs = doVBMSub(imgs, matName)
+
+%these lines confirm presence of eT1 (stolen from doDTISub)
+eT1 = prefixSub('e',imgs.T1); %enantimorphic image
+if ~exist(eT1,'file'), eT1 = imgs.T1; end; %if no lesion, use raw T1
+if ~exist(eT1,'file'), fprintf('doVBM unable to find %s\n', eT1); return; end; %required
+
+global ForceVBM; %e.g. user can call "global ForceVBM;  ForceVBM = true;"
+
+%call nii_VBM, only needs eT1 as parameter
+nii_VBM(eT1);
+
+%add results to matName
+
+%end doVBMSub()
+
+
 
 function imgs = dofMRISub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.fMRI), return; end; %required
@@ -764,6 +787,7 @@ for i = 1: nROI
         command=sprintf('%s -x "%s" --dir="%s" --forcedir  -P %d -s "%s" -m "%s" --opd --pd -l -c 0.2 --distthresh=0', ...
             exeName, maski, prob_diri, nPerm ,bed_merged, bed_mask );
         commands = [commands {command}]; %#ok<AGROW>
+    fprintf("%s\n", command);
     %end %if voxels survive
 end %for each region
 if numel(commands) < 1
@@ -978,12 +1002,37 @@ if ~exist(fsldir,'dir')
 end
 %end fslDirSub()
 
+% function fslEnvSub
+% fsldir = fslDirSub;
+% curpath = getenv('PATH');
+% k = strfind(curpath, fsldir);
+% if isempty(k)
+% 	setenv('PATH',sprintf('%s:%s',fullfile(fsldir,'bin'),curpath));
+% end
+% %end fslEnvSub()
+
 function fslEnvSub
 fsldir = fslDirSub;
 curpath = getenv('PATH');
 k = strfind(curpath, fsldir);
 if isempty(k)
 	setenv('PATH',sprintf('%s:%s',fullfile(fsldir,'bin'),curpath));
+end
+%next code for GPUs...
+ldpath = getenv('LD_LIBRARY_PATH');
+if contains(ldpath,'cuda') return; end %cuda already in LD path
+%look for all /usr/local/cuda* folders
+pth = '/usr/local/';
+d = dir([pth, '*']);
+isub = [d(:).isdir];
+d = {d(isub).name}';
+dcuda = d(contains(d,'cuda'));
+if isempty(dcuda), fprintf('GPU tools may fail: Unable to find cuda folders in %s', pth); end 
+for i = 1 : numel(dcuda)
+    cudalib=[[pth, dcuda{i}], filesep, 'lib64'];
+    if ~exist(cudalib), continue; end
+    fprintf('LD_LIBRARY_PATH now includes %s\n', cudalib); 
+    setenv('LD_LIBRARY_PATH',sprintf('%s:%s',cudalib,ldpath));
 end
 %end fslEnvSub()
 
@@ -1093,8 +1142,11 @@ end; %required
 nii_nii2mat (prefixSub(rest_prefix,imgs.Rest), 'rest', matName) % slightly modified by GY, March 3
 nii_nii2mat (prefixSub(['palf_dsw', prefix ],imgs.Rest), 'alf', matName) %detrended
 nii_nii2mat (prefixSub(['palf_sw', prefix ],imgs.Rest), 'palf', matName) %conventional linear trends only
+vox2mat(prefixSub(['mean' ],imgs.Rest), 'NativeRestAve', matName); %no prefix: prior to slice time
 vox2mat(prefixSub(['wmean' ],imgs.Rest), 'RestAve', matName); %no prefix: prior to slice time
-vox2mat(prefixSub(['wbmean' ],imgs.Rest), 'RestAve', matName);
+%vox2mat(prefixSub(['wbmean' ],imgs.Rest), 'RestAve', matName);
+vox2mat(prefixSub(['wbmaskmean' ],imgs.Rest), 'RestAve', matName); % Grigori added "mask"
+
 %end doRestSub()
 
 function delImgs(prefix, fnm)

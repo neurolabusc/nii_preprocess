@@ -44,8 +44,12 @@ echo "Filenames dti= $dti dtir=$dtir"
 eddyExeName=eddy_openmp
 if  [[ $PATH == *"cuda"* ]]; then
   eddyExeName=eddy_cuda7.0
+  if  [[ $PATH == *"cuda-9.1"* ]]; then
+	eddyExeName=eddy_cuda9.1
+  fi
   if ! hash $eddyExeName 2>/dev/null; then
 	eddyExeName=eddy_cuda8.0
+
   fi
   echo "cuda found in path: will use $eddyExeName"
 else

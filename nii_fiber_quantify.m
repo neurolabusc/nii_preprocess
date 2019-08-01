@@ -71,6 +71,9 @@ function mtx = loadMtxSub(fnm, nROI)
 %load raw binary little-endian double-precision matrix
 num = nROI * nROI;
 f=dir(fnm);
+if (isempty(f)) 
+   error('Unable to find %s\n', fnm); 
+end
 if (f.bytes ~= (num * 8))
 	error('Incorrect file size (expected %d*%d*8 bytes) %s', nROI, nROI, fnm);
 end
