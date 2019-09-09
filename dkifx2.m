@@ -5,7 +5,6 @@ function dkifx2 (DWI_nam, bval_nam, Mask_nam, Smooth,param)
 %Example
 % dkifx2; %use GUI
 % dkifx2('ddki_ecc.nii.gz', 'dki.bval', 'ddki_mask.nii.gz', false, true)
-global dwi_name
 %check requirements
 isDeleteTempImages = false; %if true, we will delete intermediate images
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
@@ -35,9 +34,11 @@ end
 [p,n] = fileparts(DWI_nam(1:end-3)); % this was originally bval name but would give bugs if you had both PA and AP
 dwi_name= n;
 bvec_nam = fullfile(p, [dwi_name '.eddy_rotated_bvecs']);
-if ~exist(DWI_nam,'file'), error('Unable to find %s',DWI_nam); end;
-if ~exist(bvec_nam,'file'), error('Unable to find %s',bvec_nam); end;
-if ~exist(bval_nam,'file'), error('Unable to find %s',bval_nam); end;
+
+
+if ~exist(DWI_nam,'file'), warning('Skipping McKinnon DKI: Unable to find %s',DWI_nam); return; end;
+if ~exist(bvec_nam,'file'), warning('Skipping McKinnon DKI: Unable to find %s',bvec_nam); return; end;
+if ~exist(bval_nam,'file'), warning('Skipping McKinnon DKI: Unable to find %s',bval_nam); return; end;
 %load data
 fprintf('%s version 7/2017 loading data\n', mfilename);
 
@@ -188,6 +189,7 @@ cmd = '';
 if ~isempty(mask)
     cmd = [' -mask "', mask, '" '];
 end
+%cmd = sprintf('%s %s -force -fslgrad "%s" "%s" -dkt "%s" "%s" "%s"', exenam, cmd, bvec_nam, bval_nam,  dkt, dwi,  dt);
 cmd = sprintf('%s %s -quiet -force -fslgrad "%s" "%s" -dkt "%s" "%s" "%s"', exenam, cmd, bvec_nam, bval_nam,  dkt, dwi,  dt);
 %cmd = fslCmdSub (cmd);
 status = systemSub(cmd);

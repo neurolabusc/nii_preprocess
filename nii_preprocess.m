@@ -115,11 +115,10 @@ if ~exist(pth,'file'), pth = ''; end;
 %printDTISub(imgs, fullfile(pth,'MasterDTI')); %show results - DTI
 nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (spm_clf) show results - except DTI
 diary off
-clear global dwi_name
 %nii_preprocess()
 
 function doDkiTractSub(imgs,matName,dtiDir,atlas)
-global dwi_name
+dwi_name = dki_dwiname(imgs.DKI);
 dki = imgs.DKI; 
 [p,~]=fileparts(dki);
 if ~exist('atlas','var'),
@@ -435,7 +434,6 @@ spm_write_vol(hdr,img);
 %end rescaleSub()
 
 function doDkiSub(imgs, matName, isDki)
-global dwi_name
 if exist('isDki','var') && (isDki)
     if ~isfield(imgs,'DKI'), return; end;
     if isempty(imgs.DKI), return; end; %nothing to do!
@@ -443,14 +441,13 @@ if exist('isDki','var') && (isDki)
     if isempty(ForceDTI) && isFieldSub(matName, 'mk_dki')
         fprintf('Skipping MK estimates: already computed\n')
         [~,n,~]=filepartsSub(imgs.DKI);
-        if exist(prepostfixSub('s','du',imgs.DKI),'file'), dwi_name=['s' n 'du']; else dwi_name=['/s' n 'dun']; end
         return;
     end; %stats already exist
     %preprocess - denoise
-    dwi_name='d';
-dki_d=prepostfixSub('', dwi_name, imgs.DKI);
+    temp='d';
+dki_d=prepostfixSub('', temp, imgs.DKI);
 if exist(imgs.DKIrev)
-    dki_dr=prepostfixSub('', dwi_name, imgs.DKI);
+    dki_dr=prepostfixSub('', temp, imgs.DKI);
 end;
 if isempty(ForceDTI) && exist(dki_d, 'file')
    fprintf('Skipping DTI denoising: found %s\n', dki_d);
@@ -482,7 +479,6 @@ end;
      end
      
     doFslCmd (command);
-    dwi_name='du';
     doDkiCoreSub(imgs.T1, imgs.DKI, matName)
 else
     doDkiCoreSub(imgs.T1, imgs.DTI, matName);
@@ -490,7 +486,6 @@ end
 %end doDkiSub()
 
 function doDkiCoreSub(T1, DTI, matName)
-global dwi_name
 if isempty(T1) || isempty(DTI), return; end; %required
 if isFieldSub(matName, 'mk'), fprintf('skipping DKI: already computed\n'); return; end; %stats already exist
 wbT1 = prefixSub('wb',T1); %warped brain extracted image
@@ -500,7 +495,7 @@ mask = unGzSub (mask);
 if ~exist(mask,'file'),  error('unable to find %s\n', mask); return; end;
 %MKfa=prepostfixSub('', 'd_FA', DTI);
 %if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
-dti_u=prepostfixSub('', dwi_name, DTI);
+dti_u=prepostfixSub('', 'du', DTI);
 [pth,nam] = filepartsSub(DTI);
 bvalnm = fullfile(pth, [nam, 'dboth.bval']); %assume topup
 if ~exist(bvalnm, 'file')
@@ -518,32 +513,37 @@ end
 param={'fa','md','dax','drad','mk','kax','krad','kfa'};
 dkifx2(dti_u, bvalnm, mask, true, param);
 MKmask=mask;
+dwi_name = dki_dwiname(DTI);
+[pth,dwi_name] = filepartsSub(dwi_name)
+dwi_name = ['s' dwi_name];
+
 
 if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
-if ~exist([dwi_name '_' param{1} '_dki.nii'], 'file') || ~exist(MKmask, 'file')
-   fprintf('Serious error: no kurtosis images named %s %s\n', [dwi_name '_' param{1} '_dki.nii'], MKmask);
+fa_name = [pth filesep dwi_name '_' param{1} '_dki.nii']
+if ~exist(fa_name, 'file') || ~exist(MKmask, 'file')
+   fprintf('Serious error: no kurtosis images named %s %s\n', fa_name, MKmask);
    return;
 end
     
-nFA = rescaleSub([pth '/' dwi_name '_' param{1} '_dki.nii']);
+nFA = rescaleSub(fa_name);
 
 oldNormstring=cell(1,length(param)+1);
 oldNormstring{1}=nFA;
 for par=1:length(param)
-DKI_par=[pth '/' dwi_name '_' param{par} '_dki.nii'];
+DKI_par=[pth filesep dwi_name '_' param{par} '_dki.nii'];
 oldNormstring(par+1)={DKI_par};
 end
 oldNormSub(oldNormstring,wbT1, 8, 8 );
 
 for par=1:length(param)
-DKI_par=[pth '/' dwi_name '_' param{par} '_dki.nii'];
-%normalize mean kurtosis to match normalized, brain extracted T1
-wDKI_par = prepostfixSub('w', '', DKI_par);
-nii_nii2mat(wDKI_par, [param{par} '_dki'], matName);
-%save note
-fid = fopen('dki.txt', 'a+');
-fprintf(fid, '%s\n', matName);
-fclose(fid);        
+    DKI_par=[pth filesep dwi_name '_' param{par} '_dki.nii'];
+    %normalize mean kurtosis to match normalized, brain extracted T1
+    wDKI_par = prepostfixSub('w', '', DKI_par);
+    nii_nii2mat(wDKI_par, [param{par} '_dki'], matName);
+    %save note
+    fid = fopen('dki.txt', 'a+');
+    fprintf(fid, '%s\n', matName);
+    fclose(fid);        
 end
 
 
@@ -994,8 +994,8 @@ movefile(wroiname, roiname);
 %end doFaMdSub()
 
 function doDkiWarpSub(imgs, atlas)
-global dwi_name
 if isempty(imgs.T1) || isempty(imgs.DKI), return; end; %required
+dwi_name = dki_dwiname(imgs.DKI);
 if ~exist('atlas','var'), atlas = 'jhu'; end;
 if strcmpi(atlas,'jhu')
     atlasext = '_roi';
@@ -1326,7 +1326,7 @@ function idx = roiIndexSub(roiName)
 if idx < 1, error('Invalid roi name %s', roiName); end;
 %end roiIndexSub()
 
-function imgs = doAslSub(imgs, matName)
+function imgs = doAslSubOld(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end; %we need these images
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL; %e.g. user can call "global ForceASL;  ForceASL = true;"
@@ -1357,7 +1357,40 @@ stat.cbf.c1R = c1R;
 stat.cbf.c2L = c2L;
 stat.cbf.c2R = c2R;
 save(matName,'-struct', 'stat');
+%end doAslSubOld()
+
+function imgs = doAslSub(imgs, matName)
+if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
+imgs.ASL = removeDotSub (imgs.ASL);
+global ForceASL;
+ASLrev = []; %reverse phase encoded image
+jsonFile = [];   %name of json file that stores parameters for this scan
+[numVolASLImg, ~] = nVolSub (imgs.ASL) ;
+switch numVolASLImg
+    case 101 %handles POLAR and legacy pasl sequences
+        jsonFile = which('POLAR_dummy.json');
+    case 74
+        jsonFile = which('LEGACY_PCASL_dummy.json');
+    case 97
+        jsonFile = which('LARC_dummy.json'); 
+        [pth,nam,ext] = spm_fileparts(imgs.ASL);
+        ASLrev = [pth '/' nam 'rev',ext];
+    case 60
+        jsonFile = which('SEN_dummy.json'); 
+    otherwise
+        error('Can''t guess sequence type');
+end
+pth = spm_fileparts(imgs.ASL);
+basilDir = fullfile(pth, 'BASIL');
+if ~exist('basilDir', 'dir'), mkdir(basilDir); end;
+[filepath,name,ext] = fileparts(imgs.T1)
+healedT1 = [filepath,'/e',name,ext];
+%function exitCode = nii_basil(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRun, overwrite, outDir)
+exitCode = nii_basil(imgs.ASL,healedT1, ASLrev, jsonFile, '', '', false, basilDir)
+if exitCode ~= 0, error('BASIL failed\n'); end;
+basil2mat(basilDir, matName);
 %end doAslSub()
+
 
 function [nVol, nSlices] = nVolSub (fnm)
 %Report number of volumes

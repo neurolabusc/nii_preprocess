@@ -8,6 +8,14 @@ function [X,param] = estimate_parameters(DT,KT,param)
 %Author: Russell Glenn
 % Medical University of South Carolina
 %Author has provided permission for distribution with nii_preprocess
+if ~exist('rotate_tensors', 'file')
+    p = fileparts(which(mfilename));
+    addpath(fullfile(p, 'DKI_tractography'));
+    if ~exist('rotate_tensors', 'file')
+        error('Unable to find rotate_tensors');
+    end
+end
+
 
 %Initialize output
 X = zeros(length(param),size(DT,2)); if ismember('fa_rgb',param); X = [X;zeros(2,size(DT,2))]; end
