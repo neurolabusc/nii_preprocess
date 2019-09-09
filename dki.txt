@@ -6,3 +6,4 @@
 /media/research/FAT1000CR/Master_In/M2120/T1_M2120_CT_lime.mat
 /media/research/FAT1000CR/Master_In/M2125/T1_M2125_LIME_lime.mat
 /media/research/FAT1000CR/Master_In/M2126/T1_M2126_LIME_lime.mat
+/Users/Emilie/Box/PhD_Projects/DKI_USC_MUSC/30_20171018_175427_test_subject_1_2/output_mac/T1_mprage_ns_sag_p2_iso_1mm_192_3_lime.mat
