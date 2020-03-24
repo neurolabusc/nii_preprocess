@@ -82,7 +82,8 @@ end;
 function degibbsSub(fname)
 %http://mrtrix.readthedocs.io/en/latest/reference/commands/mrdegibbs.html
 if ~exist(fname, 'file'), warning('Unable to find %s', fname); return; end;
-exenam = '/usr/local/bin/mrdegibbs';
+[~,exenam] = system('which mrdegibbs');
+exenam = strip(exenam);
 if ~exist(exenam, 'file')
    userDir = char(java.lang.System.getProperty('user.home'));
    exenam2 = fullfile(userDir, 'mrtrix3','bin','mrdegibbs');
@@ -124,7 +125,8 @@ copyfile([inname '.bvec'], [outname '.bvec']);
 copyfile([inname '.bval'], [outname '.bval']);
 inname = [inname ext];
 fname = [outname ext];
-exenam = '/usr/local/bin/dwidenoise';
+[~,exenam] = system('which dwidenoise');
+exenam = strip(exenam);
 if ~exist(exenam, 'file')
    userDir = char(java.lang.System.getProperty('user.home'));
    exenam2 = fullfile(userDir, 'mrtrix3','bin','dwidenoise');
@@ -158,11 +160,11 @@ end
 
 function status  = systemSub (cmd)
 % Save library paths
-MatlabPath = getenv('LD_LIBRARY_PATH');
+%MatlabPath = getenv('LD_LIBRARY_PATH');
 % Make Matlab use system libraries
-setenv('LD_LIBRARY_PATH',getenv('PATH'));
+%setenv('LD_LIBRARY_PATH',getenv('PATH'));
 fprintf('%s\n',cmd);
 status = system(cmd);
 % Reassign old library paths
-setenv('LD_LIBRARY_PATH',MatlabPath);
+%setenv('LD_LIBRARY_PATH',MatlabPath);
 %systemSub

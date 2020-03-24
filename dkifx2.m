@@ -151,7 +151,8 @@ if isSmooth, delete(sDWI_nam); end;
 
 function tensor2metricSub(sDWI_nam, dt)
 if ~exist(dt, 'file'), warning('Unable to find %s', dt); return; end;
-exenam = '/usr/local/bin/tensor2metric';
+[~,exenam] = system('which tensor2metric');
+exenam = strip(exenam);
 if ~exist(exenam, 'file')
    userDir = char(java.lang.System.getProperty('user.home'));
    exenam2 = fullfile(userDir, 'mrtrix3','bin','tensor2metric');
@@ -172,7 +173,8 @@ if status ~= 0, error('unable to run command: %s', cmd); end;
 
 function [dt, dkt] = dwi2tensorSub(dwi, bvec_nam, bval_nam,  mask)
 if ~exist(dwi, 'file'), warning('Unable to find %s', dwi); return; end;
-exenam = '/usr/local/bin/dwi2tensor';
+[~,exenam] = system('which dwi2tensor');
+exenam = strip(exenam);
 if ~exist(exenam, 'file')
    userDir = char(java.lang.System.getProperty('user.home'));
    exenam2 = fullfile(userDir, 'mrtrix3','bin','dwi2tensor');
@@ -240,11 +242,11 @@ end;
 
 function status  = systemSub (cmd)
 % Save library paths
-MatlabPath = getenv('LD_LIBRARY_PATH');
+% MatlabPath = getenv('LD_LIBRARY_PATH');
 % Make Matlab use system libraries
-setenv('LD_LIBRARY_PATH',getenv('PATH'));
+% setenv('LD_LIBRARY_PATH',getenv('PATH'));
 fprintf('%s\n',cmd);
 status = system(cmd);
 % Reassign old library paths
-setenv('LD_LIBRARY_PATH',MatlabPath);
+% setenv('LD_LIBRARY_PATH',MatlabPath);
 %systemSub

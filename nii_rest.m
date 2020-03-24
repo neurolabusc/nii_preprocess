@@ -164,20 +164,20 @@ sampleFreq 	 = 1/kTRsec;
 sampleLength = nDimTimePoints;
 paddedLength = sampleLength; %no need to pad with Matlab
 if (LowCutoff >= sampleFreq/2) % All high included
-    idx_LowCutoff = paddedLength/2 + 1;
+    idx_LowCutoff = int64(paddedLength/2 + 1);
 else % high cut off, such as freq > 0.01 Hz
-    idx_LowCutoff = ceil(LowCutoff * paddedLength * kTRsec + 1);
+    idx_LowCutoff = int64(ceil(LowCutoff * paddedLength * kTRsec + 1));
     % Change from round to ceil: idx_LowCutoff = round(LowCutoff *paddedLength *ASamplePeriod + 1);
 end
 if (HighCutoff>=sampleFreq/2)||(HighCutoff==0) % All low pass
-    idx_HighCutoff = paddedLength/2 + 1;
+    idx_HighCutoff = int64(paddedLength/2 + 1);
 else % Low pass, such as freq < 0.08 Hz
-    idx_HighCutoff = fix(HighCutoff *paddedLength *kTRsec + 1);
+    idx_HighCutoff = int64(fix(HighCutoff *paddedLength *kTRsec + 1));
     % Change from round to fix: idx_HighCutoff	=round(HighCutoff *paddedLength *ASamplePeriod + 1);
 end
 data4D=reshape(data4D,[],nDimTimePoints)';
 data4D = 2*abs(fft(data4D))/sampleLength;
-fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:(paddedLength/2 + 1),:));
+fALFF_2D = sum(data4D(idx_LowCutoff:idx_HighCutoff,:)) ./ sum(data4D(2:int64((paddedLength/2 + 1)),:));
 fALFF_2D(~isfinite(fALFF_2D))=0;
 fALFFBrain = reshape(fALFF_2D,nDim1, nDim2, nDim3);
 %mask data

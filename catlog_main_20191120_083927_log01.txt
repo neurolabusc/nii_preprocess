@@ -1,0 +1,195 @@
+
+                            < M A T L A B (R) >
+                  Copyright 1984-2019 The MathWorks, Inc.
+              R2019a Update 4 (9.6.0.1150989) 64-bit (glnxa64)
+                               June 26, 2019
+
+ 
+To get started, type doc.
+For product information, visit www.mathworks.com.
+ 
+CAT parallel processing with MATLAB PID: 5178
+
+------------------------------------------------------------------------
+CAT12.6 r1450: 1/1:  ./BigData1/ABC_MASTER_IN/ABC1011/T1_ABC1011_ABC.nii
+------------------------------------------------------------------------
+SANLM denoising (medium):                                            11s
+APP: Rough bias correction:                                       
+  Initialize                                                          2s
+  Estimate background                                                 1s
+  Initial correction                                                  3s
+  Refine background                                                   1s
+  Final correction                                                    2s
+  Final scaling                                                       3s
+                                                                     14s
+Affine registration                                                   3s
+Affine registration                                                   7s
+SPM preprocessing 1 (estimate 1):                                    39s
+SPM preprocessing 1 (estimate 2):                                    29s
+SPM preprocessing 2 (write):                                      
+  Write Segmentation                                                  7s
+  Update Segmentation                                                11s
+  Update Skull-Stripping                                             12s
+  Update probability maps                                             2s
+                                                                     33s
+Global intensity correction:                                          5s
+SANLM denoising after intensity normalization (medium):               5s
+Fast registration                                                 
+Dartel registration with 1.50 mm on a 1.50 mm Template:           
+  Template: "/home/coffee/Neuro/spm12/toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii"
+    1 | 0.1345 |   428373        0   428373  332.212 
+    2 | 0.1126 |   358558     8342   366900  215.280 
+    3 | 0.1020 |   324699    12631   337330  174.090 
+    4 | 0.0929 |   295882    15170   311053  151.112 
+    5 | 0.0843 |   268508    16434   284942  126.376 
+    6 | 0.0758 |   241467    31619   273085   66.175 
+
+                                                                     44s
+   46s
+Local adaptive segmentation (LASstr=0.50):                        
+  Prepare maps                                                        2s
+  Prepare partitions                                                  0s
+  Prepare segments (LASmod = 1.05)                                    5s
+  Estimate local tissue thresholds (WM)                               6s
+  Estimate local tissue thresholds (GM)                              10s
+  Estimate local tissue thresholds (CSF/BG)                           1s
+  Intensity transformation                                           26s
+  SANLM denoising after LAS (medium)                                 10s
+                                                                     10s
+ROI segmentation (partitioning):                                  
+  Atlas -> subject space                                              4s
+  Major structures                                                    2s
+  Ventricle detection                                                 5s
+  Blood vessel detection                                              4s
+  WMH detection (WMHCstr=0.50 > WMHCstr'=0.22)                       13s
+  Manual stroke lesion detection                                      0s
+  Closing of deep structures                                          1s
+  Side alignment                                                      2s
+  Final corrections                                                   1s
+                                                                     31s
+Blood vessel correction (BVCstr=0.50):                                0s
+Amap using initial SPM12 segmentations (MRF filter strength 0.06):   11s
+    AMAP peaks: [CSF,GM,WM] = [0.44±0.08,0.71±0.08,0.97±0.04]
+Final cleanup (gcutstr=0.25):                                     
+  Level 1 cleanup (ROI estimation)                                    1s
+  Level 1 cleanup (brain masking)                                     1s
+  Level 2 cleanup (CSF correction)                                    0s
+  Level 3 cleanup (CSF/WM PVE)                                        0s
+                                                                      2s
+
+
+Dartel registration with 1.50 mm on a 1.50 mm Template:           
+  Template: "/home/coffee/Neuro/spm12/toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii"
+    1 | 0.1365 |   434620        0   434620  334.483 
+    2 | 0.1174 |   373697    18416   392112  127.755 
+    3 | 0.1148 |   365622    21381   387003   58.241 
+    4 | 0.1146 |   364816    11477   376293  183.258 
+    5 | 0.1056 |   336295    29688   365983   67.074 
+    6 | 0.1052 |   335043    29998   365041   40.453 
+    7 | 0.1063 |   338654    15605   354259  159.615 
+    8 | 0.0969 |   308506    34999   343505   59.446 
+    9 | 0.0966 |   307699    34712   342410   37.362 
+   10 | 0.0978 |   311576    18255   329831  142.822 
+   11 | 0.0880 |   280176    38079   318255   58.436 
+   12 | 0.0875 |   278529    38112   316641   38.165 
+   13 | 0.0885 |   281791    20208   301999  118.326 
+   14 | 0.0798 |   254139    36914   291053   53.588 
+   15 | 0.0789 |   251123    37981   289104   37.041 
+   16 | 0.0785 |   250018    40015   290033   43.169 
+   17 | 0.0781 |   248592    40378   288970   32.533 
+   18 | 0.0777 |   247346    41254   288600   29.566 
+                                                                    121s
+  Jacobian determinant (RMS):  0.116454 
+           Template Matching:  0.077674 
+Write result maps:                                                   10s
+Surface and thickness estimation:                                 
+lh:
+  Thickness estimation (0.50 mm³):                                
+    WM distance:                                                     19s
+    CSF distance:                                                    17s
+    PBT2x thickness:                                                 13s
+                                                                     53s
+                                                                     54s
+  Create initial surface                                             23s
+  Topology correction and surface refinement:                        46s
+  Refine central surface                                             51s
+  Correction of central surface in highly folded areas 2              2s
+  Spherical mapping with areal smoothing                             91s
+  Spherical registration                                            172s
+ Surface Euler number: 2
+ Overall size of topology defects: 0
+[Warning: A value of class "int32" was indexed with no subscripts specified.
+Currently the result of this operation is the indexed value itself, but in a
+future release, it will be an error.] 
+[> In gifti/subsref (line 45)
+  In cat_surf_createCS (line 875)
+  In cat_main (line 663)
+  In cat_run_job (line 786)
+  In cat_run_newcatch (line 15)
+  In cat_run>run_job (line 720)
+  In cat_run (line 434)] 
+rh:
+  Thickness estimation (0.50 mm³):                                
+    WM distance:                                                     18s
+    CSF distance:                                                    18s
+    PBT2x thickness:                                                 13s
+                                                                     52s
+                                                                     54s
+  Create initial surface                                             24s
+  Topology correction and surface refinement:                        48s
+  Refine central surface                                             55s
+  Correction of central surface in highly folded areas 2              2s
+  Spherical mapping with areal smoothing                             95s
+  Spherical registration                                            179s
+ Surface Euler number: 2
+ Overall size of topology defects: 0
+[Warning: A value of class "int32" was indexed with no subscripts specified.
+Currently the result of this operation is the indexed value itself, but in a
+future release, it will be an error.] 
+[> In gifti/subsref (line 45)
+  In cat_surf_createCS (line 875)
+  In cat_main (line 663)
+  In cat_run_job (line 786)
+  In cat_run_newcatch (line 15)
+  In cat_run>run_job (line 720)
+  In cat_run (line 434)] 
+Display thickness: /media/coffee/BigData1/ABC_MASTER_IN/ABC1011/surf/lh.thickness.T1_ABC1011_ABC
+Display thickness: /media/coffee/BigData1/ABC_MASTER_IN/ABC1011/surf/rh.thickness.T1_ABC1011_ABC
+Surface and thickness estimation:                                  1061s
+ROI estimation:                                                   
+  Data mapping to normalized atlas space                             46s
+  ROI estimation of 'cobra' atlas                                    10s
+  Data mapping to normalized atlas space                             38s
+  ROI estimation of 'neuromorphometrics' atlas                        2s
+  ROI estimation of 'lpba40' atlas                                    0s
+  ROI estimation of 'hammers' atlas                                   2s
+                                                                     99s
+Quality check:                                                        2s
+
+------------------------------------------------------------------------
+CAT Preprocessing error for T1_ABC1011_ABC:
+------------------------------------------------------------------------
+The IP address of "www.neuro.uni-jena.de" could not be determined.
+------------------------------------------------------------------------
+[Warning: Replacing blank spaces with %20] 
+[> In urlreadwrite>cleanUrlChar (line 249)
+  In urlreadwrite (line 23)
+  In urlread (line 47)
+  In cat_run_newcatch (line 39)
+  In cat_run>run_job (line 720)
+  In cat_run (line 434)] 
+{Error using urlreadwrite (line 90)
+The IP address of "www.neuro.uni-jena.de" could not be determined.
+
+Error in urlread (line 47)
+[s,status] = urlreadwrite(mfilename,catchErrors,url,varargin{:});
+
+Error in cat_run_newcatch (line 39)
+      urlread(url);
+
+Error in cat_run>run_job (line 720)
+      cat_run_newcatch(job,tpm,subj);
+
+Error in cat_run (line 434)
+varargout{1} = run_job(job);
+} 
