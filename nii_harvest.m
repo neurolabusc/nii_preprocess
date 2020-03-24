@@ -13,52 +13,121 @@ function nii_harvest (baseDir)
 %outDir = '/media/research/POLAREXP/POLAR_Master_In';
 %baseDir = '/media/research/POLAREXP/POLAR_Master_Db';
 
-
-
 %Big Data Master Chief Backup
 outDir = '/media/coffee/BigData1/MasterChief_12-12-2018/Master_In';
 baseDir = '/media/coffee/BigData1/MasterChief_12-12-2018/Master_DB';
+
+outDir = '/media/coffee/BigData1/LARC_MASTER_IN';
+baseDir = '/media/coffee/BigData1/LARC_MASTER_DB';
+
+outDir = '/media/coffee/BigData1/ABC_MASTER_IN';
+baseDir = '/media/coffee/BigData1/ABC_MASTER_DB';
+
+
+baseDir = '/home/coffee/Desktop/POLAR_TEST_DB';
+outDir = '/media/coffee/Desktop/POLAR_TEST_IN';
+%outDir = '/media/coffee/BigData1/KateNew_IN';
+%baseDir = '/media/coffee/BigData1/KateNew_DB';
 
 %BRIE INTERPERSONAL CORRELATION ONLY
 %outDir = '/home/research/Desktop/BRIE_PILOT/Master_IN';
 %baseDir = '/home/research/Desktop/BRIE_PILOT/Master_DB';
 
-
 % outDir = '/home/research/In';
 % baseDir = '/home/research/DB';
-
-isExitAfterTable = false; % <- if true, only generates table, does not process data
-isPreprocess = false; % <- if true full processing, otherwise just cropping
-isReportDims = false; %if true, report dimensions of raw data
-reprocessRest = true;
-reprocessfMRI = false;
-reprocessASL = false;
-reprocessDTI = false;
-reprocessVBM = false;
 
 %outDir = '/media/UBU/Master_In/';
 %baseDir = '/media/UBU/Master_DB/'; %'/Root'
 
+baseDir = '/work/reddydp/neuro/ABC_MASTER_DB';
+outDir = '/work/reddydp/neuro/ABC_MASTER_IN';
+
+% if the correct environment variables are set in the environment, override
+% the above
+if ~isempty(getenv('nii_harvest_baseDir'))
+    baseDir = getenv('nii_harvest_baseDir')
+end
+if ~isempty(getenv('nii_harvest_outDir'))
+    outDir = getenv('nii_harvest_outDir')
+end
+
+isExitAfterTable = false; % <- if true, only generates table, does not process data
+isPreprocess = true; % <- if true full processing, otherwise just cropping
+isReportDims = true; %if true, report dimensions of raw data
+reprocessRest = true;
+reprocessfMRI = true;
+reprocessASL = true;
+reprocessDTI = true;
+reprocessVBM = true;
+explicitProcess = false; % <- if true, will only process if the reprocess flag is true
+
+% if the correct environment variables are set in the environment, override
+% the above
+if ~isempty(getenv('nii_harvest_isExitAfterTable'))
+    isExitAfterTable = strcmpi(getenv('nii_harvest_isExitAfterTable'),'true')
+end
+if ~isempty(getenv('nii_harvest_isPreprocess'))
+    isPreprocess = strcmpi(getenv('nii_harvest_isPreprocess'),'true')
+end
+if ~isempty(getenv('nii_harvest_isReportDims'))
+    isReportDims = strcmpi(getenv('nii_harvest_isReportDims'),'true')
+end
+if ~isempty(getenv('nii_harvest_reprocessRest'))
+    reprocessRest = strcmpi(getenv('nii_harvest_reprocessRest'),'true')
+end
+if ~isempty(getenv('nii_harvest_reprocessfMRI'))
+    reprocessfMRI = strcmpi(getenv('nii_harvest_reprocessfMRI'),'true')
+end
+if ~isempty(getenv('nii_harvest_reprocessASL'))
+    reprocessASL = strcmpi(getenv('nii_harvest_reprocessASL'),'true')
+end
+if ~isempty(getenv('nii_harvest_reprocessDTI'))
+    reprocessDTI = strcmpi(getenv('nii_harvest_reprocessDTI'),'true')
+end
+if ~isempty(getenv('nii_harvest_reprocessVBM'))
+    reprocessVBM = strcmpi(getenv('nii_harvest_reprocessVBM'),'true')
+end
+if ~isempty(getenv('nii_harvest_explicitProcess'))
+    explicitProcess = strcmpi(getenv('nii_harvest_explicitProcess'),'true')
+end
+
 if ~exist('baseDir','var') || isempty(baseDir)
     %baseDir = pwd; %
     baseDir = uigetdir('','Pick folder that contains all subjects');
-    
+end
+
+%666 ROGER Added
+%check for folder /ASL_DUMMY_FILES which contains dummy files for BASIL,
+%FYI the referenced 'dummy files' are .json files that are created when you convert the
+%DICOMs to .nii files using the newer versions of MRICROGL
+%and make sure in path, otherwise throw a warning and continue
+[FILEPATH,NAME,EXT] = fileparts(which('nii_preprocess.m'));
+if ~exist(fullfile(FILEPATH,'ASL_DUMMY_FILES'),'dir')
+    warning('Did not find path to ASL_DUMMY_FILES on your machine, please add /ASL_DUMMY_FILES folder, which contains json files for your ASL files you want to go through nii_basil to %s to ensure BASIL works properly',FILEPATH)
+else
+    addpath(fullfile(FILEPATH,'ASL_DUMMY_FILES'));
+    fprintf('Added %s to path',fullfile(FILEPATH,'ASL_DUMMY_FILES'));
 end
 
 %***Ignores directories containing '_' symbol
 subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 
+%subjDirs ={'LARC15M2165'};
+subjDirs = {'ABC1001'};
+
+if ~isempty(getenv('nii_harvest_subjDirs'))
+    subjDirs = {getenv('nii_harvest_subjDirs')}
+end
+
 %subjDirs = subjDirs(86:98);  % 1-50 of Polar, rest on other box - RN
 %subjDirs = subjDirs(1); % temporary, for testing only!!! -- GY
-%subjDirs = { 'M10413'; 'M10463'}; 
-%subjDirs = {'M10432'};
 
-modalityKeysVerbose = {'Lesion', 'T1', 'T2', 'DTI_',  'DTIrev', 'ASL', 'Rest_', 'fMRI'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
-modalityDependency = [0, 1, 1,  0, 4, 0, 0, 0]; %T1 and T2 must be from same study as lesion
+modalityKeysVerbose = {'Lesion','T1','T2','DTI_','DTIrev','ASL','ASLrev','Rest_','fMRI','fme1','fme2','fmph','fMRI_pass','fMRI_fam'}; %DTIREV before DTI!!! both "DTIREV.nii" and "DTI.nii" have prefix "DTI"
+modalityDependency =  [0,       1,   1,   0,     4,       0,    6,       0,      0,     0,     0,     0,     0           0         ]; %e.g. T1 and T2 must be from same study as lesion
 
 modalityKeys = strrep(modalityKeysVerbose,'_',''); 
-xperimentKeys = {'POLAR','SE', 'LIME', 'CT', 'R01', 'CAT'}; %order specifies priority: 1st item checked first!
+xperimentKeys = {'ABC','LARC','POLAR','SE','LIME','CT','R01','CAT'}; %order specifies priority: 1st item checked first!
 %create empty structure
 blank = [];
 blank.subjName = [];
@@ -83,6 +152,8 @@ for s = 1: size(subjDirs,1)%1:nSubjDir2 %(nSubjDir2+1):nSubjDir
             xLabel = deblank(xperimentKeys{x}); %e.g. "R01"
             xDir = [subjDir,filesep, xLabel]; %no filesep
             if ~exist(xDir, 'file'), continue; end;
+            %check the following line which CHris says is pseudocode - DPR
+            if strcmpi(xLabel,'ABC') && (strcmpi(modality,'fMRI') || strcmpi(modality,'fMRI_fam')), continue; end;
             %fprintf('%s\n', xDir);
             imgs(nSubj) = findImgsSub(imgs(nSubj), xDir, xLabel, modality, m, modalityDependency(m));
             %imgs(nSubj) = findImgsSub(imgs(nSubj), xDir, xLabel, modalityKeysVerbose, modalityDependency);
@@ -121,6 +192,7 @@ for s = 1: nSubj
     end
     fprintf('%s\n', str);
 end
+
 fprintf('Table required %g seconds\n', toc(startTime));
 %copy core files to new folder
 if isExitAfterTable 
@@ -130,7 +202,11 @@ end
 if exist(outDir, 'file') ~= 7, error('Unable to find folder %s', outDir); end;
 %find images we have already processed
 if isempty(spm_figure('FindWin','Graphics')), spm fmri; end; %launch SPM if it is not running
-process1st = true;
+process1st = false; % do not check for updates on the cluster!  DPR 20200205
+
+
+
+t_start=tic;
 
 for s =  1: nSubj 
     anyNewImg = false;
@@ -232,17 +308,20 @@ for s =  1: nSubj
 
         %process the data
         nii_preprocess(mat,[],process1st);
-        process1st = false; %only check for updates for first person
-        %matName = fullfile(subjDir, sprintf('T1_%s_%s_lime.mat', subj, imgs(s).nii.T1.x));
+      
+        matName = fullfile(subjDir, sprintf('T1_%s_%s_lime.mat', subj, imgs(s).nii.T1.x));
         if isPreprocess
-            nii_preprocess(mat,matName)
+            nii_preprocess(mat,matName,process1st)
+            
         else
             fprintf('Cropped but did not preprocess %s\n',matName);
         end
+        process1st = false; %only check for updates for first person
         
     end
 end
 fprintf('All done\n');
+fprintf ('nii_harvest required %f seconds to run.\n', toc(t_start) );
 %end nii_harvest
 
 function reportDimsSub(imgs,nSubj)
@@ -492,7 +571,9 @@ isKey = true;
 for k = 1 : size(imgKey,1)
     key = deblank(imgKey(k,:));
     pos = strfind(lower(char(str)),lower(key));
-    if ~isempty(pos), isKey = pos(1); return; end;
+    if ~isempty(pos), isKey = pos(1); 
+        return; 
+    end;
 end
 isKey = false;
 %isStringInKey()

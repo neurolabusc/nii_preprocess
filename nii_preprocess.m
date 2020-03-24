@@ -6,7 +6,7 @@ function matName = nii_preprocess(imgs, matName, checkForUpdates, hideInteractiv
 % imgs.ASL : pCASL or PASL sequence
 % imgs.Rest : Resting state sequence
 % DTI : Diffusion scan
-% DTIrev : Diffusion scan with reverse phase encoding of 'DTI'
+% DTIrev : Diffusion scan with reverse phase encoding of 'DTIdum'
 % fMRI : fMRI scan
 %Examples
 % imgs.T1 = 'T1.nii'; imgs.ASL = 'ASL.nii';
@@ -56,11 +56,15 @@ if ~exist('matName','var') || isempty(matName)
 end
 if true
     diary([matName, '.log.txt'])
+    
     imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
     tStart = tic;
+    
     imgs = doT1Sub(imgs, matName); %normalize T1
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
+    
+    imgs = doVBMSub(imgs, matName);    
     
     %666x -> recommented in by Roger for Jill's Data
     imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
@@ -70,13 +74,24 @@ if true
     imgs = doAslSub(imgs, matName);
     tStart = timeSub(tStart,'ASL');
     
-    %666x -> recommented in by Roger for Data with fMRI
+    %666x -> old function for processing only fMRI naming 60 
+    %commented out 11/2019
     imgs = dofMRISub(imgs, matName);
     %666x <-
     
-    %666 VBM
-    imgs = doVBMSub(imgs, matName);   
-    
+    %666x -> New functionality for processing fMRInaming60 as well as other task-based
+    %added 11/2019
+    %imgs = dofMRISub_Task(imgs, matName,keyString);  %will process fmri files ending in keyString, using nii_fmrikeyString.m
+    if ~isempty(imgs.fMRI) && size(niftiread(imgs.fMRI),4) == 60
+        imgs = dofMRISub_Task(imgs, matName);        %will process using original nii_fmri60
+    end
+    if ~isempty(imgs.fMRIpass)
+        imgs = dofMRISub_Task(imgs, matName,'pass'); %will process fmri files ending in 'pass', using nii_fmripass.m
+    end
+%     if ~isempty(imgs.fMRInam)
+%         imgs = dofMRISub_Task(imgs, matName,'fam'); %will process fmri files ending in 'pass', using nii_fmripass.m
+%     end
+
     tStart = timeSub(tStart,'fMRI');
     %warning('Skipping DTI');
     if true
@@ -260,26 +275,114 @@ text(pos(1)+0.0,pos(2)+0.01, n,'Parent',ax, 'FontSize',8, 'fontn','Arial', 'colo
 %end orthSub()
 
 
-%adding RNN 666 
+%added RNN  
+%Performs cat12 initial processing on T1-weighted structural image
+%*In the case of lesioned brains, performs cat12 on enantiomorphically
+%healed brain, i.e. 'eT1'
 function imgs = doVBMSub(imgs, matName)
 
-%these lines confirm presence of eT1 (stolen from doDTISub)
-eT1 = prefixSub('e',imgs.T1); %enantimorphic image
-if ~exist(eT1,'file'), eT1 = imgs.T1; end; %if no lesion, use raw T1
-if ~exist(eT1,'file'), fprintf('doVBM unable to find %s\n', eT1); return; end; %required
-
 global ForceVBM; %e.g. user can call "global ForceVBM;  ForceVBM = true;"
+%these lines confirm presence of eT1 (stolen from doDTISub)
+targetImage = imgs.T1;
+eT1 = prefixSub('e',imgs.T1); %enantimorphic image
+if exist(eT1,'file'), targetImage = eT1; end; %if no lesion, use raw T1
+if ~exist(targetImage,'file'), fprintf('doVBM unable to find %s\n', targetImage); return; end; %required
+%[p, n, x] = fileparts(targetImage);
 
-%call nii_VBM, only needs eT1 as parameter
-%nii_VBM(eT1);
+mySPM = which('spm');
+[p, n, x] = fileparts(mySPM);
+SPM_file_arg = {[targetImage ',1']};
 
-%add results to matName
+TPM_arg = {fullfile(p, 'tpm/TPM.nii')}
+if ~exist(fullfile(p, 'tpm/TPM.nii'),'file')
+    error('Failed to find TPM.nii at: %s',fullfile(p, 'tpm/TPM.nii'));
+end
+
+dartelTPM_arg = {fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii')}
+if ~exist(fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii'),'file')
+    error('Failed to find dartelTemplate at: %s',fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii'));
+end
+
+%do cat12 if not already done
+if ~isFieldSub(matName,'vbm_gm')
+catbatch{1}.spm.tools.cat.estwrite.data = SPM_file_arg;
+catbatch{1}.spm.tools.cat.estwrite.nproc = 6;
+catbatch{1}.spm.tools.cat.estwrite.opts.tpm = TPM_arg;
+catbatch{1}.spm.tools.cat.estwrite.opts.affreg = 'mni';
+catbatch{1}.spm.tools.cat.estwrite.opts.biasstr = 0.5;
+catbatch{1}.spm.tools.cat.estwrite.opts.accstr = 0.5;
+catbatch{1}.spm.tools.cat.estwrite.extopts.APP = 1070;
+catbatch{1}.spm.tools.cat.estwrite.extopts.LASstr = 0.5;
+catbatch{1}.spm.tools.cat.estwrite.extopts.gcutstr = 2;
+catbatch{1}.spm.tools.cat.estwrite.extopts.registration.dartel.darteltpm = dartelTPM_arg;
+catbatch{1}.spm.tools.cat.estwrite.extopts.vox = 1.5;
+catbatch{1}.spm.tools.cat.estwrite.extopts.restypes.fixed = [1 0.1];
+catbatch{1}.spm.tools.cat.estwrite.output.surface = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.neuromorphometrics = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.lpba40 = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.cobra = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.hammers = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.GM.native = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.GM.mod = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.GM.dartel = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WM.native = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WM.mod = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WM.dartel = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.labelnative = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.bias.warped = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.jacobianwarped = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.warps = [0 0];
+
+spm_jobman('run',catbatch);
+clear catbatch
+end
+
+%%CHOOSE files to store in the mat file for later analysis
+[p, n, x] = fileparts(imgs.T1);
+targetDir = fullfile(p,'mri');
+normGM = dir(fullfile(targetDir,'mwp1T1*.nii'));
+normWM = dir(fullfile(targetDir,'mwp2T1*.nii'));
+targetDir = fullfile(p,'surf');
+lhSURF = dir(fullfile(targetDir,'lh.cent*.gii'));
+rhSURF = dir(fullfile(targetDir,'rh.cent*.gii'));
+nii_nii2mat(fullfile(normGM.folder, normGM.name), 'vbm_gm' , matName); 
+nii_nii2mat(fullfile(normWM.folder, normWM.name), 'vbm_wm' , matName); 
+%nii_nii2mat(fullfile(lhSURF.folder, lhSURF.name), 'surf_lh' , matName); 
+%nii_nii2mat(fullfile(rhSURF.folder, rhSURF.name), 'surf_rh' , matName); 
+
+
+%estimate TIV, GM, WM and WM-hyperintensity volumes and save to mat file
+%field
+[p, n, x] = fileparts(imgs.T1);
+targetDir = fullfile(p,'report');
+cat12xmlfile  = dir(fullfile(targetDir,'*.xml'));
+if ~exist(fullfile(p, 'report',cat12xmlfile.name),'file')
+    error('Failed to find participant''s xml file at: %s',fullfile(p, 'report',cat12xmlfile.name));
+end
+
+tivbatch{1}.spm.tools.cat.tools.calcvol.data_xml = {fullfile(p, 'report',cat12xmlfile.name)};
+tivbatch{1}.spm.tools.cat.tools.calcvol.calcvol_TIV = 0;
+tivbatch{1}.spm.tools.cat.tools.calcvol.calcvol_name = fullfile(p,'TIV.txt');
+spm_jobman('run',tivbatch);
+
+pause(10);
+if exist(fullfile(p,'TIV.txt'),'file')
+    TIVdata = textread(fullfile(p,'TIV.txt')); %Volume values =  Total,GM,WM,CSF,WMH
+    m = matfile(matName,'Writable',true)
+    m.VBM_volume_Total = TIVdata(1);
+    m.VBM_volume_GM  = TIVdata(2);
+    m.VBM_volume_WM  = TIVdata(3);
+    m.VBM_volume_CSF = TIVdata(4);
+    m.VBM_volume_WMH = TIVdata(5);
+else
+    warning('Could not find %s ',fullfile(p,'TIV.txt'));
+end
 
 %end doVBMSub()
 
 
-
 function imgs = dofMRISub(imgs, matName)
+
 if isempty(imgs.T1) || isempty(imgs.fMRI), return; end; %required
 imgs.fMRI = removeDotSub (imgs.fMRI);
 [~,n] = fileparts(imgs.fMRI);
@@ -308,16 +411,87 @@ end
 
 %GY, Oct 5, 2017
 %nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2); %use fMRI for normalization
-nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2, imgs.Lesion);
+%RNN, Nov 1 2019, capable of swapping in a different fMRI file for
+%processing now.
+    nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2, imgs.Lesion);
+% if (exist(imgs.fMRI,'file') && ~exist(imgs.fMRIpass,'file'))
+%     nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2, imgs.Lesion);
+% end
+% if (exist(imgs.fMRIpass,'file'))
+%     %easiest to just set this to imgs.fMRI to ensure it goes through subsequent name changes correctly
+%     nii_fmriABCpassages(imgs.fMRI, imgs.T1, imgs.fme1, imgs.fme2, imgs.fmph);
+% end
+% 
 
 if ~exist(cstat, 'file') || ~exist(bstat,'file')
     error('fMRI analysis failed : %s\n  %s', bstat, cstat);
 end
+
 nii_nii2mat(cstat, 'fmri' , matName); %12
 nii_nii2mat(bstat, 'fmrib', matName); %13
 vox2mat(prefixSub('wmean',imgs.fMRI), 'fMRIave', matName);
 vox2mat(prefixSub('wbmean',imgs.fMRI), 'fMRIave', matName);
 %end dofMRISub()
+
+function imgs = dofMRISub_Task(imgs, matName, task)
+if ~exist('task','var'), task= ''; end;
+structName = ['fMRI', task];
+
+if isempty(imgs.T1) || ~isfield(imgs, structName) || isempty(imgs.(structName)), return; end; %required
+imgs.(structName) = removeDotSub (imgs.(structName));
+[~,n] = fileparts(imgs.(structName));
+[p] = fileparts(imgs.(structName));
+cstat = fullfile(p,[n], 'con_0002.nii');
+bstat = fullfile(p,[n], 'beta_0001.nii');
+global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
+%do not check cstat files anymore, as folder names may have changed...
+%if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+if isempty(ForcefMRI) && isFieldSub(matName, structName), fprintf('Skipping fMRI (already done) %s\n',imgs.(structName)); return;  end;
+if ~exist(imgs.(structName),'file'), warning('Unable to find %s', imgs.(structName)); return; end;
+%if ~isempty(ForcefMRI)
+    d = fullfile(p,n);
+    if exist(d,'file'), rmdir(d,'s'); end; %delete statistics directory
+    delImgs('sw', imgs.(structName));
+    delMat(imgs.(structName))
+    %delImgs('swa', imgs.fMRI); %we never slice-time correct sparse data!
+%end
+
+
+
+
+
+if ~exist(['nii_fmri' task],'file')
+    fnm = fullfile(fileparts(which(mfilename)), ['nii_fmri' task]);
+    if ~exist(fnm,'file')
+        error('Unable to find %s', fnm);
+    end
+    addpath(fnm);
+end
+
+%RNN, Nov 1 2019, 
+%Use appropriate function call depending on which fMRI task is being processed
+switch task
+    case ''
+        selected_fmri_fcncall = 'nii_fmri60(imgs.(structName), imgs.T1, imgs.T2, imgs.Lesion)'
+    case 'pass'
+        selected_fmri_fcncall = 'nii_fmripass(imgs.(structName), imgs.T1, imgs.fme1, imgs.fme2, imgs.fmph)'
+    otherwise
+        error('Based on task %s, could not find nii_fmri* specifying appropriate processing...',task);
+end
+eval(selected_fmri_fcncall);
+
+if ~exist(cstat, 'file') || ~exist(bstat,'file')
+    error('fMRI analysis failed : %s\n  %s', bstat, cstat);
+end
+
+nii_nii2mat(cstat, 'fmri' , matName); %12
+nii_nii2mat(bstat, 'fmri', matName); %13
+vox2mat(prefixSub('wmean',imgs.(structName)), ['fMRIave', task], matName);       %wmean not generated, not sure if important... 
+vox2mat(prefixSub('wbmaskmean',imgs.(structName)), ['fMRIaveb', task], matName); %wbmean not generated, renamed wbmaskmean
+%end dofMRISub_pass()
+
+
+
 
 function XYZmm = getCenterOfIntensitySub(vols)
 XYZmm = ones(3,1);
@@ -1132,14 +1306,18 @@ if ~exist(fnm,'file'), error('%s required', fnm); end;
 txt = fileread(fnm);
 goodStr = '_gpu';
 if isempty(strfind(txt,goodStr))
-   error('Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm);
+   warning('Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm);
 end
 %make sure eddy supports repol
 cmd = fullfile(fsldir, 'bin', 'eddy_openmp');
+%cmd
 fslEnvSub;
 cmd = fslCmdSub(cmd);
 [~,cmdout]  = system(cmd);
 goodStr = '--repol';
+%cmd
+%cmdout
+isempty(strfind(cmdout,goodStr))
 if isempty(strfind(cmdout,goodStr))
    error('Update eddy files to support "repol" https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
 end
@@ -1150,7 +1328,14 @@ fsldir= '/usr/local/fsl/'; %CentOS intall location
 if ~exist(fsldir,'dir')
     fsldir = '/usr/share/fsl/5.0/'; %Debian install location (from neuro debian)
     if ~exist(fsldir,'dir')
-        error('FSL is not in the standard CentOS or Debian locations, please check you installation!');
+        fsldir = '/usr/share/fsl/6.0/'; %Debian install location (from neuro debian
+    end
+    if ~exist(fsldir,'dir')
+        fprintf('FSL is not in the standard CentOS or Debian locations, please check your installation!\n');
+        fsldir = getenv("FSLDIR");
+        if ~exist(fsldir,'dir')
+            error('FSL is not in FSLDIR environment variable either, quitting...');
+        end
     end
 end
 %end fslDirSub()
@@ -1191,7 +1376,7 @@ end
 
 function command  = fslCmdSub (command)
 fsldir = fslDirSub;
-cmd=sprintf('sh -c ". %setc/fslconf/fsl.sh; ',fsldir);
+cmd=sprintf('sh -c ". %s/etc/fslconf/fsl.sh; ',fsldir);
 command = [cmd command '"'];
 %fslCmdSub
 
@@ -1302,6 +1487,9 @@ vox2mat(prefixSub(['wbmaskmean' ],imgs.Rest), 'RestAve', matName); % Grigori add
 
 %end doRestSub()
 
+
+
+
 function delImgs(prefix, fnm)
 %e.g. delImgs('sw', 'X.nii') would delete wX.nii and swX.nii
 [pth,nam] = spm_fileparts(fnm);
@@ -1360,12 +1548,14 @@ save(matName,'-struct', 'stat');
 %end doAslSubOld()
 
 function imgs = doAslSub(imgs, matName)
+
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL;
 ASLrev = []; %reverse phase encoded image
 jsonFile = [];   %name of json file that stores parameters for this scan
 [numVolASLImg, ~] = nVolSub (imgs.ASL) ;
+
 switch numVolASLImg
     case 101 %handles POLAR and legacy pasl sequences
         jsonFile = which('POLAR_dummy.json');
@@ -1374,19 +1564,34 @@ switch numVolASLImg
     case 97
         jsonFile = which('LARC_dummy.json'); 
         [pth,nam,ext] = spm_fileparts(imgs.ASL);
-        ASLrev = [pth '/' nam 'rev',ext];
+        
+        ASLrev = imgs.ASLrev;   % [pth '/' nam 'rev',ext];
     case 60
         jsonFile = which('SEN_dummy.json'); 
     otherwise
         error('Can''t guess sequence type');
 end
+if ~exist(jsonFile, 'file') 
+    error('Can''t find json dummy file anywhere in your current Matlab path, you dummy!');
+end
+
 pth = spm_fileparts(imgs.ASL);
 basilDir = fullfile(pth, 'BASIL');
-if ~exist('basilDir', 'dir'), mkdir(basilDir); end;
+if ~exist(basilDir, 'dir')
+    mkdir(basilDir);
+end
 [filepath,name,ext] = fileparts(imgs.T1)
 healedT1 = [filepath,'/e',name,ext];
 %function exitCode = nii_basil(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRun, overwrite, outDir)
-exitCode = nii_basil(imgs.ASL,healedT1, ASLrev, jsonFile, '', '', false, basilDir)
+%if you have a lesion, then use the healed T1 for nii_basil, otherwise use the original T1 for nii_basil
+
+
+if(~isempty(imgs.Lesion))
+    exitCode = nii_basil(imgs.ASL,healedT1, ASLrev, jsonFile, '', '', false, basilDir)
+else
+    exitCode = nii_basil(imgs.ASL,imgs.T1, ASLrev, jsonFile, '', '', false, basilDir)
+end
+    
 if exitCode ~= 0, error('BASIL failed\n'); end;
 basil2mat(basilDir, matName);
 %end doAslSub()
@@ -1421,7 +1626,7 @@ nii_nii2mat(i3m, 'i3mT1', matName); %4
 
 function imgs = doT1Sub(imgs, matName)
 if isempty(imgs.T1), return; end;
-if isFieldSub(matName, 'T1'), fprintf('Skipping T1 normalization (already done): %s\n',imgs.T1); return; end;
+if isFieldSub(matName, 'i3mT1'), fprintf('Skipping T1 normalization (already done): %s\n',imgs.T1); return; end;
 imgs.T1 = removeDotSub (imgs.T1);
 if size(imgs.T1,1) > 1 || size(imgs.T2,1) > 1 || size(imgs.Lesion,1) > 1
     error('Require no more than one image for these modalities: T1, T2, lesion');

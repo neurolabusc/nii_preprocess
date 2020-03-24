@@ -44,8 +44,11 @@ echo "Filenames dti= $dti dtir=$dtir"
 eddyExeName=eddy
 if  [[ $PATH == *"cuda"* ]]; then
   eddyExeName=eddy_cuda7.0
-  if  [[ $PATH == *"cuda-9.1"* ]]; then
-	eddyExeName=eddy_cuda9.1
+  if  [[ $PATH == *"cuda-9.1" || $PATH == *"cuda/9.1"* ]]; then
+        eddyExeName=eddy_cuda9.1
+  fi
+  if  [[ $PATH == *"cuda-10.1" || $PATH == *"cuda/10.1"* ]]; then
+	eddyExeName=eddy_cuda10.1
   fi
   if ! hash $eddyExeName 2>/dev/null; then
 	eddyExeName=eddy_cuda8.0
