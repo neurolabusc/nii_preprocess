@@ -41,24 +41,27 @@ if [ $nvol -lt 7 ]; then
 fi
 echo "Filenames dti= $dti dtir=$dtir"
 
-eddyExeName=eddy
-if  [[ $PATH == *"cuda"* ]]; then
-  eddyExeName=eddy_cuda7.0
-  if  [[ $PATH == *"cuda-9.1"* ]]; then
-	eddyExeName=eddy_cuda9.1
-  fi
-  if ! hash $eddyExeName 2>/dev/null; then
-	eddyExeName=eddy_cuda8.0
+#much better way to detect CUDA version - CR and DPR 20200327
+if ! [ -x "$(which nvcc)" ] ; then
+    echo "Unable to find nvcc: check CUDA is installed correctly"
+    exit 1
+fi
+cudav=$(nvcc --version | grep "release" | awk '{ print $6 }' | cut -c2- ) 
 
-  fi
-  echo "cuda found in path: will use $eddyExeName"
+eddyExeName=eddy
+if  [[ $cudav == *"8.0."* ]]; then
+    eddyExeName=eddy_cuda8.0
+elif  [[ $cudav == *"9.1."* ]]; then
+    eddyExeName=eddy_cuda9.1
+elif  [[ $cudav == *"10.1."* ]]; then
+    eddyExeName=eddy_cuda10.1
 else
-  echo "cuda NOT found in path: will use $eddyExeName"
+    echo "FSL 6.0.3 only supports CUDA 8.0, 9.1 and 10.1, not version: $cudav"
+    exit 1
 fi
-if ! hash $eddyExeName 2>/dev/null; then
-	echo "Error: unable to find $eddyExeName"
-	exit 1
-fi
+
+echo $cudav
+echo $eddyExeName
 
 #process dti data
 dti_bvec=${dti}.bvec
