@@ -23,8 +23,6 @@ function exitCode = nii_basil(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRu
 %outDir = place to store all results
 
 if isempty(which('nii_tool')), error('nii_tool required (https://github.com/xiangruili/dicm2nii)'); end;
-if isempty(which('nii_fileparts')), error('nii_fileparts required (https://github.com/rordenlab/spmScripts)'); end;
-
 
 % TESTING
 TESTING = ~exist('asl','var');
@@ -574,6 +572,22 @@ end
         end
     end
 
+    function [pth,nam,ext,num] = nii_fileparts(fname)
+        % extends John Ashburner's spm_fileparts.m to include '.nii.gz' as ext
+        num = '';
+        if ~ispc, fname = strrep(fname,'\',filesep); end
+        [pth,nam,ext] = fileparts(fname);
+        ind = find(ext==',');
+        if ~isempty(ind)
+            num = ext(ind(1):end);
+            ext = ext(1:(ind(1)-1));
+        end
+        if strcmpi(ext,'.gz')
+           [pth nam ext] = fileparts(fullfile(pth, nam));
+           ext = [ext, '.gz'];
+        end
+    end
+
     function path = findBestPath(paths)
         path = nan;
         for i = 1:numel(paths)
@@ -599,7 +613,10 @@ end
         if ~exist(flirt,'file')
             error('%s: flirt (%s) not found',mfilename,flirt);
         end
-        command=sprintf('sh -c ". %s/etc/fslconf/fsl.sh; %s/bin/%s"\n',fsldir,fsldir, Cmd);
+        opts = '';
+        global noGz % <- your need this!
+        if ~isempty(noGz) && noGz, opts = 'export FSLOUTPUTTYPE=NIFTI'; end
+        command=sprintf('sh -c ". %s/etc/fslconf/fsl.sh; %s %s/bin/%s"\n',fsldir, opts, fsldir, Cmd);
         %command=sprintf('sh -c ". %s/etc/fslconf/fsl.sh; %s/bin/%s" >log.txt\n',fsldir,fsldir, Cmd);
         
         fprintf(command);

@@ -280,25 +280,22 @@ text(pos(1)+0.0,pos(2)+0.01, n,'Parent',ax, 'FontSize',8, 'fontn','Arial', 'colo
 %*In the case of lesioned brains, performs cat12 on enantiomorphically
 %healed brain, i.e. 'eT1'
 function imgs = doVBMSub(imgs, matName)
-
-global ForceVBM; %e.g. user can call "global ForceVBM;  ForceVBM = true;"
 %these lines confirm presence of eT1 (stolen from doDTISub)
 targetImage = imgs.T1;
 eT1 = prefixSub('e',imgs.T1); %enantimorphic image
 if exist(eT1,'file'), targetImage = eT1; end; %if no lesion, use raw T1
 if ~exist(targetImage,'file'), fprintf('doVBM unable to find %s\n', targetImage); return; end; %required
+global ForceVBM; %e.g. user can call "global ForceVBM;  ForceVBM = true;"
+if isempty(ForceVBM) && isFieldSub(matName, 'VBM_volume_WMH'), fprintf('Skipping VBM (already done) %s\n',targetImage); return;  end;
 %[p, n, x] = fileparts(targetImage);
-
-mySPM = which('spm');
-[p, n, x] = fileparts(mySPM);
+p = spm('Dir');
 SPM_file_arg = {[targetImage ',1']};
-
-TPM_arg = {fullfile(p, 'tpm/TPM.nii')}
+TPM_arg = {fullfile(p, 'tpm/TPM.nii')};
 if ~exist(fullfile(p, 'tpm/TPM.nii'),'file')
     error('Failed to find TPM.nii at: %s',fullfile(p, 'tpm/TPM.nii'));
 end
 
-dartelTPM_arg = {fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii')}
+dartelTPM_arg = {fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii')};
 if ~exist(fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii'),'file')
     error('Failed to find dartelTemplate at: %s',fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii'));
 end
@@ -341,12 +338,24 @@ end
 [p, n, x] = fileparts(imgs.T1);
 targetDir = fullfile(p,'mri');
 normGM = dir(fullfile(targetDir,'mwp1T1*.nii'));
+if isempty(normGM)
+    normGM = dir(fullfile(targetDir,'mwp1eT1*.nii'));
+end
+if isempty(normGM)
+    error('Unable to find file %s', fullfile(targetDir,'mwp1T1*.nii'));
+end
 normWM = dir(fullfile(targetDir,'mwp2T1*.nii'));
+if isempty(normWM)
+    normWM = dir(fullfile(targetDir,'mwp2eT1*.nii'));
+end
+if isempty(normWM)
+    error('Unable to find file %s', fullfile(targetDir,'mwp2T1*.nii'));
+end
 targetDir = fullfile(p,'surf');
 lhSURF = dir(fullfile(targetDir,'lh.cent*.gii'));
 rhSURF = dir(fullfile(targetDir,'rh.cent*.gii'));
-nii_nii2mat(fullfile(normGM.folder, normGM.name), 'vbm_gm' , matName); 
-nii_nii2mat(fullfile(normWM.folder, normWM.name), 'vbm_wm' , matName); 
+nii_nii2mat(fullfile(normGM(1).folder, normGM(1).name), 'vbm_gm' , matName); 
+nii_nii2mat(fullfile(normWM(1).folder, normWM(1).name), 'vbm_wm' , matName); 
 %nii_nii2mat(fullfile(lhSURF.folder, lhSURF.name), 'surf_lh' , matName); 
 %nii_nii2mat(fullfile(rhSURF.folder, rhSURF.name), 'surf_rh' , matName); 
 
@@ -435,7 +444,7 @@ vox2mat(prefixSub('wbmean',imgs.fMRI), 'fMRIave', matName);
 
 function imgs = dofMRISub_Task(imgs, matName, task)
 if ~exist('task','var'), task= ''; end;
-structName = ['fMRI', task];
+structName = ['fmri', task];
 
 if isempty(imgs.T1) || ~isfield(imgs, structName) || isempty(imgs.(structName)), return; end; %required
 imgs.(structName) = removeDotSub (imgs.(structName));
@@ -937,8 +946,9 @@ bed_dir=fullfile(pth, 'bedpost');
 %if exist(bed_dir, 'file'), rmdir(bed_dir, 's'); end; %666 ForceBedpost
 if ~exist(bed_dir, 'file'), mkdir(bed_dir); end;
 dti_u=prepostfixSub('', 'du', dti);
-dti_x=fullfile(bed_dir, 'data.nii.gz');
 if ~exist(dti_u,'file'), error('Bedpost unable to find %s', dti_u); end;
+[~,~,x] = fsl_filepartsSub(dti_u);
+dti_x=fullfile(bed_dir, ['data', x]);
 copyfile(dti_u, dti_x);
 [bvec, bval] = getBVec(dti);
 dti_x=fullfile(bed_dir, 'bvecs');
@@ -946,7 +956,8 @@ copyfile(bvec, dti_x);
 dti_x=fullfile(bed_dir, 'bvals');
 copyfile(bval, dti_x);
 dti_faThr=prepostfixSub('', 'd_FA_thr', dti);
-dti_x=fullfile(bed_dir, 'nodif_brain_mask.nii.gz');
+[~,~,x] = fsl_filepartsSub(dti_faThr);
+dti_x=fullfile(bed_dir, ['nodif_brain_mask', x]);
 copyfile(dti_faThr, dti_x);
 if isGpuInstalledSub
     command=sprintf('bedpostx_gpu "%s" ', bed_dir);
@@ -1062,7 +1073,7 @@ for i = 1: nROI
         command=sprintf('%s -x "%s" --dir="%s" --forcedir  -P %d -s "%s" -m "%s" --opd --pd -l -c 0.2 --distthresh=0', ...
             exeName, maski, prob_diri, nPerm ,bed_merged, bed_mask );
         commands = [commands {command}]; %#ok<AGROW>
-    fprintf("%s\n", command);
+    %fprintf("%s\n", command);
     %end %if voxels survive
 end %for each region
 if numel(commands) < 1
@@ -1122,6 +1133,8 @@ if ~exist('maxThreads', 'var')
     if maxThreads > 15, maxThreads = maxThreads - 1; end;
 end
 setenv('FSLPARALLEL', num2str(maxThreads));
+setenv('PROBTRACKX_PARALLEL', num2str(3));
+setenv('XFIBRE_PARALLEL', num2str(3));
 %end fslParallelSub()
 
 
@@ -1280,9 +1293,17 @@ if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 function nii_check_dependencies
 %make sure we can run nii_preprocess optimally
 if isempty(which('NiiStat')), error('NiiStat required (https://github.com/neurolabusc/NiiStat)'); end;
-if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
-if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
+p = fullfile(spm('Dir'),'toolbox','Clinical');
+if ~exist(p,'dir')
+    error('Missing the Clinical Toolbox https://github.com/neurolabusc/Clinical\n');
+    
+end
+p = fullfile(spm('Dir'),'toolbox','cat12');
+if ~exist(p,'dir')
+    error('Missing the cat12 Toolbox http://www.neuro.uni-jena.de/cat/index.html#DOWNLOAD\n');
+    
+end
 if isempty(which('nii_batch12')),
     p = fileparts(which('nii_preprocess'));
     p = fullfile(p,'nii_fmri');
@@ -1317,14 +1338,16 @@ cmd = fslCmdSub(cmd);
 goodStr = '--repol';
 %cmd
 %cmdout
-isempty(strfind(cmdout,goodStr))
 if isempty(strfind(cmdout,goodStr))
    error('Update eddy files to support "repol" https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
 end
 %end nii_check_dependencies()
 
 function fsldir = fslDirSub;
-fsldir= '/usr/local/fsl/'; %CentOS intall location
+fsldir=getenv('FSLDIR');
+if isempty(fsldir)
+    fsldir= '/usr/local/fsl/'; %CentOS intall location
+end
 if ~exist(fsldir,'dir')
     fsldir = '/usr/share/fsl/5.0/'; %Debian install location (from neuro debian)
     if ~exist(fsldir,'dir')
@@ -1365,7 +1388,14 @@ d = dir([pth, '*']);
 isub = [d(:).isdir];
 d = {d(isub).name}';
 dcuda = d(contains(d,'cuda'));
-if isempty(dcuda), fprintf('GPU tools may fail: Unable to find cuda folders in %s', pth); end 
+if isempty(dcuda), 
+    [status,cmdout]  = system('nvcc --version');
+    if status == 0
+        fprintf('GPU tools might fail: nvcc found but cuda not in LD_LIBRARY_PATH\n');
+    else
+        fprintf('GPU tools may fail: Unable to find cuda folders in %s\n', pth);
+    end
+end 
 for i = 1 : numel(dcuda)
     cudalib=[[pth, dcuda{i}], filesep, 'lib64'];
     if ~exist(cudalib), continue; end
@@ -1376,7 +1406,10 @@ end
 
 function command  = fslCmdSub (command)
 fsldir = fslDirSub;
-cmd=sprintf('sh -c ". %s/etc/fslconf/fsl.sh; ',fsldir);
+opts = '';
+global noGz % <- your need this!
+if ~isempty(noGz) && noGz, opts = 'export FSLOUTPUTTYPE=NIFTI;'; end
+cmd=sprintf('sh -c ". %s/etc/fslconf/fsl.sh; %s ',fsldir, opts);
 command = [cmd command '"'];
 %fslCmdSub
 
@@ -1516,6 +1549,8 @@ if idx < 1, error('Invalid roi name %s', roiName); end;
 
 function imgs = doAslSubOld(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end; %we need these images
+if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
+if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL; %e.g. user can call "global ForceASL;  ForceASL = true;"
 if isempty(ForceASL) && isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
@@ -1548,50 +1583,52 @@ save(matName,'-struct', 'stat');
 %end doAslSubOld()
 
 function imgs = doAslSub(imgs, matName)
-
+warning('ASL not functional');
+return;
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL;
+if isempty(ForceASL) && isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
 ASLrev = []; %reverse phase encoded image
-jsonFile = [];   %name of json file that stores parameters for this scan
-[numVolASLImg, ~] = nVolSub (imgs.ASL) ;
-
-switch numVolASLImg
-    case 101 %handles POLAR and legacy pasl sequences
-        jsonFile = which('POLAR_dummy.json');
-    case 74
-        jsonFile = which('LEGACY_PCASL_dummy.json');
-    case 97
-        jsonFile = which('LARC_dummy.json'); 
-        [pth,nam,ext] = spm_fileparts(imgs.ASL);
-        
-        ASLrev = imgs.ASLrev;   % [pth '/' nam 'rev',ext];
-    case 60
-        jsonFile = which('SEN_dummy.json'); 
-    otherwise
-        error('Can''t guess sequence type');
+[p,n] = filepartsSub(imgs.ASL);
+jsonFile = fullfile(p, [n, '.json']);   %name of json file that stores parameters for this scan
+if ~exist(jsonFile,'file')
+    [numVolASLImg, ~] = nVolSub (imgs.ASL) ;
+    warning('Guessing ASL parameters: missing JSON "%s"\n', jsonFile)
+    p = fileparts(which(mfilename));
+    p = fullfile(p,'json');
+    switch numVolASLImg
+        case 101 %handles POLAR and legacy pasl sequences
+            jsonFile = fullfile(p,'POLAR_dummy.json');
+        case 74
+            jsonFile = fullfile(p,'LEGACY_PCASL_dummy.json');
+        case 97
+            jsonFile = fullfile(p,'LARC_dummy.json'); 
+            [pth,nam,ext] = spm_fileparts(imgs.ASL);
+            ASLrev = imgs.ASLrev;   % [pth '/' nam 'rev',ext];
+        case 60
+            jsonFile = fullfile(p,'SEN_dummy.json'); 
+        otherwise
+            error('Can''t guess sequence type');
+    end
+    if ~exist(jsonFile,'file')
+        error('Can''t find json %s', jsonFile);
+    end 
 end
-if ~exist(jsonFile, 'file') 
-    error('Can''t find json dummy file anywhere in your current Matlab path, you dummy!');
-end
-
 pth = spm_fileparts(imgs.ASL);
 basilDir = fullfile(pth, 'BASIL');
 if ~exist(basilDir, 'dir')
     mkdir(basilDir);
 end
-[filepath,name,ext] = fileparts(imgs.T1)
-healedT1 = [filepath,'/e',name,ext];
+[filepath,name,ext] = fileparts(imgs.T1);
+healedT1 = fullfile(filepath,['e',name,ext]);
 %function exitCode = nii_basil(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRun, overwrite, outDir)
 %if you have a lesion, then use the healed T1 for nii_basil, otherwise use the original T1 for nii_basil
-
-
 if(~isempty(imgs.Lesion))
     exitCode = nii_basil(imgs.ASL,healedT1, ASLrev, jsonFile, '', '', false, basilDir)
 else
     exitCode = nii_basil(imgs.ASL,imgs.T1, ASLrev, jsonFile, '', '', false, basilDir)
 end
-    
 if exitCode ~= 0, error('BASIL failed\n'); end;
 basil2mat(basilDir, matName);
 %end doAslSub()
@@ -1977,6 +2014,12 @@ end
 
 function v = isGpuInstalledSub()
 v = ~isempty(strfind(getenv('PATH'),'cuda'));
+if v, return; end
+[status,cmdout]  = system('nvcc --version');
+if status == 0
+    %fprintf('GPU tools might fail: nvcc found but cuda not in LD_LIBRARY_PATH\n');
+    v = true;
+end 
 %v = 0; %default to 0
 %if ~exist('/usr/local/cuda/bin/nvcc','file')
 %    return;

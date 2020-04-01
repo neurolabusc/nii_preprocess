@@ -125,16 +125,19 @@ copyfile([inname '.bvec'], [outname '.bvec']);
 copyfile([inname '.bval'], [outname '.bval']);
 inname = [inname ext];
 fname = [outname ext];
+%setenv([getenv('PATH') ':/usr/mrtrix3/bin']);
 [~,exenam] = system('which dwidenoise');
 exenam = strip(exenam);
 if ~exist(exenam, 'file')
-   userDir = char(java.lang.System.getProperty('user.home'));
-   exenam2 = fullfile(userDir, 'mrtrix3','bin','dwidenoise');
-   if exist(exenam2, 'file')
-    exenam = exenam2;
-   else
-    error('unable to find %s', exenam); 
-   end
+    userDir = char(java.lang.System.getProperty('user.home'));
+    p = fullfile(userDir, 'mrtrix3','bin');
+    
+    exenam2 = fullfile(p,'dwidenoise');
+    if exist(exenam2, 'file')
+        exenam = exenam2;
+    else
+        error('unable to find dwidenoise in path (install MRtrix3): %s', exenam2); 
+    end
 end
 cmd = sprintf('%s -force -quiet "%s" "%s"', exenam, inname, fname);
 fprintf('Running : %s\n', cmd);
@@ -162,7 +165,14 @@ function status  = systemSub (cmd)
 % Save library paths
 %MatlabPath = getenv('LD_LIBRARY_PATH');
 % Make Matlab use system libraries
-%setenv('LD_LIBRARY_PATH',getenv('PATH'));
+ldpth = getenv('LD_LIBRARY_PATH');
+pth = getenv('PATH');
+if isempty(ldpth) && ~isempty(pth)
+    setenv('LD_LIBRARY_PATH',pth);
+elseif ~isempty(pth)
+	%setenv('PATH',sprintf('%s:%s',ldpath,path));
+    setenv('LD_LIBRARY_PATH',getenv('PATH'));
+end
 fprintf('%s\n',cmd);
 status = system(cmd);
 % Reassign old library paths

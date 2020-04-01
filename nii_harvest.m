@@ -39,8 +39,8 @@ outDir = '/media/coffee/Desktop/POLAR_TEST_IN';
 %outDir = '/media/UBU/Master_In/';
 %baseDir = '/media/UBU/Master_DB/'; %'/Root'
 
-baseDir = '/work/reddydp/neuro/ABC_MASTER_DB';
-outDir = '/work/reddydp/neuro/ABC_MASTER_IN';
+baseDir = '/home/chris/neuro/master/DB';
+outDir = '/home/chris/neuro/master/In';
 
 % if the correct environment variables are set in the environment, override
 % the above
@@ -51,14 +51,15 @@ if ~isempty(getenv('nii_harvest_outDir'))
     outDir = getenv('nii_harvest_outDir')
 end
 
+setOrigin = false; %attempt to crop and set anterior commissure for images
 isExitAfterTable = false; % <- if true, only generates table, does not process data
 isPreprocess = true; % <- if true full processing, otherwise just cropping
 isReportDims = true; %if true, report dimensions of raw data
-reprocessRest = true;
-reprocessfMRI = true;
-reprocessASL = true;
-reprocessDTI = true;
-reprocessVBM = true;
+reprocessRest = false;
+reprocessfMRI = false;
+reprocessASL = false;
+reprocessDTI = false;
+reprocessVBM = false;
 explicitProcess = false; % <- if true, will only process if the reprocess flag is true
 
 % if the correct environment variables are set in the environment, override
@@ -114,7 +115,7 @@ subjDirs = subFolderSub(baseDir);
 subjDirs = sort(subjDirs);
 
 %subjDirs ={'LARC15M2165'};
-subjDirs = {'ABC1001'};
+%subjDirs = {'ABC1001'};
 
 if ~isempty(getenv('nii_harvest_subjDirs'))
     subjDirs = {getenv('nii_harvest_subjDirs')}
@@ -231,9 +232,10 @@ for s =  1: nSubj
     %imgs(s).nii.fMRI.newImg = false;
     %imgs(s).nii.Rest.newImg = false;
     %666x <-
-    if imgs(s).nii.fMRI.newImg, ForcefMRI = true; end;
-    if imgs(s).nii.Rest.newImg, ForceRest = true; end;
-    if imgs(s).nii.ASL.newImg, ForceASL = true; end;
+    %following lines always force reprocessing...
+    %if imgs(s).nii.fMRI.newImg, ForcefMRI = true; end;
+    %if imgs(s).nii.Rest.newImg, ForceRest = true; end;
+    %if imgs(s).nii.ASL.newImg, ForceASL = true; end;
     %666 if imgs(s).nii.DTI.newImg, ForceDTI = true; end;
       %to reprocess one modality for EVERYONE....
     if reprocessDTI && isfield(imgs(s).nii.DTI,'img')
@@ -246,6 +248,7 @@ for s =  1: nSubj
     end
     if reprocessfMRI && isfield(imgs(s).nii.fMRI,'img')
         ForcefMRI = true;
+        error('xx');
         anyNewImg = true;
     end
     if reprocessASL && isfield(imgs(s).nii.ASL,'img')
@@ -299,13 +302,14 @@ for s =  1: nSubj
         matNameGUI = fullfile(subjDir, [subj, '_limegui.mat']);
         fprintf('Creating %s\n',matNameGUI);
         save(matNameGUI,'-struct', 'mat');
-        %determine T1 name even if output folder renamed...
-        if imgs(s).nii.T1.newImg || imgs(s).nii.Lesion.newImg, setAcpcSubT1(matNameGUI); end;
-        %if imgs(s).nii.T1.newImg, setAcpcSubT1(matNameGUI); end;
-        %if imgs(s).nii.Lesion.newImg, setAcpcSubT1 (matNameGUI); end;
-        
-        if imgs(s).nii.DTI.newImg, setAcpcSubDTI (matNameGUI); end;
+        if setOrigin 
+            %determine T1 name even if output folder renamed...
+            if imgs(s).nii.T1.newImg || imgs(s).nii.Lesion.newImg, setAcpcSubT1(matNameGUI); end;
+            %if imgs(s).nii.T1.newImg, setAcpcSubT1(matNameGUI); end;
+            %if imgs(s).nii.Lesion.newImg, setAcpcSubT1 (matNameGUI); end;
 
+            if imgs(s).nii.DTI.newImg, setAcpcSubDTI (matNameGUI); end;
+        end
         %process the data
         nii_preprocess(mat,[],process1st);
       
