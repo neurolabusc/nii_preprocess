@@ -1,0 +1,162 @@
+
+                            < M A T L A B (R) >
+                  Copyright 1984-2020 The MathWorks, Inc.
+                  R2020a (9.8.0.1323502) 64-bit (glnxa64)
+                             February 25, 2020
+
+ 
+To get started, type doc.
+For product information, visit www.mathworks.com.
+ 
+CAT parallel processing with MATLAB PID: 168042
+
+------------------------------------------------------------------------
+CAT12.6 r1450: 1/1:  /home/chris/neuro/master/In/M2024/eT1_M2024_R01.nii
+------------------------------------------------------------------------
+SANLM denoising (medium):                                            14s
+APP: Rough bias correction:                                       
+  Initialize                                                          2s
+  Estimate background                                                 1s
+  Initial correction                                                  3s
+  Refine background                                                   1s
+  Final correction                                                    2s
+  Final scaling                                                       3s
+                                                                     14s
+Affine registration                                                   4s
+Affine registration                                                   7s
+SPM preprocessing 1 (estimate 1):                                    33s
+SPM preprocessing 1 (estimate 2):                                    28s
+SPM preprocessing 2 (write):                                      
+  Write Segmentation                                                  8s
+  Update Segmentation                                                14s
+  Update Skull-Stripping                                             12s
+  Update probability maps                                             2s
+                                                                     35s
+Global intensity correction:                                          5s
+SANLM denoising after intensity normalization (medium):               5s
+Fast registration                                                 
+Dartel registration with 1.50 mm on a 1.50 mm Template:           
+  Template: "/home/chris/neuro/spm12/toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii"
+    1 | 0.1240 |   394966        0   394966  303.780 
+    2 | 0.1062 |   338215     6618   344833  191.924 
+    3 | 0.0973 |   309782     9900   319682  155.358 
+    4 | 0.0891 |   283690    12231   295921  140.524 
+    5 | 0.0808 |   257274    13740   271014  118.972 
+    6 | 0.0732 |   233071    27211   260281   62.788 
+
+                                                                     25s
+   27s
+Local adaptive segmentation (LASstr=0.50):                        
+  Prepare maps                                                        2s
+  Prepare partitions                                                  0s
+  Prepare segments (LASmod = 1.00)                                    4s
+  Estimate local tissue thresholds (WM)                               7s
+  Estimate local tissue thresholds (GM)                              10s
+  Estimate local tissue thresholds (CSF/BG)                           1s
+  Intensity transformation                                           25s
+  SANLM denoising after LAS (medium)                                 12s
+                                                                     12s
+ROI segmentation (partitioning):                                  
+  Atlas -> subject space                                              3s
+  Major structures                                                    2s
+  Ventricle detection                                                 5s
+  Blood vessel detection                                              4s
+  WMH detection (WMHCstr=0.50 > WMHCstr'=0.13)                       11s
+  Manual stroke lesion detection                                      0s
+  Closing of deep structures                                          1s
+  Side alignment                                                      1s
+  Final corrections                                                   1s
+                                                                     29s
+Blood vessel correction (BVCstr=0.50):                                0s
+Amap using initial SPM12 segmentations (MRF filter strength 0.06):    9s
+    AMAP peaks: [CSF,GM,WM] = [0.40±0.06,0.68±0.09,0.97±0.04]
+Final cleanup (gcutstr=0.25):                                     
+  Level 1 cleanup (ROI estimation)                                    1s
+  Level 1 cleanup (brain masking)                                     0s
+  Level 2 cleanup (CSF correction)                                    0s
+  Level 3 cleanup (CSF/WM PVE)                                        0s
+                                                                      2s
+
+
+Dartel registration with 1.50 mm on a 1.50 mm Template:           
+  Template: "/home/chris/neuro/spm12/toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii"
+    1 | 0.1265 |   402978        0   402978  304.064 
+    2 | 0.1113 |   354556    14324   368880  109.588 
+    3 | 0.1094 |   348351    17023   365375   42.096 
+    4 | 0.1086 |   345932     9083   355015  164.772 
+    5 | 0.1015 |   323367    23707   347074   59.063 
+    6 | 0.1011 |   322026    24283   346309   37.077 
+    7 | 0.1010 |   321774    12682   334456  146.244 
+    8 | 0.0930 |   296171    29181   325352   55.753 
+    9 | 0.0926 |   294902    29436   324338   36.378 
+   10 | 0.0923 |   293969    15469   309439  132.678 
+   11 | 0.0838 |   266730    32618   299348   54.690 
+   12 | 0.0832 |   265083    32917   298000   36.827 
+   13 | 0.0832 |   264788    17399   282188  109.834 
+   14 | 0.0757 |   240910    31913   272823   50.152 
+   15 | 0.0748 |   238344    32979   271323   35.981 
+   16 | 0.0745 |   237271    34719   271990   41.974 
+   17 | 0.0742 |   236255    34910   271165   32.371 
+   18 | 0.0739 |   235315    35633   270948   30.401 
+                                                                     74s
+  Jacobian determinant (RMS):  0.100964 
+           Template Matching:  0.073896 
+Write result maps:                                                    9s
+Surface and thickness estimation:                                 
+lh:
+  Thickness estimation (0.50 mm³):                                
+    WM distance:                                                     14s
+    CSF distance:                                                    13s
+    PBT2x thickness:                                                 11s
+                                                                     41s
+                                                                     43s
+  Create initial surface                                             21s
+  Topology correction and surface refinement:                        32s
+  Refine central surface                                             45s
+  Correction of central surface in highly folded areas 2              2s
+  Spherical mapping with areal smoothing                             76s
+  Spherical registration                                            201s
+ Surface Euler number: 2
+ Overall size of topology defects: 0
+rh:
+  Thickness estimation (0.50 mm³):                                
+    WM distance:                                                     15s
+    CSF distance:                                                    15s
+    PBT2x thickness:                                                 13s
+                                                                     46s
+                                                                     48s
+  Create initial surface                                             23s
+  Topology correction and surface refinement:                        35s
+  Refine central surface                                             43s
+  Correction of central surface in highly folded areas 2              2s
+  Spherical mapping with areal smoothing                             84s
+  Spherical registration                                            204s
+ Surface Euler number: 2
+ Overall size of topology defects: 0
+Display thickness: /home/chris/neuro/master/In/M2024/surf/lh.thickness.eT1_M2024_R01
+Display thickness: /home/chris/neuro/master/In/M2024/surf/rh.thickness.eT1_M2024_R01
+Surface and thickness estimation:                                   972s
+ROI estimation:                                                   
+  Data mapping to normalized atlas space                             51s
+  ROI estimation of 'cobra' atlas                                     8s
+  Data mapping to normalized atlas space                             36s
+  ROI estimation of 'neuromorphometrics' atlas                        1s
+  ROI estimation of 'lpba40' atlas                                    0s
+  ROI estimation of 'hammers' atlas                                   1s
+                                                                     98s
+Quality check:                                                        2s
+Developer display mode!
+Print 'Graphics' figure to: 
+  /home/chris/neuro/master/In/M2024/report/catreport_eT1_M2024_R01.pdf
+
+------------------------------------------------------------------------
+CAT preprocessing takes 22 minute(s) and 4 second(s).
+Image Quality Rating (IQR):  86.19% (B)
+Segmentations are saved in /home/chris/neuro/master/In/M2024/mri
+Reports are saved in /home/chris/neuro/master/In/M2024/report
+Labels are saved in /home/chris/neuro/master/In/M2024/label
+------------------------------------------------------------------------
+
+
+________________________________________________________________________
+CAT12 Segmentation job finished.
