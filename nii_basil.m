@@ -1,4 +1,4 @@
-function exitCode = nii_basil(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRun, outDir)
+function exitCode = nii_bas(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRun, outDir)
 
 %warning('in nii_basil');
 % asl='/work/reddydp/neuro/ABC_MASTER_IN/ABC1001/ASL_ABC1001_ABC.nii';
@@ -276,13 +276,16 @@ switch sequence
         options.labelControlPairs = PAIRS_CONTROL_THEN_LABEL;
 end
 
-if aslOrder(aslX) && strcmp(options.labelControlPairs,PAIRS_LABEL_THEN_CONTROL)
-     warning('ASL has label-control, but specified as control-label')
-end
-if aslOrder(aslX) && ~strcmp(options.labelControlPairs,PAIRS_LABEL_THEN_CONTROL)
-     warning('ASL has control-label, but specified as label-control')
-end
 
+controlBeforeLabel = aslOrder(aslX);
+if ~controlBeforeLabel && strcmp(options.labelControlPairs,PAIRS_CONTROL_THEN_LABEL)
+	controlBeforeLabel = aslOrder(aslX, true);
+    error('ASL has label-then-control order, but specified as control-then-label')
+end
+if controlBeforeLabel && strcmp(options.labelControlPairs,PAIRS_LABEL_THEN_CONTROL)
+	controlBeforeLabel = aslOrder(aslX, true);
+	error('ASL has control-then-label order, but specified as label-then-control')
+end
 options.output = aslOutput;
 options.inputImage = aslX;
 options.calibrationImage = m0X;
@@ -299,11 +302,19 @@ if ~isempty(options.T1Image)
     % generate anat .struct file
     if isempty(anatDir)
         anatDir = options.output;
+    else
+        [p,n,x] = fileparts(anatDir);
+        if strcmpi([n,x], 'struc.anat')
+            anatDir = p;
+        end
     end
     options.anatFile = [anatDir '/struc.anat'];
+    if ~exist(anatDir, 'dir')
+        error('Missing anatDir named "%s"\', anatDir);
+    end
 
-    if ~exist(options.anatFile, 'file')
-        command = ['fsl_anat -i "' options.T1Image '" -o ' anatDir '/struc']
+    if ~exist(options.anatFile, 'dir')
+        command = ['fsl_anat -i "' options.T1Image '" -o ' anatDir '/struc'];
         if ~dryRun
             exitCode = fslCmd(command);
             if exitCode ~= 0
@@ -313,19 +324,22 @@ if ~isempty(options.T1Image)
             % show command for dry runs
             disp(command);
         end
-    elseif exist(options.anatFile, 'file')
-        command = ['fsl_anat -i "' options.T1Image '" --clobber -o ' anatDir '/struc']
-        if ~dryRun
-            exitCode = fslCmd(command);
-            if exitCode ~= 0
-                return;
-            end
+    else %exist(options.anatFile, 'dir')
+        if false
+            fprintf('Using existing files %s\n', options.anatFile); 
         else
-            % show command for dry runs
-            disp(command);
+            %20200325 RNN and DR suggest we always recreated files
+            command = ['fsl_anat -i "' options.T1Image '" --clobber -o ' anatDir '/struc'];
+            if ~dryRun
+                exitCode = fslCmd(command);
+                if exitCode ~= 0
+                    return;
+                end
+            else
+                % show command for dry runs
+                disp(command);
+            end
         end
-    elseif dryRun
-        disp (['found .anat file at "' options.anatFile '"']);
     end
 else
     options.anatFile = '';
@@ -338,6 +352,7 @@ command = makeCommand(options);
 if ~isempty(command) && ~dryRun
     exitCode = fslCmd(command);
 else
+    disp(command);
     exitCode = 0;
 end
 
@@ -443,7 +458,7 @@ end
             '-o "', options.output, '"'
             ];
         
-        command = [part1 ' ' part2 ' ' part3 ' ' part4 ' ' part5 ' ' part6]
+        command = [part1 ' ' part2 ' ' part3 ' ' part4 ' ' part5 ' ' part6];
     end
 
     function SecPerSlice = calculateSliceTiming(SliceTiming)
@@ -478,14 +493,18 @@ end
         sequence = result{1}{2};
         %sequence = js.PulseSequenceDetails;
         % TODO: make reverse lookup table 
-        if strcmp(sequence,'to_ep2d_VEPCASL')
+        
+        
+        if strcmpi(sequence,'to_ep2d_VEPCASL')
             sequence = SEQUENCE_PCASL_OXFORD;
         end
-        
+        if strcmpi(sequence,'tgse_pcasl_ve11c') %aka 'jw_tgse_VEPCASL'
+            sequence = SEQUENCE_PCASL_TGSE;
+        end
         switch sequence
            
             case SEQUENCE_PCASL_OXFORD
-                if ~isfield(js, 'InversionTime'), error('Require InversionTime'); end
+                %if ~isfield(js, 'InversionTime'), error('Require InversionTime'); end
                 if ~isfield(js, 'BolusDuration'), error('Require BolusDuration'); end
                 if ~isfield(js, 'InitialPostLabelDelay'), error('Require InitialPostLabelDelay'); end
                 if ~isfield(js, 'RepetitionTime'), error('Require RepetitionTime'); end
@@ -497,7 +516,24 @@ end
                 PLDs = js.InitialPostLabelDelay;
                 TR = js.RepetitionTime;
                 EffectiveEchoSpacing = js.EffectiveEchoSpacing;
-                                                
+
+            case SEQUENCE_PCASL_TGSE
+                %if ~isfield(js, 'InversionTime'), error('Require InversionTime'); end
+                if ~isfield(js, 'InitialPostLabelDelay'), error('Require InitialPostLabelDelay'); end
+                if ~isfield(js, 'RepetitionTime'), error('Require RepetitionTime'); end
+                if isfield(js, 'MaximumT1Opt')
+                    BD = js.MaximumT1Opt;
+                elseif isfield(js, 'T1')
+                    BD = T1;
+                else
+                    error('Require MaximumT1Opt');
+                end
+                PLDs = js.InitialPostLabelDelay;
+                TR = js.RepetitionTime;
+                SecPerSlice = '';
+                EffectiveEchoSpacing = '';                  
+
+                
             case SEQUENCE_PASL_SIEMENS
                 if ~isfield(js, 'InversionTime'), error('Require InversionTime'); end
                 if ~isfield(js, 'RepetitionTime'), error('Require RepetitionTime'); end

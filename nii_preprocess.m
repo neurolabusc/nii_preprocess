@@ -44,6 +44,7 @@ if ~isfield(imgs,'Rest'), imgs.Rest = []; end;
 if ~isfield(imgs,'DTI'), imgs.DTI = []; end;
 if ~isfield(imgs,'DTIrev'), imgs.DTIrev = []; end;
 if ~isfield(imgs,'fMRI'), imgs.fMRI = []; end;
+if ~isfield(imgs,'fMRIpass'), imgs.fMRIpass = []; end;
 if ~isfield(imgs,'DKIrev'), imgs.DKIrev = []; end;
 if ~isfield(imgs,'DKI'), imgs.DKI = []; end;
 
@@ -287,6 +288,10 @@ if exist(eT1,'file'), targetImage = eT1; end; %if no lesion, use raw T1
 if ~exist(targetImage,'file'), fprintf('doVBM unable to find %s\n', targetImage); return; end; %required
 global ForceVBM; %e.g. user can call "global ForceVBM;  ForceVBM = true;"
 if isempty(ForceVBM) && isFieldSub(matName, 'VBM_volume_WMH'), fprintf('Skipping VBM (already done) %s\n',targetImage); return;  end;
+if contains(targetImage,'dummy','IgnoreCase',true) 
+    fprintf('Skipping VBM (dummy T1 acquired in previous session) %s\n',targetImage);
+    return;
+end
 %[p, n, x] = fileparts(targetImage);
 p = spm('Dir');
 SPM_file_arg = {[targetImage ',1']};
@@ -1583,8 +1588,6 @@ save(matName,'-struct', 'stat');
 %end doAslSubOld()
 
 function imgs = doAslSub(imgs, matName)
-warning('ASL not functional');
-return;
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL;
@@ -1631,6 +1634,7 @@ else
 end
 if exitCode ~= 0, error('BASIL failed\n'); end;
 basil2mat(basilDir, matName);
+warning('cr20200528 todo here - test old sequences\n');
 %end doAslSub()
 
 
