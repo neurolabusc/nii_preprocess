@@ -1,4 +1,4 @@
-function dkifx2 (DWI_nam, bval_nam, Mask_nam, Smooth,param)
+function MK_nam = dkifx2 (DWI_nam, bval_nam, Mask_nam, Smooth)
 % DWI_nam  : name of DWI file, either (img.nii or img.nii.gz)
 % bval_nam : b-value name (img.bval)
 % Mask_nam : (optional) name of masking image (mask.nii or mask.nii.gz)
@@ -31,74 +31,23 @@ if ~exist('Mask_nam','var')  %Mask_nam not specified
 else
     if ~exist(Mask_nam, 'file'), error('Unable to find %s', Mask_nam); end;
 end
-[p,n] = fileparts(DWI_nam(1:end-3)); % this was originally bval name but would give bugs if you had both PA and AP
-dwi_name= n;
-bvec_nam = fullfile(p, [dwi_name '.eddy_rotated_bvecs']);
-
-
-if ~exist(DWI_nam,'file'), warning('Skipping McKinnon DKI: Unable to find %s',DWI_nam); return; end;
-if ~exist(bvec_nam,'file'), warning('Skipping McKinnon DKI: Unable to find %s',bvec_nam); return; end;
-if ~exist(bval_nam,'file'), warning('Skipping McKinnon DKI: Unable to find %s',bval_nam); return; end;
+[p,n] = fileparts(bval_nam);
+bvec_nam = fullfile(p, [n '.bvec']);
+if ~exist(DWI_nam,'file'), error('Unable to find %s',DWI_nam); end;
+if ~exist(bvec_nam,'file'), error('Unable to find %s',bvec_nam); end;
+if ~exist(bval_nam,'file'), error('Unable to find %s',bval_nam); end;
 %load data
 fprintf('%s version 7/2017 loading data\n', mfilename);
-
-% renormalize USC data because of difference in TE
-load(bval_nam)
-load(bvec_nam)
-
-if exist('DTI_99_DTI_dir42_AP_4') & (length(DTI_99_DTI_dir42_AP_4)==99)
-dwi_name= [dwi_name 'n']; % add n for normalization 
-b0i=find(DTI_99_DTI_dir42_AP_4==5);
-b1000i=find(abs([DTI_99_DTI_dir42_AP_4]-1000)<100); % b=1000 fluctuates from 990-1010
-b2000i=find(abs([DTI_99_DTI_dir42_AP_4]-2000)<100);
-b01i=b0i(b0i<=(b1000i(end)+1));%b0s from the 1000s set
-b02i=b0i(b0i>=(b2000i(1)-1));%b0s from the 1000s set; expression is not really that general   
-[hdr, img] = read_volsSub (DWI_nam);
-b01mean=mean(cat(4,img(:,:,:,b01i)),4); %take the mean of b0s at the same TE as the b1000s
-b02mean=mean(cat(4,img(:,:,:,b02i)),4); %take the mean of the b0s at the same TE as the b2000s
-ratio=b01mean./b02mean; %get a ratio of this
-normalization_nam = fullfile(p, [dwi_name '_normalization_factor.nii']);
-save_volSub(normalization_nam, hdr(1), ratio); 
-S_DKE=cat(4,b01mean,img(:,:,:,b1000i),img(:,:,:,b2000i).*ratio);
-S_DKE(isnan(S_DKE))=0;
-DWI_nam = fullfile(p, [dwi_name '.nii']);
-hdr(1).fname=DWI_nam;
-hdr_4D=repmat(hdr(1),[1 sum(length(b1000i)+length(b2000i)+1)]);
-
-% write the 4D nifti file for calculation KT and DT  
-
-for ii=1:sum(length(b1000i)+length(b2000i)+1)
-   hdr_4D(ii).n=[ii 1];
-   spm_write_vol(hdr_4D(ii),S_DKE(:,:,:,ii));
-end
-
-% write gradient file and bval file for for calculation KT and DT   
-    bval_nam = fullfile(p, [dwi_name '.bval']);
-    fid = fopen(bval_nam,'w');   
-    fprintf(fid,'%18.15f\t',DTI_99_DTI_dir42_AP_4([1,b1000i,b2000i])); 
-    fclose(fid);     
-    
-    bvec_nam = fullfile(p, [dwi_name '.bvec']);
-    fid = fopen(bvec_nam,'w');   
-    fprintf(fid,'%18.15f ',DTI_99_DTI_dir42_AP_4du(1,[1,b1000i,b2000i]));
-    fprintf(fid,'\n');
-    fprintf(fid,'%18.15f ',DTI_99_DTI_dir42_AP_4du(2,[1,b1000i,b2000i])); 
-    fprintf(fid,'\n');
-    fprintf(fid,'%18.15f ',DTI_99_DTI_dir42_AP_4du(3,[1,b1000i,b2000i])); 
-    fclose(fid); 
-end
-
 %smooth data (optional)
 sDWI_nam = DWI_nam;
 isSmooth = false;
 %if exist('Smooth','var') && Smooth  %default: no smooth - recommended by mrtrix
 if ~exist('Smooth','var') || Smooth  %default: smooth - recommended by MUSC
     isSmooth = true;
-    dwi_name= ['s' dwi_name];
     [hdr, img] = read_volsSub (DWI_nam);
     fprintf(' Smoothing %d volumes\n', size(img,4));
     [pth,nam] = filepartsSub(DWI_nam);
-    sDWI_nam = fullfile(pth, [dwi_name '.nii']);
+    sDWI_nam = fullfile(pth, ['s', nam, '.nii']);
     hdr = hdr(1);
     hdr.fname = sDWI_nam;
     for v = 1 : size(img,4) %smooth each volume
@@ -116,8 +65,7 @@ end
 fprintf(' Computing mean kurtosis\n');
 start = tic;
 [dt, dkt] = dwi2tensorSub(sDWI_nam, bvec_nam, bval_nam, Mask_nam);
-%tensor2metricSub(sDWI_nam, dt); reduntant since we have
-%estimate_parameters
+tensor2metricSub(sDWI_nam, dt);
 %fprintf(' %g seconds, Mean kurtosis values range from %g..%g (clipped to %g..%g)\n', toc(start), min(MK(:)), max(MK(:)), min_kurtosis, max_kurtosis );
 fprintf('dwi2tensor %g seconds\n', toc(start) );
 % function [X,param] = estimate_parameters(DT,KT,'mk')
@@ -126,21 +74,20 @@ fprintf('dwi2tensor %g seconds\n', toc(start) );
 hdr = hdrT(1);
 imgM = any(imgT,4)+any(imgK,4);
 imgM(imgM > 0) = 1;
-MK_nam = fullfile(p, [dwi_name '_MKmask.nii']); %this naming convention would be wrong if no smoothing is done 
+MK_nam = fullfile(p, [n, '_MKmask.nii']);
 save_volSub(MK_nam, hdr, imgM);
 imgT = reshape(imgT,[],6)';
 imgK = reshape(imgK,[],15)';
 %(6 x nvox) and KT is kurtosis tensor (15 x nvox)
-[imgX,~] = estimate_parameters(imgT,imgK,param);
+[imgMK,param] = estimate_parameters(imgT,imgK,{'mk'});
+%save MK map
+imgMK = reshape(imgMK, hdr.dim(1), hdr.dim(2), hdr.dim(3));
 
-for par=1:length(param)
-%save DKI parametric maps
-imgX_rs = reshape(imgX(par,:), hdr.dim(1), hdr.dim(2), hdr.dim(3));
-imgX_rs(((imgM(:) > 0) .* (imgX_rs(:) == 0)) > 0) = nan; %make all MK = zero values = NaN
-imgX_rs(isnan(imgX_rs(:))) = nan; %make all air NaN [optional]
-imgX_nam = fullfile(p, [dwi_name '_' param{par} '_dki.nii']);  %this naming convention would be wrong if no smoothing is done  
-save_volSub(imgX_nam, hdr, imgX_rs)
-end
+imgMK(((imgM(:) > 0) .* (imgMK(:) == 0)) > 0) = nan; %make all MK = zero values = NaN
+imgMK(isnan(imgMK(:))) = nan; %make all air NaN [optional]
+
+MK_nam = fullfile(p, [n, '_MK.nii']);
+save_volSub(MK_nam, hdr, imgMK)
 if ~isDeleteTempImages, return; end; %next lines delete temp files
 delete(dt);
 delete(dkt);
