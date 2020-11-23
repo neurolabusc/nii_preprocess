@@ -1264,11 +1264,17 @@ end
 %end doFslCmd()
 
 function fsldir = fslDirSub
+if (getenv("FSLDIR"))
+    fsldir = strcat(getenv("FSLDIR"),"/");
+    if exist(fsldir,"dir")
+        return;
+    end
+end
 fsldir= '/usr/local/fsl/'; %CentOS intall location
 if ~exist(fsldir,'dir')
     fsldir = '/usr/share/fsl/5.0/'; %Debian install location (from neuro debian)
     if ~exist(fsldir,'dir')
-        error('FSL is not in the standard CentOS or Debian locations, please check you installation!');
+        error('FSL is not in the standard CentOS or Debian locations, please check your installation!');
     end
 end
 %end fslDirSub()
