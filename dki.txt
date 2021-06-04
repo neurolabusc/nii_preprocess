@@ -1,8 +1,0 @@
-/media/research/FAT1000CR/Master_In/M2005/T1_M2005_LIME_lime.mat
-/media/research/FAT1000CR/Master_In/M2006/T1_M2006_LIME_lime.mat
-/media/research/FAT1000CR/Master_In/M2039/T1_M2039_R01_lime.mat
-/media/research/FAT1000CR/Master_In/M2116/T1_M2116_CT_lime.mat
-/media/research/FAT1000CR/Master_In/M2117/T1_M2117_CT_lime.mat
-/media/research/FAT1000CR/Master_In/M2120/T1_M2120_CT_lime.mat
-/media/research/FAT1000CR/Master_In/M2125/T1_M2125_LIME_lime.mat
-/media/research/FAT1000CR/Master_In/M2126/T1_M2126_LIME_lime.mat

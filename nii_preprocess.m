@@ -2,8 +2,9 @@ function matName = nii_preprocess(imgs, matName, checkForUpdates, hideInteractiv
 %preprocess data from multiple modalities3
 % imgs.T1: filename of T1 scan - ONLY REQUIRED INPUT: ALL OTHERS OPTIONAL
 % imgs.T2: filename used to draw lesion, if absent lesion drawn on T1
-% imgs.lesion : lesion map
+% imgs.Lesion : lesion map
 % imgs.ASL : pCASL or PASL sequence
+% imgs.ASLrev : phase reversed sequence
 % imgs.Rest : Resting state sequence
 % DTI : Diffusion scan
 % DTIrev : Diffusion scan with reverse phase encoding of 'DTI'
@@ -12,9 +13,8 @@ function matName = nii_preprocess(imgs, matName, checkForUpdates, hideInteractiv
 % imgs.T1 = 'T1.nii'; imgs.ASL = 'ASL.nii';
 % nii_preprocess(imgs);
 
-
 %check dependencies
-fprintf('%s version 1Aug2016\n', mfilename);
+fprintf('%s version 27May2021\n', mfilename);   
 %warning('Not checking for updates 6666');
 if ~exist('checkForUpdates','var') || checkForUpdates
     checkForUpdate(fileparts(mfilename('fullpath')));
@@ -25,6 +25,15 @@ if nargin < 1 %, error('Please use nii_preprocess_gui to select images');
     [f, p] = uigetfile('*limegui.mat', 'Select a mat file');
     imgs = fullfile(p,f);
 end;
+if ~isstruct(imgs) %user passes folder, e.g. "nii_preprocess(pwd)"
+    if iscell(imgs), imgs = imgs{1}; end;
+    pth = imgs;
+    if ~exist(pth, 'dir'), error('Unable to find folder %s', pth); end;
+    imgs = findImgs(pth);
+    if isempty(imgs) 
+        error('Unable to find NIfTI images (e.g. "T1_.nii") in folder %s\n', pth);
+    end
+end 
 if isempty(spm_figure('FindWin','Graphics')), 
     spm fmri; 
     %spm_get_defaults('cmdline',true); %enable command line mode in scripts
@@ -40,6 +49,7 @@ if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end;
 if ~isfield(imgs,'T2'), imgs.T2 = []; end;
 if ~isfield(imgs,'Lesion'), imgs.Lesion = []; end;
 if ~isfield(imgs,'ASL'), imgs.ASL = []; end;
+if ~isfield(imgs,'ASLrev'), imgs.ASLrev = []; end;
 if ~isfield(imgs,'Rest'), imgs.Rest = []; end;
 if ~isfield(imgs,'DTI'), imgs.DTI = []; end;
 if ~isfield(imgs,'DTIrev'), imgs.DTIrev = []; end;
@@ -50,6 +60,7 @@ if ~exist('matName','var') || isempty(matName)
     if ~exist(p,'dir')
         error('Please provide a matName: files no longer located in %s', p);
     end
+    if endsWith(n,'_'), n = n(1:end-1); end
     matName = fullfile(p, [n, '_lime.mat']);
 end
 if true
@@ -59,15 +70,14 @@ if true
     imgs = doT1Sub(imgs, matName); %normalize T1
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
-    
+    imgs = doAslSub(imgs, matName);
+    tStart = timeSub(tStart,'ASL');   
     %666x -> recommented in by Roger for Jill's Data
     imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
     %666x <-
     
     %tStart = timeSub(tStart,'REST');
-    imgs = doAslSub(imgs, matName);
-    tStart = timeSub(tStart,'ASL');
-    
+
     %666x -> recommented in by Roger for Data with fMRI
     imgs = dofMRISub(imgs, matName);
     %666x <-
@@ -108,6 +118,21 @@ nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (sp
 diary off
 %nii_preprocess()
 
+function imgs = findImgs(pth);
+%find images in path
+imgs = [];
+ms = {'T1', 'T2', 'Lesion', 'ASL', 'ASLrev', 'Rest', 'DTI','DTIrev', 'fMRI', 'DKI','DKIrev'};
+for m = 1 : numel(ms)
+    fnm = fullfile(pth,[ms{m}, '_*.n*']);
+    fnms = nii_dir(fnm, false);
+    if isempty(fnms), continue; end;
+    if numel(fnms) > 1 
+       error('Multiple NIfTI files have the name %s\n', fnm); 
+    end
+    imgs.(ms{m}) = fnms{1};
+end
+
+%end findImgs
 function addLimeVersionSub(matName)
 %add 'timestamp' to file allowing user to autodetect if there mat files are current
 % e.g. after running
@@ -953,8 +978,9 @@ if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 function nii_check_dependencies
 %make sure we can run nii_preprocess optimally
 if isempty(which('NiiStat')), error('NiiStat required (https://github.com/neurolabusc/NiiStat)'); end;
-if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
-if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
+%we no longer use ASLtbx:
+% if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
+% if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
 if isempty(which('nii_batch12')),
     p = fileparts(which('nii_preprocess'));
@@ -965,6 +991,7 @@ if isempty(which('nii_batch12')),
     end;
 end;
 if ~exist('spm_create_vol','file'), error('SPM12 required'); end;
+if ~exist('prctile' , 'file'), error('Resting state requires "prctile" from Statistics and Machine Learning Toolbox (https://www.mathworks.com/matlabcentral/mlc-downloads/downloads/submissions/53545/versions/5/previews/tools/prctile.m/index.html).'); end;
 %make sure user uncomments timing line in spm
 fnm = which('spm_create_vol');
 txt = fileread(fnm);
@@ -979,8 +1006,22 @@ if ~exist(fnm,'file'), error('%s required', fnm); end;
 txt = fileread(fnm);
 goodStr = '_gpu';
 if isempty(strfind(txt,goodStr))
-   error('Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm);
+   error('Unless you are using SLURM, Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm);
 end
+%check MRTrix installed: required for DTI
+if isempty(nii_mrtrix_pth() )
+   error('Please install MRTrix3'); 
+end
+%check FSL version
+fnm = fullfile(fsldir, 'etc', 'fslversion');
+fileExistsOrErrorSub(fnm);
+fid = fopen(fnm);
+vers = strsplit(fgetl(fid), ':'); %6.0.2:a4f562d9
+fclose(fid);
+if numel(vers) < 1, error('FSL version not detected: %s', fnm);  end
+vers = vers{1};
+versReq = '6.0.4';
+if ~strcmpi(vers,versReq), error('nii_preprocess and FSL version mismatch: Expected "%s", found "%s": %s', versReq, vers, fnm); end 
 %make sure eddy supports repol
 cmd = fullfile(fsldir, 'bin', 'eddy_openmp');
 fslEnvSub;
@@ -990,6 +1031,16 @@ goodStr = '--repol';
 if isempty(strfind(cmdout,goodStr))
    error('Update eddy files to support "repol" https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
 end
+fnm = fullfile(fsldir, 'bin', 'eddy_cuda');
+if ~exist(fnm,'file')
+    error('Run FSL command "configure_eddy" and test installation (https://github.com/neurolabusc/gpu_test): %s required', fnm); 
+end
+%requirements for BASIL, ASL
+if isempty(which('nii_tool'))
+    error('%s requires nii_tool for ASL (https://github.com/xiangruili/dicm2nii)\n',which(mfilename));
+end
+fileExistsOrErrorSub(fullfile(fsldir, 'bin', 'fsl_anat'));
+fileExistsOrErrorSub(fullfile(fsldir, 'bin', 'oxford_asl'));
 %end nii_check_dependencies()
 
 function fsldir = fslDirSub;
@@ -1001,6 +1052,11 @@ if ~exist(fsldir,'dir')
     end
 end
 %end fslDirSub()
+
+function fileExistsOrErrorSub(fnm)
+if exist(fnm,'file'), return; end;
+error('Update FSL, missing required file: %s', fnm); 
+%end fileExistsOrErrorSub()
 
 % function fslEnvSub
 % fsldir = fslDirSub;
@@ -1206,7 +1262,40 @@ stat.cbf.c2R = c2R;
 save(matName,'-struct', 'stat');
 %end doAslSubOld()
 
+
 function imgs = doAslSub(imgs, matName)
+if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
+imgs.ASL = removeDotSub (imgs.ASL);
+global ForceASL;
+inCalScan = []; %M0 scan
+anatDir = '';
+dryRun=false;
+basilDir = fullfile(fileparts(imgs.T1), 'basil');
+if isempty(ForceASL) && isFieldSub(matName, 'basilStd')
+    fprintf('Skipping ASL (Basil already computed) %s\n', imgs.ASL);
+    return;
+end;
+if exist(basilDir,'file'), rmdir(basilDir,'s'); end; %delete ASL directory
+if ~exist('basilDir', 'dir'), mkdir(basilDir); end;
+[p,n] = fileparts(imgs.ASL);
+inJSON = fullfile(p, [n, '.json']);
+if ~exist(inJSON, 'file')
+   error('Unable to find %s', inJSON); 
+end
+T1 = imgs.T1;
+[p,n,x] = fileparts(T1);
+healedT1 = fullfile(p,['e',n,x]);
+if exist(healedT1, 'file') 
+    T1 = healedT1;
+else
+    error('Unable to find %s\n', healedT1);
+end
+exitCode = nii_basil(imgs.ASL, T1, imgs.ASLrev, inJSON, inCalScan, anatDir, dryRun, basilDir);
+if exitCode ~= 0, return; end;
+basil2mat(basilDir, matName);
+%end doAslSub()
+
+function imgs = doAslSubOldish(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL;

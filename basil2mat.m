@@ -52,7 +52,9 @@ save(matName,'-struct', 'stat');
 function fnm = unGzSub (fnm)
 [pth,nam,ext] = spm_fileparts(fnm);
 if strcmpi(ext,'.gz') %.nii.gz
-    fnm = char(gunzip(fnm));    
+    onam = fnm;
+    fnm = char(gunzip(fnm));
+    delete(onam); % gunzip() does not delete the original file DPR 20200318   
 elseif strcmpi(ext,'.voi') %.voi -> 
     onam = char(gunzip(fnm));
     fnm = fullfile(pth, [nam '.nii']);

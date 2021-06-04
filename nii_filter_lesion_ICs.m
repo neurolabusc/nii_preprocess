@@ -37,7 +37,11 @@ all_ic_hdr = spm_vol ('melodic_output/melodic_IC.nii');
 all_ic_img = spm_read_vols (all_ic_hdr);
 for i = 1:size (all_ic_img, 4)
     ic_img = squeeze (all_ic_img (:, :, :, i));
-    thresh = prctile (ic_img (:), 97.5); % threshold at p<=0.05, 2-tailed
+    if exist('prctile','file')
+        thresh = prctile (ic_img (:), 97.5); % threshold at p<=0.05, 2-tailed
+    else
+        thresh = nii_prctile (ic_img (:), 97.5); % threshold at p<=0.05, 2-tailed
+    end
     [~, r_ic_img] = nii_reslice_target (all_ic_hdr(i), ic_img, lesion_hdr, 1);
     t_ic_img = (r_ic_img >= thresh | r_ic_img <= -thresh);
     jaccard(i) = sum (t_ic_img(:) & lesion_img(:)) / sum (t_ic_img (:) | lesion_img(:));

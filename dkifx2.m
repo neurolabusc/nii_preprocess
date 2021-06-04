@@ -100,6 +100,10 @@ function tensor2metricSub(sDWI_nam, dt)
 if ~exist(dt, 'file'), warning('Unable to find %s', dt); return; end;
 exenam = '/usr/local/bin/tensor2metric';
 if ~exist(exenam, 'file')
+	[~,exenam] = system('which tensor2metric');
+	exenam = strip(exenam);
+end
+if ~exist(exenam, 'file')
    userDir = char(java.lang.System.getProperty('user.home'));
    exenam2 = fullfile(userDir, 'mrtrix3','bin','tensor2metric');
    if exist(exenam2, 'file')
@@ -120,6 +124,10 @@ if status ~= 0, error('unable to run command: %s', cmd); end;
 function [dt, dkt] = dwi2tensorSub(dwi, bvec_nam, bval_nam,  mask)
 if ~exist(dwi, 'file'), warning('Unable to find %s', dwi); return; end;
 exenam = '/usr/local/bin/dwi2tensor';
+if ~exist(exenam, 'file')
+	[~,exenam] = system('which dwi2tensor');
+	exenam = strip(exenam);
+end
 if ~exist(exenam, 'file')
    userDir = char(java.lang.System.getProperty('user.home'));
    exenam2 = fullfile(userDir, 'mrtrix3','bin','dwi2tensor');

@@ -23,6 +23,22 @@ if [ $# -lt 1 ]; then
 	echo ' ./dti_1_eddy.sh "DTIA_LM1001" "DTIP_LM1001" '
 	exit 1
 fi
+
+#much better way to detect CUDA version - CR and DPR 20200327
+if ! [ -x "$(which nvcc)" ] ; then
+    echo "Unable to find nvcc: check CUDA is installed correctly"
+    exit 1
+fi
+#cudav=$(nvcc --version | grep "release" | awk '{ print $6 }' | cut -c2- ) 
+
+eddyExeName=eddy_cuda
+if ! [ -x "$(command -v $eddyExeName)" ]; then
+  echo 'You may need to run configure_eddy.sh
+  echo ' https://github.com/neurolabusc/gpu_test/tree/master/eddy_setup'
+  echo 'Error: ' $eddyExeName ' is not installed.' >&2
+  exit 1
+fi
+
 dti=`$FSLDIR/bin/remove_ext $1`
 pth=$(dirname $dti)
 if [ "$pth" = "." ]; then
@@ -40,25 +56,6 @@ if [ $nvol -lt 7 ]; then
  exit 1
 fi
 echo "Filenames dti= $dti dtir=$dtir"
-
-eddyExeName=eddy_openmp
-if  [[ $PATH == *"cuda"* ]]; then
-  eddyExeName=eddy_cuda7.0
-  if  [[ $PATH == *"cuda-9.1"* ]]; then
-	eddyExeName=eddy_cuda9.1
-  fi
-  if ! hash $eddyExeName 2>/dev/null; then
-	eddyExeName=eddy_cuda8.0
-
-  fi
-  echo "cuda found in path: will use $eddyExeName"
-else
-  echo "cuda NOT found in path: will use $eddyExeName"
-fi
-if ! hash $eddyExeName 2>/dev/null; then
-	echo "Error: unable to find $eddyExeName"
-	exit 1
-fi
 
 #process dti data
 dti_bvec=${dti}.bvec

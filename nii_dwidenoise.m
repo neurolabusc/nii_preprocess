@@ -82,15 +82,9 @@ end;
 function degibbsSub(fname)
 %http://mrtrix.readthedocs.io/en/latest/reference/commands/mrdegibbs.html
 if ~exist(fname, 'file'), warning('Unable to find %s', fname); return; end;
-exenam = '/usr/local/bin/mrdegibbs';
+exenam = fullfile(nii_mrtrix_pth, 'mrdegibbs');
 if ~exist(exenam, 'file')
-   userDir = char(java.lang.System.getProperty('user.home'));
-   exenam2 = fullfile(userDir, 'mrtrix3','bin','mrdegibbs');
-   if exist(exenam2, 'file')
-    exenam = exenam2;
-   else
     error('unable to find %s', exenam); 
-   end
 end
 [pth,nam,ext] = filepartsSub(fname);
 tempname = fullfile(pth,['temp', nam, ext]);
@@ -124,15 +118,9 @@ copyfile([inname '.bvec'], [outname '.bvec']);
 copyfile([inname '.bval'], [outname '.bval']);
 inname = [inname ext];
 fname = [outname ext];
-exenam = '/usr/local/bin/dwidenoise';
+exenam = fullfile(nii_mrtrix_pth, 'dwidenoise');
 if ~exist(exenam, 'file')
-   userDir = char(java.lang.System.getProperty('user.home'));
-   exenam2 = fullfile(userDir, 'mrtrix3','bin','dwidenoise');
-   if exist(exenam2, 'file')
-    exenam = exenam2;
-   else
     error('unable to find %s', exenam); 
-   end
 end
 cmd = sprintf('%s -force -quiet "%s" "%s"', exenam, inname, fname);
 fprintf('Running : %s\n', cmd);
