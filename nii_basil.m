@@ -22,7 +22,6 @@ function exitCode = nii_bas(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRun,
 %overwrite = bool to do something...
 %outDir = place to store all results
 
-exitCode = 123;
 if isempty(which('nii_tool')), error('nii_tool required (https://github.com/xiangruili/dicm2nii)'); end;
 
 % TESTING
@@ -202,12 +201,20 @@ if exist(aslRev,'file')
     nii_tool('save', niiRev, aslRevX);
 end
 
+
 % load ASL
 if ~exist(asl,'file'), error('Unable to find %s\n', asl); end
 nii = nii_tool('load', asl);
+
+if ~exist(inJSON, 'file')
+    inJSON = '/home/chris/Downloads/ask_PCASL.json';
+    if ~exist(inJSON, 'file')
+        error('We need a JSON to determine ASL parameters: %s\n', asl);
+    end;
+end
 [TR, PLDs, BD, SecPerSlice, EffectiveEchoSpacing, sequence] = readJson(asl, inJSON);
 
-% check bolus duration is within a rangeread
+% check bolus duration is within a range
 if BD > 20
     warning('Abnormally high Bolus Duration: %s detected, dividing by 1000 assuming it was entered as ms...',BD);
     BD = BD /1000;
@@ -216,8 +223,7 @@ end
 % additonal steps for scans with calibration images
 switch sequence
     case {SEQUENCE_PASL_SIEMENS, SEQUENCE_PCASL_OXFORD}
-        ok = check_volumesOK(nii, true);
-        if ~ok, warning('Unable to process ASL dataset: wrong number of volumes'); return; end
+        check_volumes(nii, true)
         %save calibration image
         [~,n,x] = nii_fileparts(asl);
         niiM0.hdr = nii.hdr;
@@ -244,15 +250,12 @@ switch sequence
         check_volumes(nii, false)
         aslX = asl;
         if ~exist(inCalScan, 'file')
-            warning('SEQUENCE_PASL_FAIREST requires a calibration image to be passed in directly');
-            return;
+            error('SEQUENCE_PASL_FAIREST requires a calibration image to be passed in directly');
         end
         m0X = inCalScan;
 
     otherwise
-        warning('invalid sequence %s', sequence)
-        return;
-        
+        error('invalid sequence %s', sequence)
 end
 
 % sequence specific options
@@ -285,13 +288,12 @@ end
 controlBeforeLabel = aslOrder(aslX);
 if ~controlBeforeLabel && strcmp(options.labelControlPairs,PAIRS_CONTROL_THEN_LABEL)
 	controlBeforeLabel = aslOrder(aslX, true);
-    warning('ASL has label-then-control order, but specified as control-then-label')
-    return;
+    
+    error('ASL has label-then-control order, but specified as control-then-label: %s', aslX)
 end
 if controlBeforeLabel && strcmp(options.labelControlPairs,PAIRS_LABEL_THEN_CONTROL)
 	controlBeforeLabel = aslOrder(aslX, true);
-	warning('ASL has control-then-label order, but specified as label-then-control')
-    return;
+	error('ASL has control-then-label order, but specified as label-then-control: %s', aslX)
 end
 options.output = aslOutput;
 options.inputImage = aslX;
@@ -321,7 +323,7 @@ if ~isempty(options.T1Image)
     end
 
     if ~exist(options.anatFile, 'dir')
-        command = ['fsl_anat -i "' options.T1Image '" -o ' anatDir '/struc'];
+        command = ['fsl_anat -i "' options.T1Image '" --clobber -o ' anatDir '/struc'];
         if ~dryRun
             exitCode = fslCmd(command);
             if exitCode ~= 0
@@ -371,17 +373,7 @@ end
         if expectsCalibImage && (mod(vols, 2) == 0)
             error('You said it has a calibration image, but there is an even number of volumes');
         elseif ~expectsCalibImage && (mod(vols, 2) ~= 0)
-            error('You said it doesn''t have a calibration image, but there is an odd number of volumes');
-        end
-    end
-
-    function ok = check_volumesOK(nii, expectsCalibImage)
-        vols = nii.hdr.dim(5);
-        ok = true;
-        if expectsCalibImage && (mod(vols, 2) == 0)
-            ok = false;
-        elseif ~expectsCalibImage && (mod(vols, 2) ~= 0)
-            ok = false;
+            error('You said it doTESTINGesn''t have a calibration image, but there is an odd number of volumes');
         end
     end
 
@@ -502,16 +494,13 @@ end
         js = loadJson(json);
         if isfield(js, 'MultibandAccelerationFactor'), error('Update to support multiband'); end
         if ~isfield(js, 'PulseSequenceDetails'), error('Require PulseSequenceDetails'); end
+        
         % get sequence name
         result = regexp(js.PulseSequenceDetails, '^%(CustomerSeq|SiemensSeq)+%_(\w+)$', 'tokens');
-        if isempty(result)
-           result = regexp(js.PulseSequenceDetails, '^%(CustomerSeq|SiemensSeq)+%\\(\w+)$', 'tokens'); 
+        if isempty(result) 
+            result = regexp(js.PulseSequenceDetails, '^%(CustomerSeq|SiemensSeq)+%\\(\w+)$', 'tokens');
         end
-        if isempty(result)  
-            js.PulseSequenceDetails
-            error('Cant parse pulse sequence details'); 
-        
-        end
+        if isempty(result) error('Cant parse pulse sequence details %s', js.PulseSequenceDetails); end
         prefix = result{1}{1};
         sequence = result{1}{2};
         %sequence = js.PulseSequenceDetails;
@@ -558,12 +547,6 @@ end
 
                 
             case SEQUENCE_PASL_SIEMENS
-                if ~isfield(js, 'InversionTime') && isfield(js, 'RepetitionTime') && (abs(2.5 - js.RepetitionTime) < 0.05) && isfield(js, 'SliceTiming') && (numel(js.SliceTiming) == 14)
-                    js.InversionTime = 0.8;
-                    warning('Unable to read ASL values from JSON: guessing');
-                    %error('x')
-                end
-
                 if ~isfield(js, 'InversionTime'), error('Require InversionTime'); end
                 if ~isfield(js, 'RepetitionTime'), error('Require RepetitionTime'); end
                 if ~isfield(js, 'SliceTiming'), error('Require SliceTiming'); end
@@ -577,14 +560,7 @@ end
                 EffectiveEchoSpacing = js.EffectiveEchoSpacing;
                   
             case {SEQUENCE_PCASL_USC_WANG,SEQUENCE_PCASL_2D_VE11C}
-                if ~isfield(js, 'NumRFBlocks') && isfield(js, 'RepetitionTime') && (abs(3.5 - js.RepetitionTime) < 0.05) && isfield(js, 'SliceTiming') && (numel(js.SliceTiming) == 17)
-                    js.NumRFBlocks = 80;
-                    js.PostLabelDelay = 1.2;
-                    warning('Unable to read pCASL values from JSON: guessing');
-                end
-                if ~isfield(js, 'NumRFBlocks'),
-                    error('Require NumRFBlocks'); 
-                end
+                if ~isfield(js, 'NumRFBlocks'), error('Require NumRFBlocks'); end
                 if ~isfield(js, 'PostLabelDelay'), error('Require PostLabelDelay'); end
                 if ~isfield(js, 'RepetitionTime'), error('Require RepetitionTime'); end
                 if ~isfield(js, 'SliceTiming'), error('Require SliceTiming'); end

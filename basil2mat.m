@@ -14,16 +14,28 @@ c1 = fullfile(sdir, 'T1_fast_pve_1.nii.gz');
 c2 = fullfile(sdir, 'T1_fast_pve_2.nii.gz');
 sdir = fullfile(dir,'native_space');
 native = fullfile(sdir, 'perfusion_calib.nii.gz'); 
+if ~exist(native,'file')
+    warning('using "perfusion" instead of "perfusion_calib" %s', native); 
+    native = fullfile(sdir, 'perfusion.nii.gz');
+end
+
 sdir = fullfile(dir,'std_space');
 std = fullfile(sdir, 'perfusion_calib.nii.gz');
 if ~exist(c1,'file'), error('Unable to find %s', c1); end
 if ~exist(c2,'file'), error('Unable to find %s', c2); end
-if ~exist(std,'file'), error('Unable to find %s', std); end
 if ~exist(native,'file'), error('Unable to find %s', native); end
 if ~exist(matName, 'file'), error('Unable to find %s', matName); end;
 addNiiSub(c1, 'basilC1', matName); %1
 addNiiSub(c2, 'basilC2', matName); %1
+if ~exist(std,'file')
+    warning('No M0! using "perfusion" instead of "perfusion_calib" %s', std);
+    std = fullfile(sdir, 'perfusion.nii.gz');
+end
+if ~exist(std,'file') 
+    warning('Unable to find %s', std); 
+end
 addNiiSub(std, 'basilStd', matName); %1
+
 addNiiSub(native, 'basilNative', matName); %1
 %end basil2mat()
 
@@ -54,7 +66,7 @@ function fnm = unGzSub (fnm)
 if strcmpi(ext,'.gz') %.nii.gz
     onam = fnm;
     fnm = char(gunzip(fnm));
-    delete(onam); % gunzip() does not delete the original file DPR 20200318   
+    delete(onam); % gunzip() does not delete the original file DPR 20200318
 elseif strcmpi(ext,'.voi') %.voi -> 
     onam = char(gunzip(fnm));
     fnm = fullfile(pth, [nam '.nii']);

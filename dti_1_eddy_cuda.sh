@@ -1,6 +1,6 @@
 #!/bin/bash
 #This script processes DTI images using FSL tools
-# dti_1_eddy_cuda <dti> <dtir>
+# dti_core.sh <dti> <dtir>
 #  dti  : diffusion image (4D NIfTI img.nii.gz with img.bvec, img.bval)
 #  dtir : (optional) as dti but reversed phase-encoding polarity
 #         if <dti> but no <dtir> then eddy_correct used instead of topup+eddy
@@ -18,27 +18,11 @@
 if [ $# -lt 1 ]; then
 	echo "Please call this script with input arguments"
 	echo "Example: single DTI scan from healthy participant"
-	echo ' ./dti_1_eddy_cuda.sh "DTIA_LM1001"'
+	echo ' ./dti_1_eddy.sh "DTIA_LM1001"'
 	echo "Example: opposite phase DTI scans"
-	echo ' ./dti_1_eddy_cuda.sh "DTIA_LM1001" "DTIP_LM1001" '
+	echo ' ./dti_1_eddy.sh "DTIA_LM1001" "DTIP_LM1001" '
 	exit 1
 fi
-
-#much better way to detect CUDA version - CR and DPR 20200327
-if ! [ -x "$(which nvcc)" ] ; then
-    echo "Unable to find nvcc: check CUDA is installed correctly"
-    exit 1
-fi
-#cudav=$(nvcc --version | grep "release" | awk '{ print $6 }' | cut -c2- ) 
-
-eddyExeName=eddy_cuda
-if ! [ -x "$(command -v $eddyExeName)" ]; then
-  echo 'You may need to run configure_eddy.sh
-  echo ' https://github.com/neurolabusc/gpu_test/tree/master/eddy_setup'
-  echo 'Error: ' $eddyExeName ' is not installed.' >&2
-  exit 1
-fi
-
 dti=`$FSLDIR/bin/remove_ext $1`
 pth=$(dirname $dti)
 if [ "$pth" = "." ]; then
@@ -57,11 +41,23 @@ if [ $nvol -lt 7 ]; then
 fi
 echo "Filenames dti= $dti dtir=$dtir"
 
+#if ! [ -x "$(which nvcc)" ] ; then
+#    echo "Unable for find nvcc: check CUDA is installed correctly"
+#    exit 1
+#fi
+#cudav=$(nvcc --version | grep "release" | awk '{ print $6 }' | cut -c2- )
 
-
-
-echo $cudav
-echo $eddyExeName
+#eddyExeName=eddy
+#if  [[ $cudav == *"8.0."* ]]; then
+#    eddyExeName=eddy_cuda8.0
+#elif  [[ $cudav == *"9.1."* ]]; then
+#    eddyExeName=eddy_cuda9.1
+#elif  [[ $cudav == *"10.1."* ]]; then
+    eddyExeName=eddy_cuda
+#else
+#    echo "FSL 6.0.3 only supports CUDA 8.0, 9.1 and 10.1, not version: $cudav"
+#    exit 1
+#fi
 
 #process dti data
 dti_bvec=${dti}.bvec

@@ -2,19 +2,19 @@ function matName = nii_preprocess(imgs, matName, checkForUpdates, hideInteractiv
 %preprocess data from multiple modalities3
 % imgs.T1: filename of T1 scan - ONLY REQUIRED INPUT: ALL OTHERS OPTIONAL
 % imgs.T2: filename used to draw lesion, if absent lesion drawn on T1
-% imgs.Lesion : lesion map
+% imgs.lesion : lesion map
 % imgs.ASL : pCASL or PASL sequence
-% imgs.ASLrev : phase reversed sequence
 % imgs.Rest : Resting state sequence
 % DTI : Diffusion scan
-% DTIrev : Diffusion scan with reverse phase encoding of 'DTI'
+% DTIrev : Diffusion scan with reverse phase encoding of 'DTIdum'
 % fMRI : fMRI scan
 %Examples
 % imgs.T1 = 'T1.nii'; imgs.ASL = 'ASL.nii';
 % nii_preprocess(imgs);
 
+
 %check dependencies
-fprintf('%s version 27May2021\n', mfilename);   
+fprintf('%s version 1Aug2016\n', mfilename);
 %warning('Not checking for updates 6666');
 if ~exist('checkForUpdates','var') || checkForUpdates
     checkForUpdate(fileparts(mfilename('fullpath')));
@@ -25,15 +25,6 @@ if nargin < 1 %, error('Please use nii_preprocess_gui to select images');
     [f, p] = uigetfile('*limegui.mat', 'Select a mat file');
     imgs = fullfile(p,f);
 end;
-if ~isstruct(imgs) %user passes folder, e.g. "nii_preprocess(pwd)"
-    if iscell(imgs), imgs = imgs{1}; end;
-    pth = imgs;
-    if ~exist(pth, 'dir'), error('Unable to find folder %s', pth); end;
-    imgs = findImgs(pth);
-    if isempty(imgs) 
-        error('Unable to find NIfTI images (e.g. "T1_.nii") in folder %s\n', pth);
-    end
-end 
 if isempty(spm_figure('FindWin','Graphics')), 
     spm fmri; 
     %spm_get_defaults('cmdline',true); %enable command line mode in scripts
@@ -49,42 +40,60 @@ if ~isfield(imgs,'T1') || isempty(imgs.T1), error('T1 scan is required'); end;
 if ~isfield(imgs,'T2'), imgs.T2 = []; end;
 if ~isfield(imgs,'Lesion'), imgs.Lesion = []; end;
 if ~isfield(imgs,'ASL'), imgs.ASL = []; end;
-if ~isfield(imgs,'ASLrev'), imgs.ASLrev = []; end;
 if ~isfield(imgs,'Rest'), imgs.Rest = []; end;
 if ~isfield(imgs,'DTI'), imgs.DTI = []; end;
 if ~isfield(imgs,'DTIrev'), imgs.DTIrev = []; end;
 if ~isfield(imgs,'fMRI'), imgs.fMRI = []; end;
+if ~isfield(imgs,'fMRIpass'), imgs.fMRIpass = []; end;
+if ~isfield(imgs,'DKIrev'), imgs.DKIrev = []; end;
+if ~isfield(imgs,'DKI'), imgs.DKI = []; end;
 
 if ~exist('matName','var') || isempty(matName)
     [p,n] = filepartsSub(imgs.T1);
     if ~exist(p,'dir')
         error('Please provide a matName: files no longer located in %s', p);
     end
-    if endsWith(n,'_'), n = n(1:end-1); end
     matName = fullfile(p, [n, '_lime.mat']);
 end
 if true
     diary([matName, '.log.txt'])
+    
     imgs = unGzAllSub(imgs); %all except DTI - fsl is OK with nii.gz
     tStart = tic;
+    
     imgs = doT1Sub(imgs, matName); %normalize T1
     imgs = doI3MSub(imgs, matName);
     tStart = timeSub(tStart,'T1');
-    imgs = doAslSub(imgs, matName);
-    tStart = timeSub(tStart,'ASL');   
-    %666x -> recommented in by Roger for Jill's Data
+    
+    try
+        imgs = doVBMSub(imgs, matName);    
+    catch
+        warning('Cat12-based VBM failed, see logfile for details');
+    end
+    
     imgs = doRestSub(imgs, matName); %TR= 1.850 sec, descending; %doRestSub(imgs, matName, 2.05, 5); %Souvik study
-    %666x <-
     
-    %tStart = timeSub(tStart,'REST');
+    try
+        imgs = doAslSub(imgs, matName);
+    catch
+        warning('BASIL-based ASL processing failed, see logfile for details');
+    end
+    tStart = timeSub(tStart,'ASL');
+    
+    %This will need to be customized if you use fMRI tasks
+    %In general, create an fMRIprocessing mat file which you will call via dofMRISub_Task function
+    %I.e. create nii_fmri
+    %imgs = dofMRISub_Task(imgs, matName,keyString);  %will process fmri files ending in keyString, using nii_fmrikeyString.m
+    if ~isempty(imgs.fMRI) && size(niftiread(imgs.fMRI),4) == 60
+        imgs = dofMRISub_Task(imgs, matName);        %will process using original nii_fmri60
+    end
+    if ~isempty(imgs.fMRIpass)
+        imgs = dofMRISub_Task(imgs, matName,'pass'); %will process fmri files ending in 'pass', using nii_fmripass.m
+    end
+%      if ~isempty(imgs.fMRInam)
+%          imgs = dofMRISub_Task(imgs, matName,'fam'); %will process fmri files ending in 'pass', using nii_fmripass.m
+%      end
 
-    %666x -> recommented in by Roger for Data with fMRI
-    imgs = dofMRISub(imgs, matName);
-    %666x <-
-    
-    %666 VBM
-    imgs = doVBMSub(imgs, matName);   
-    
     tStart = timeSub(tStart,'fMRI');
     %warning('Skipping DTI');
     if true
@@ -97,14 +106,21 @@ if true
             %-->(un)comment next line for JHU tractography
             doDtiTractSub(imgs, matName, dtiDir, 'jhu');
             %-->(un)comment next line for AICHA tractography
-            doDtiTractSub(imgs, matName, dtiDir, 'AICHA'); % uncommented by GY, Aug10_2016
+            doDtiTractSub(imgs, matName, dtiDir, 'AICHA'); 
             %-->compute scalar DTI metrics
             
             doTractographySub(imgs);
-            %666 doDkiSub(imgs, matName);
+            doDkiSub(imgs, matName);
             tStart = timeSub(tStart,'DTI');
         end
-        %666 doDkiSub(imgs, matName, true);
+                if ~isempty(imgs.DKI)
+                dkiDir = fileparts(imgs.DKI);    
+                doDkiSub(imgs, matName, true);
+                %-->(un)comment next line for AICHA tractography
+                %doDkiTractSub(imgs,matName, dkiDir, 'AICHA');
+                %-->(un)comment next line for JHU tractography
+                doDkiTractSub(imgs,matName, dkiDir, 'jhu');
+        end
     end
     tStart = timeSub(tStart,'DKI');
     %matName
@@ -118,21 +134,50 @@ nii_mat2ortho(matName, fullfile(pth,'MasterNormalized')); %do after printDTI (sp
 diary off
 %nii_preprocess()
 
-function imgs = findImgs(pth);
-%find images in path
-imgs = [];
-ms = {'T1', 'T2', 'Lesion', 'ASL', 'ASLrev', 'Rest', 'DTI','DTIrev', 'fMRI', 'DKI','DKIrev'};
-for m = 1 : numel(ms)
-    fnm = fullfile(pth,[ms{m}, '_*.n*']);
-    fnms = nii_dir(fnm, false);
-    if isempty(fnms), continue; end;
-    if numel(fnms) > 1 
-       error('Multiple NIfTI files have the name %s\n', fnm); 
-    end
-    imgs.(ms{m}) = fnms{1};
+function doDkiTractSub(imgs,matName,dtiDir,atlas)
+dwi_name = dki_dwiname(imgs.DKI);
+dki = imgs.DKI; 
+[p,~]=fileparts(dki);
+if ~exist('atlas','var'),
+    atlas = 'jhu';
 end
 
-%end findImgs
+if strcmpi(atlas,'jhu')
+    atlasext = '';
+else
+   atlasext = ['_' atlas];
+end
+
+ if ~exist(prepostfixSub('',['_roi' atlasext],dki)), doDkiWarpSub(imgs, atlas), end
+dki_dt=fullfile(p,[dwi_name '_DT.nii']);
+dki_kt=fullfile(p,[dwi_name '_DK.nii']);
+dki_fa=fullfile(p,[dwi_name '_fa_dki.nii']);
+
+if ~exist(dki_kt,'file')
+    fprintf('Can not find tensors %s\n',dki_kt);
+    return;
+end   
+% make parameters file for kODF_nii_preprocess 
+fid=fopen(fullfile(fileparts(mfilename('fullpath')),'DKI_tractography','ft_parameters.txt')); % original ft_parameters in nii_preprocess
+fout=fullfile(dtiDir,'ft_parameters_subj.txt'); % new ft_parameters 
+fidout=fopen(fout,'w');
+
+while(~feof(fid))
+    s=fgetl(fid);
+    s=strrep(s,'path',[dtiDir '/']);
+    if exist([dtiDir,'/SH_coeff.nii'],'file'), s=strrep(s,'odf_optimization = 1','odf_optimization = 0');, end
+    fprintf(fidout,'%s\n',s);
+    disp(s)
+end
+
+fclose(fid);
+fclose(fidout);
+
+kODF_nii_preprocess(fullfile(dtiDir,'ft_parameters_subj.txt'),dki_dt,dki_kt,dki_fa)
+param={'fa','md','dax','drad','mk','kax','krad','kfa'}; % calculate along tract stats of these metrics 
+DKI_tractography_along_tract_stats_2(imgs,atlas,100,param) % devide tracts in 100 nodes 
+
+
 function addLimeVersionSub(matName)
 %add 'timestamp' to file allowing user to autodetect if there mat files are current
 % e.g. after running
@@ -232,26 +277,169 @@ text(pos(1)+0.0,pos(2)+0.01, n,'Parent',ax, 'FontSize',8, 'fontn','Arial', 'colo
 %end orthSub()
 
 
-%adding RNN 666 
+%added RNN  
+%Performs cat12 initial processing on T1-weighted structural image
+%*In the case of lesioned brains, performs cat12 on enantiomorphically
+%healed brain, i.e. 'eT1'
 function imgs = doVBMSub(imgs, matName)
 
+
 %these lines confirm presence of eT1 (stolen from doDTISub)
+targetImage = imgs.T1;
 eT1 = prefixSub('e',imgs.T1); %enantimorphic image
-if ~exist(eT1,'file'), eT1 = imgs.T1; end; %if no lesion, use raw T1
-if ~exist(eT1,'file'), fprintf('doVBM unable to find %s\n', eT1); return; end; %required
-
+if exist(eT1,'file'), targetImage = eT1; end; %if no lesion, use raw T1
+if ~exist(targetImage,'file'), fprintf('doVBM unable to find %s\n', targetImage); return; end; %required
 global ForceVBM; %e.g. user can call "global ForceVBM;  ForceVBM = true;"
+if isempty(ForceVBM) && isFieldSub(matName, 'VBM_volume_WMH'), fprintf('Skipping VBM (already done) %s\n',targetImage); return;  end;
+if contains(targetImage,'dummy','IgnoreCase',true) 
+    fprintf('Skipping VBM (dummy T1 acquired in previous session) %s\n',targetImage);
+    return;
+end
+%[p, n, x] = fileparts(targetImage);
+p = spm('Dir');
+SPM_file_arg = {[targetImage ',1']};
+TPM_arg = {fullfile(p, 'tpm/TPM.nii')};
+if ~exist(fullfile(p, 'tpm/TPM.nii'),'file')
+    error('Failed to find TPM.nii at: %s',fullfile(p, 'tpm/TPM.nii'));
+end
 
-%call nii_VBM, only needs eT1 as parameter
-%nii_VBM(eT1);
+dartelTPM_arg = {fullfile(p, 'toolbox/cat12/templates_MNI152NLin2009cAsym/Template_0_GS.nii')};
+if ~exist(fullfile(p, 'toolbox/cat12/templates_MNI152NLin2009cAsym/Template_0_GS.nii'),'file')
+    error('Failed to find dartelTemplate at: %s',fullfile(p, 'toolbox/cat12/templates_1.50mm/Template_1_IXI555_MNI152.nii'));
+end
+                          
+%do cat12 if not already done
+if ~isFieldSub(matName,'vbm_gm')
+catbatch{1}.spm.tools.cat.estwrite.data = SPM_file_arg;
+catbatch{1}.spm.tools.cat.estwrite.nproc = 4;
+catbatch{1}.spm.tools.cat.estwrite.opts.tpm = TPM_arg;
+catbatch{1}.spm.tools.cat.estwrite.opts.affreg = 'mni';
+catbatch{1}.spm.tools.cat.estwrite.opts.biasstr = 0.5;
+catbatch{1}.spm.tools.cat.estwrite.opts.accstr = 0.5;
+catbatch{1}.spm.tools.cat.estwrite.extopts.APP = 1070;
+catbatch{1}.spm.tools.cat.estwrite.extopts.segmentation.WMHC = 3;
+catbatch{1}.spm.tools.cat.estwrite.extopts.LASstr = 0.5;
+catbatch{1}.spm.tools.cat.estwrite.extopts.gcutstr = 2;
+catbatch{1}.spm.tools.cat.estwrite.extopts.registration.dartel.darteltpm = dartelTPM_arg{1:length(dartelTPM_arg)}%'/home/chris/neuro/spm12/toolbox/cat12/templates_MNI152NLin2009cAsym/Template_0_GS.nii';
+catbatch{1}.spm.tools.cat.estwrite.extopts.vox = 1.5;
+catbatch{1}.spm.tools.cat.estwrite.extopts.restypes.fixed = [1 0.1];
 
-%add results to matName
+catbatch{1}.spm.tools.cat.estwrite.output.surface = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.surf_measures = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.neuromorphometrics = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.lpba40 = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.cobra = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.hammers = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.thalamus = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.ibsr = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.aal3 = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.mori = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.anatomy3 = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.julichbrain = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.Schaefer2018_100Parcels_17Networks_order = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.Schaefer2018_200Parcels_17Networks_order = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.Schaefer2018_400Parcels_17Networks_order = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.Schaefer2018_600Parcels_17Networks_order = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.ROImenu.atlases.ownatlas = {
+                                                                         '/home/chris/neuro/NiiStat/roi/AICHA.nii,1'
+                                                                         '/home/chris/neuro/NiiStat/roi/aal.nii,1'
+                                                                         '/home/chris/neuro/NiiStat/roi/aalcat.nii,1'
+                                                                         '/home/chris/neuro/NiiStat/roi/bro.nii,1'
+                                                                         '/home/chris/neuro/NiiStat/roi/cat.nii,1'
+                                                                         '/home/chris/neuro/NiiStat/roi/jhu.nii,1'
+                                                                         };
+catbatch{1}.spm.tools.cat.estwrite.output.surface = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.GM.native = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.GM.warped = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.GM.mod = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.GM.dartel = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.WM.native = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WM.warped = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WM.mod = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WM.dartel = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.WMH.native = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WMH.warped = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WMH.mod = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.WMH.dartel = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.labelnative = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.bias.warped = 1;
+catbatch{1}.spm.tools.cat.estwrite.output.jacobianwarped = 0;
+catbatch{1}.spm.tools.cat.estwrite.output.warps = [1 1];
+catbatch{1}.spm.tools.cat.estwrite.output.rmat = 0;
+
+spm_jobman('run',catbatch);
+clear catbatch
+end
+
+%%CHOOSE files to store in the mat file for later analysis
+[p, n, x] = fileparts(imgs.T1);
+targetDir = fullfile(p,'mri');
+
+%get smooth normalized GM image
+normGM = dir(fullfile(targetDir,'mwp1T1*.nii'));
+if isempty(normGM)
+    normGM = dir(fullfile(targetDir,'mwp1eT1*.nii'));
+end
+if isempty(normGM)
+    error('Unable to find file %s', fullfile(targetDir,'mwp1T1*.nii'));
+end
+
+%get smoothed normalized WM image
+normWM = dir(fullfile(targetDir,'mwp2T1*.nii'));
+if isempty(normWM)
+    normWM = dir(fullfile(targetDir,'mwp2eT1*.nii'));
+end
+if isempty(normWM)
+    error('Unable to find file %s', fullfile(targetDir,'mwp2T1*.nii'));
+end
+
+%should we save p7eT1*.nii which is white matter hyperintensity map as
+%calculated by cat12???
+%should we save wp7eT1*.nii which is normalized white matter hyperintensity map as
+%calculated by cat12???
+
+
+targetDir = fullfile(p,'surf');
+lhSURF = dir(fullfile(targetDir,'lh.cent*.gii'));
+rhSURF = dir(fullfile(targetDir,'rh.cent*.gii'));
+nii_nii2mat(fullfile(normGM(1).folder, normGM(1).name), 'vbm_gm' , matName); 
+nii_nii2mat(fullfile(normWM(1).folder, normWM(1).name), 'vbm_wm' , matName); 
+%nii_nii2mat(fullfile(lhSURF.folder, lhSURF.name), 'surf_lh' , matName); 
+%nii_nii2mat(fullfile(rhSURF.folder, rhSURF.name), 'surf_rh' , matName); 
+
+
+%estimate TIV, GM, WM and WM-hyperintensity volumes and save to mat file
+%field
+[p, n, x] = fileparts(imgs.T1);
+targetDir = fullfile(p,'report');
+cat12xmlfile  = dir(fullfile(targetDir,'*.xml'));
+if ~exist(fullfile(p, 'report',cat12xmlfile.name),'file')
+    error('Failed to find participant''s xml file at: %s',fullfile(p, 'report',cat12xmlfile.name));
+end
+
+tivbatch{1}.spm.tools.cat.tools.calcvol.data_xml = {fullfile(p, 'report',cat12xmlfile.name)};
+tivbatch{1}.spm.tools.cat.tools.calcvol.calcvol_TIV = 0;
+tivbatch{1}.spm.tools.cat.tools.calcvol.calcvol_name = fullfile(p,'TIV.txt');
+spm_jobman('run',tivbatch);
+
+pause(10);
+if exist(fullfile(p,'TIV.txt'),'file')
+    TIVdata = textread(fullfile(p,'TIV.txt')); %Volume values =  Total,GM,WM,CSF,WMH
+    m = matfile(matName,'Writable',true)
+    m.VBM_volume_Total = TIVdata(1);
+    m.VBM_volume_GM  = TIVdata(2);
+    m.VBM_volume_WM  = TIVdata(3);
+    m.VBM_volume_CSF = TIVdata(4);
+    m.VBM_volume_WMH = TIVdata(5);
+else
+    warning('Could not find %s ',fullfile(p,'TIV.txt'));
+end
 
 %end doVBMSub()
 
 
-
 function imgs = dofMRISub(imgs, matName)
+
 if isempty(imgs.T1) || isempty(imgs.fMRI), return; end; %required
 imgs.fMRI = removeDotSub (imgs.fMRI);
 [~,n] = fileparts(imgs.fMRI);
@@ -280,16 +468,87 @@ end
 
 %GY, Oct 5, 2017
 %nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2); %use fMRI for normalization
-nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2, imgs.Lesion);
+%RNN, Nov 1 2019, capable of swapping in a different fMRI file for
+%processing now.
+    nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2, imgs.Lesion);
+% if (exist(imgs.fMRI,'file') && ~exist(imgs.fMRIpass,'file'))
+%     nii_fmri60(imgs.fMRI, imgs.T1, imgs.T2, imgs.Lesion);
+% end
+% if (exist(imgs.fMRIpass,'file'))
+%     %easiest to just set this to imgs.fMRI to ensure it goes through subsequent name changes correctly
+%     nii_fmriABCpassages(imgs.fMRI, imgs.T1, imgs.fme1, imgs.fme2, imgs.fmph);
+% end
+% 
 
 if ~exist(cstat, 'file') || ~exist(bstat,'file')
     error('fMRI analysis failed : %s\n  %s', bstat, cstat);
 end
+
 nii_nii2mat(cstat, 'fmri' , matName); %12
 nii_nii2mat(bstat, 'fmrib', matName); %13
 vox2mat(prefixSub('wmean',imgs.fMRI), 'fMRIave', matName);
 vox2mat(prefixSub('wbmean',imgs.fMRI), 'fMRIave', matName);
 %end dofMRISub()
+
+function imgs = dofMRISub_Task(imgs, matName, task)
+if ~exist('task','var'), task= ''; end;
+structName = ['fmri', task];
+
+if isempty(imgs.T1) || ~isfield(imgs, structName) || isempty(imgs.(structName)), return; end; %required
+imgs.(structName) = removeDotSub (imgs.(structName));
+[~,n] = fileparts(imgs.(structName));
+[p] = fileparts(imgs.(structName));
+cstat = fullfile(p,[n], 'con_0002.nii');
+bstat = fullfile(p,[n], 'beta_0001.nii');
+global ForcefMRI; %e.g. user can call "global ForcefMRI;  ForcefMRI = true;"
+%do not check cstat files anymore, as folder names may have changed...
+%if isempty(ForcefMRI) && isFieldSub(matName, 'fmri') && exist(cstat, 'file') && exist(bstat,'file'), fprintf('Skipping fMRI (already done) %s\n',imgs.fMRI); return;  end;
+if isempty(ForcefMRI) && isFieldSub(matName, structName), fprintf('Skipping fMRI (already done) %s\n',imgs.(structName)); return;  end;
+if ~exist(imgs.(structName),'file'), warning('Unable to find %s', imgs.(structName)); return; end;
+%if ~isempty(ForcefMRI)
+    d = fullfile(p,n);
+    if exist(d,'file'), rmdir(d,'s'); end; %delete statistics directory
+    delImgs('sw', imgs.(structName));
+    delMat(imgs.(structName))
+    %delImgs('swa', imgs.fMRI); %we never slice-time correct sparse data!
+%end
+
+
+
+
+
+if ~exist(['nii_fmri' task],'file')
+    fnm = fullfile(fileparts(which(mfilename)), ['nii_fmri' task]);
+    if ~exist(fnm,'file')
+        error('Unable to find %s', fnm);
+    end
+    addpath(fnm);
+end
+
+%RNN, Nov 1 2019, 
+%Use appropriate function call depending on which fMRI task is being processed
+switch task
+    case ''
+        selected_fmri_fcncall = 'nii_fmri60(imgs.(structName), imgs.T1, imgs.T2, imgs.Lesion)'
+    case 'pass'
+        selected_fmri_fcncall = 'nii_fmripass(imgs.(structName), imgs.T1, imgs.fme1, imgs.fme2, imgs.fmph)'
+    otherwise
+        error('Based on task %s, could not find nii_fmri* specifying appropriate processing...',task);
+end
+eval(selected_fmri_fcncall);
+
+if ~exist(cstat, 'file') || ~exist(bstat,'file')
+    error('fMRI analysis failed : %s\n  %s', bstat, cstat);
+end
+
+nii_nii2mat(cstat, 'fmri' , matName); %12
+nii_nii2mat(bstat, 'fmri', matName); %13
+vox2mat(prefixSub('wmean',imgs.(structName)), ['fMRIave', task], matName);       %wmean not generated, not sure if important... 
+vox2mat(prefixSub('wbmaskmean',imgs.(structName)), ['fMRIaveb', task], matName); %wbmean not generated, renamed wbmaskmean
+%end dofMRISub_pass()
+
+
+
 
 function XYZmm = getCenterOfIntensitySub(vols)
 XYZmm = ones(3,1);
@@ -410,23 +669,46 @@ if exist('isDki','var') && (isDki)
     if ~isfield(imgs,'DKI'), return; end;
     if isempty(imgs.DKI), return; end; %nothing to do!
     global ForceDTI;
-    if isempty(ForceDTI) && isFieldSub(matName, 'mk')
-        fprintf('Skipping MK estimates: already computed\n');
+    if isempty(ForceDTI) && isFieldSub(matName, 'mk_dki')
+        fprintf('Skipping MK estimates: already computed\n')
+        [~,n,~]=filepartsSub(imgs.DKI);
         return;
     end; %stats already exist
+    %preprocess - denoise
+    temp='d';
+dki_d=prepostfixSub('', temp, imgs.DKI);
+if exist(imgs.DKIrev)
+    dki_dr=prepostfixSub('', temp, imgs.DKI);
+end;
+if isempty(ForceDTI) && exist(dki_d, 'file')
+   fprintf('Skipping DTI denoising: found %s\n', dki_d);
+else
+    mm = imgMM(imgs.DKI);
+    degibbs = (mm > 1.9); %partial fourier used for HCP 1.5mm isotropic images
+    dki_d = nii_dwidenoise (imgs.DKI, degibbs);
+    if exist(imgs.DKIrev)
+        dki_dr = nii_dwidenoise (imgs.DKIrev, degibbs);
+    end;
+end;
+
     warning('If you are using fsl 5.0.9, ensure you have patched version of eddy ("--repol" option) https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
     %2017: dti_1_eddy_cuda now auto-detects if cuda is installed
     %if isEddyCuda7Sub()
     if HalfSphere(imgs.DKI)
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda_half.sh'];
+        command= [fileparts(which(mfilename)) filesep 'dki_1_eddy_cuda_half.sh'];  
     else
-        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh'];
+        command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_cuda.sh']; %% needs to be changed to turn of dtifit 
         %command= [fileparts(which(mfilename)) filesep 'dti_1_eddy_correct.sh'];
     end
     %else
     %    command= [fileparts(which(mfilename)) filesep 'dti_1_eddy.sh'];
     %end
-    command=sprintf('%s "%s"',command, imgs.DKI);
+     if isempty(imgs.DKIrev)
+    command=sprintf('%s "%s"',command, dki_d);
+     else
+    command=sprintf('%s "%s" "%s"',command, dki_d, dki_dr);
+     end
+     
     doFslCmd (command);
     doDkiCoreSub(imgs.T1, imgs.DKI, matName)
 else
@@ -442,39 +724,64 @@ if ~exist('dkifx2','file'),  error('skipping DKI: requires dkifx2 script\n'); re
 mask=prepostfixSub('', 'db_mask', DTI);
 mask = unGzSub (mask);
 if ~exist(mask,'file'),  error('unable to find %s\n', mask); return; end;
-MKfa=prepostfixSub('', 'd_FA', DTI);
-if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
+%MKfa=prepostfixSub('', 'd_FA', DTI);
+%if ~exist(MKfa,'file'),  error('unable to find %s\n', MKfa); return; end;
 dti_u=prepostfixSub('', 'du', DTI);
 [pth,nam] = filepartsSub(DTI);
-bvalnm = fullfile(pth, [nam, 'both.bval']); %assume topup
+bvalnm = fullfile(pth, [nam, 'dboth.bval']); %assume topup
 if ~exist(bvalnm, 'file')
     bvalnm = fullfile(pth, [nam, '.bval']);
 end
 if ~exist(mask, 'file') || ~exist(dti_u, 'file') || ~exist(bvalnm, 'file')|| ~exist(wbT1, 'file')
     fprintf('Skipping DKI preprocessing. Missing file(s): %s %s %s %s\n', mask, dti_u, bvalnm, wbT1);
-end;
+end
+
 bval=load(bvalnm);
 if max(bval(:)) < 1500
     fprintf('Skipping DKI preprocessing. Require B-values >1500. Max b-value: %d\n',max(bval(:)));
     return;
 end
-MK=dkifx2(dti_u, bvalnm, mask, true);
+param={'fa','md','dax','drad','mk','kax','krad','kfa'};
+dkifx2(dti_u, bvalnm, mask, true, param);
 MKmask=mask;
+dwi_name = dki_dwiname(DTI);
+[pth,dwi_name] = filepartsSub(dwi_name)
+dwi_name = ['s' dwi_name];
+
+
+if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
+fa_name = [pth filesep dwi_name '_' param{1} '_dki.nii']
+if ~exist(fa_name, 'file') || ~exist(MKmask, 'file')
+   fprintf('Serious error: no kurtosis images named %s %s\n', fa_name, MKmask);
+   return;
+end
+    
+nFA = rescaleSub(fa_name);
+
+oldNormstring=cell(1,length(param)+1);
+oldNormstring{1}=nFA;
+for par=1:length(param)
+DKI_par=[pth filesep dwi_name '_' param{par} '_dki.nii'];
+oldNormstring(par+1)={DKI_par};
+end
+oldNormSub(oldNormstring,wbT1, 8, 8 );
+
+for par=1:length(param)
+    DKI_par=[pth filesep dwi_name '_' param{par} '_dki.nii'];
+    %normalize mean kurtosis to match normalized, brain extracted T1
+    wDKI_par = prepostfixSub('w', '', DKI_par);
+    nii_nii2mat(wDKI_par, [param{par} '_dki'], matName);
+    %save note
+    fid = fopen('dki.txt', 'a+');
+    fprintf(fid, '%s\n', matName);
+    fclose(fid);        
+end
+
+
 %MKmask = prepostfixSub('', 'u_ldfDKI_MASK', DTI);
 %MK=prepostfixSub('', 'u_ldfDKI_MK', DTI);
-if ~exist(MK, 'file') || ~exist(MKmask, 'file')
-    fprintf('Serious error: no kurtosis images named %s %s\n', MK, MKmask);
-    return;
-end;
-if ~exist(wbT1,'file'), error('unable to find %s',wbT1); end;
-%normalize mean kurtosis to match normalized, brain extracted T1
-wMK = prepostfixSub('w', '', MK);
-oldNormSub( {MKfa, MK}, wbT1, 8, 8 );
-nii_nii2mat(wMK, 'mk', matName);
-%save note
-fid = fopen('dki.txt', 'a+');
-fprintf(fid, '%s\n', matName);
-fclose(fid);
+
+
 %end doDkiCoreSub()
 
 function doFaMdSub(imgs, matName)
@@ -581,14 +888,6 @@ mm = h.mat(1:3, 1:3) * [1 1 1]';
 mm = nthroot(prod(abs(mm)), 3);
 %end imgMM
 
-function isEddyCuda = isEddyCuda7Sub
-%eddy_cuda7.0 is a beta version supplied by Jesper Andersson that supports the GTX970 and has new features
-isEddyCuda = false;
-if ~isGpuInstalledSub(), return; end;
-eddyName = '/usr/local/fsl/bin/eddy_cuda7.0';
-isEddyCuda = exist(eddyName,'file') > 0;
-if ~isEddyCuda, printf('Hint: Eddy will run faster if you install %s', eddyName); end;
-%end isEddyCuda7Sub
 
 function done = isDtiDoneBedpost(imgs)
 done = false;
@@ -687,8 +986,9 @@ bed_dir=fullfile(pth, 'bedpost');
 %if exist(bed_dir, 'file'), rmdir(bed_dir, 's'); end; %666 ForceBedpost
 if ~exist(bed_dir, 'file'), mkdir(bed_dir); end;
 dti_u=prepostfixSub('', 'du', dti);
-dti_x=fullfile(bed_dir, 'data.nii.gz');
 if ~exist(dti_u,'file'), error('Bedpost unable to find %s', dti_u); end;
+[~,~,x] = fsl_filepartsSub(dti_u);
+dti_x=fullfile(bed_dir, ['data', x]);
 copyfile(dti_u, dti_x);
 [bvec, bval] = getBVec(dti);
 dti_x=fullfile(bed_dir, 'bvecs');
@@ -696,7 +996,8 @@ copyfile(bvec, dti_x);
 dti_x=fullfile(bed_dir, 'bvals');
 copyfile(bval, dti_x);
 dti_faThr=prepostfixSub('', 'd_FA_thr', dti);
-dti_x=fullfile(bed_dir, 'nodif_brain_mask.nii.gz');
+[~,~,x] = fsl_filepartsSub(dti_faThr);
+dti_x=fullfile(bed_dir, ['nodif_brain_mask', x]);
 copyfile(dti_faThr, dti_x);
 if isGpuInstalledSub
     command=sprintf('bedpostx_gpu "%s" ', bed_dir);
@@ -812,7 +1113,7 @@ for i = 1: nROI
         command=sprintf('%s -x "%s" --dir="%s" --forcedir  -P %d -s "%s" -m "%s" --opd --pd -l -c 0.2 --distthresh=0', ...
             exeName, maski, prob_diri, nPerm ,bed_merged, bed_mask );
         commands = [commands {command}]; %#ok<AGROW>
-    fprintf("%s\n", command);
+    %fprintf("%s\n", command);
     %end %if voxels survive
 end %for each region
 if numel(commands) < 1
@@ -872,6 +1173,8 @@ if ~exist('maxThreads', 'var')
     if maxThreads > 15, maxThreads = maxThreads - 1; end;
 end
 setenv('FSLPARALLEL', num2str(maxThreads));
+setenv('PROBTRACKX_PARALLEL', num2str(3));
+setenv('XFIBRE_PARALLEL', num2str(3));
 %end fslParallelSub()
 
 
@@ -916,6 +1219,58 @@ delete(roiname);
 wroiname = prepostfixSub('w', atlasext, imgs.DTI);
 movefile(wroiname, roiname);
 %end doFaMdSub()
+
+function doDkiWarpSub(imgs, atlas)
+if isempty(imgs.T1) || isempty(imgs.DKI), return; end; %required
+dwi_name = dki_dwiname(imgs.DKI);
+if ~exist('atlas','var'), atlas = 'jhu'; end;
+if strcmpi(atlas,'jhu')
+    atlasext = '_roi';
+else
+   atlasext = ['_roi_' atlas];
+end
+T1 = prefixSub('wb',imgs.T1); %warped brain extracted image
+[p,~]=fileparts(imgs.DKI);
+MKFA = fullfile(p,[dwi_name '_fa_dki.nii']);
+%MKMD = prepostfixSub('', 'd_MD', imgs.DKI);
+%MK = prepostfixSub('', 'd_MK', imgs.DKI);
+
+if ~exist(T1,'file') fprintf('Unable to find image: %s\n',T1); return; end; %required
+if ~exist(MKFA,'file') error('Unable to find image: %s\n',MKFA); return; end; %required
+%if ~exist(MKMD,'file') error('Unable to find image: %s\n',MKMD); return; end; %required
+%if ~exist(MK,'file') error('Unable to find image: %s\n',MK); return; end; %required
+
+MKFA = unGzSub (MKFA);
+%MKMD = unGzSub (MKMD);
+%MK = unGzSub (MK);
+
+nFA = rescaleSub(MKFA);
+atlasImg = fullfile(fileparts(which('NiiStat')), 'roi' , [atlas '.nii']);
+if ~exist(atlasImg,'file')
+    error('Unable to find template %s', atlasImg);
+end
+[outhdr, outimg] = nii_reslice_target(atlasImg, '', T1, 0) ;
+roiname = prepostfixSub('', atlasext, imgs.DKI);
+
+if exist(roiname,'file') %e.g. FSL made .nii.gz version
+    delete(roiname);
+    roiname = prepostfixSub('', atlasext, imgs.DKI);
+end
+roiname = unGzNameSub(roiname);
+outhdr.fname = roiname;
+spm_write_vol(outhdr,outimg);
+oldNormSub({T1, roiname}, nFA, 8, 10, 0 );
+delete(roiname);
+wroiname = prepostfixSub('w', atlasext, imgs.DKI);
+movefile(wroiname, roiname);
+
+if ~isempty(imgs.Lesion) % transform lesion into native diffusion space 
+lesionname_DKI=prepostfixSub('', '_lesion', imgs.DKI);
+lesionname_MNI=prepostfixSub('wsr', '', imgs.Lesion);
+oldNormSub({T1,lesionname_MNI},nFA,8,10,0);
+movefile(prepostfixSub('wwsr', '', imgs.Lesion),lesionname_DKI);
+end
+
 
 function [p,n,x] = fsl_filepartsSub(imgname)
 [p, n, x] = fileparts(imgname);
@@ -978,10 +1333,17 @@ if exist(bDir, 'file'), rmdir(bDir, 's'); end;
 function nii_check_dependencies
 %make sure we can run nii_preprocess optimally
 if isempty(which('NiiStat')), error('NiiStat required (https://github.com/neurolabusc/NiiStat)'); end;
-%we no longer use ASLtbx:
-% if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
-% if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
 if isempty(which('spm')) || ~strcmp(spm('Ver'),'SPM12'), error('SPM12 required'); end;
+p = fullfile(spm('Dir'),'toolbox','Clinical');
+if ~exist(p,'dir')
+    error('Missing the Clinical Toolbox https://github.com/neurolabusc/Clinical\n');
+    
+end
+p = fullfile(spm('Dir'),'toolbox','cat12');
+if ~exist(p,'dir')
+    error('Missing the cat12 Toolbox http://www.neuro.uni-jena.de/cat/index.html#DOWNLOAD\n');
+    
+end
 if isempty(which('nii_batch12')),
     p = fileparts(which('nii_preprocess'));
     p = fullfile(p,'nii_fmri');
@@ -991,7 +1353,6 @@ if isempty(which('nii_batch12')),
     end;
 end;
 if ~exist('spm_create_vol','file'), error('SPM12 required'); end;
-if ~exist('prctile' , 'file'), error('Resting state requires "prctile" from Statistics and Machine Learning Toolbox (https://www.mathworks.com/matlabcentral/mlc-downloads/downloads/submissions/53545/versions/5/previews/tools/prctile.m/index.html).'); end;
 %make sure user uncomments timing line in spm
 fnm = which('spm_create_vol');
 txt = fileread(fnm);
@@ -1006,57 +1367,41 @@ if ~exist(fnm,'file'), error('%s required', fnm); end;
 txt = fileread(fnm);
 goodStr = '_gpu';
 if isempty(strfind(txt,goodStr))
-   error('Unless you are using SLURM, Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm);
+   warning('Please overwrite "%s" with file from https://github.com/neurolabusc/fsl_sub', fnm);
 end
-%check MRTrix installed: required for DTI
-if isempty(nii_mrtrix_pth() )
-   error('Please install MRTrix3'); 
-end
-%check FSL version
-fnm = fullfile(fsldir, 'etc', 'fslversion');
-fileExistsOrErrorSub(fnm);
-fid = fopen(fnm);
-vers = strsplit(fgetl(fid), ':'); %6.0.2:a4f562d9
-fclose(fid);
-if numel(vers) < 1, error('FSL version not detected: %s', fnm);  end
-vers = vers{1};
-versReq = '6.0.4';
-if ~strcmpi(vers,versReq), error('nii_preprocess and FSL version mismatch: Expected "%s", found "%s": %s', versReq, vers, fnm); end 
 %make sure eddy supports repol
 cmd = fullfile(fsldir, 'bin', 'eddy_openmp');
+%cmd
 fslEnvSub;
 cmd = fslCmdSub(cmd);
 [~,cmdout]  = system(cmd);
 goodStr = '--repol';
+%cmd
+%cmdout
 if isempty(strfind(cmdout,goodStr))
    error('Update eddy files to support "repol" https://fsl.fmrib.ox.ac.uk/fsldownloads/patches/eddy-patch-fsl-5.0.9/centos6/');
 end
-fnm = fullfile(fsldir, 'bin', 'eddy_cuda');
-if ~exist(fnm,'file')
-    error('Run FSL command "configure_eddy" and test installation (https://github.com/neurolabusc/gpu_test): %s required', fnm); 
-end
-%requirements for BASIL, ASL
-if isempty(which('nii_tool'))
-    error('%s requires nii_tool for ASL (https://github.com/xiangruili/dicm2nii)\n',which(mfilename));
-end
-fileExistsOrErrorSub(fullfile(fsldir, 'bin', 'fsl_anat'));
-fileExistsOrErrorSub(fullfile(fsldir, 'bin', 'oxford_asl'));
 %end nii_check_dependencies()
 
 function fsldir = fslDirSub;
-fsldir= '/usr/local/fsl/'; %CentOS intall location
+fsldir=getenv('FSLDIR');
+if isempty(fsldir)
+    fsldir= '/usr/local/fsl/'; %CentOS intall location
+end
 if ~exist(fsldir,'dir')
     fsldir = '/usr/share/fsl/5.0/'; %Debian install location (from neuro debian)
     if ~exist(fsldir,'dir')
-        error('FSL is not in the standard CentOS or Debian locations, please check you installation!');
+        fsldir = '/usr/share/fsl/6.0/'; %Debian install location (from neuro debian
+    end
+    if ~exist(fsldir,'dir')
+        fprintf('FSL is not in the standard CentOS or Debian locations, please check your installation!\n');
+        fsldir = getenv("FSLDIR");
+        if ~exist(fsldir,'dir')
+            error('FSL is not in FSLDIR environment variable either, quitting...');
+        end
     end
 end
 %end fslDirSub()
-
-function fileExistsOrErrorSub(fnm)
-if exist(fnm,'file'), return; end;
-error('Update FSL, missing required file: %s', fnm); 
-%end fileExistsOrErrorSub()
 
 % function fslEnvSub
 % fsldir = fslDirSub;
@@ -1076,6 +1421,8 @@ if isempty(k)
 end
 %next code for GPUs...
 ldpath = getenv('LD_LIBRARY_PATH');
+fprintf('Hope CUDA is in your LD_LIBRARY_PATH\n');
+return; 
 if contains(ldpath,'cuda') return; end %cuda already in LD path
 %look for all /usr/local/cuda* folders
 pth = '/usr/local/';
@@ -1083,7 +1430,14 @@ d = dir([pth, '*']);
 isub = [d(:).isdir];
 d = {d(isub).name}';
 dcuda = d(contains(d,'cuda'));
-if isempty(dcuda), fprintf('GPU tools may fail: Unable to find cuda folders in %s', pth); end 
+if isempty(dcuda), 
+    [status,cmdout]  = system('nvcc --version');
+    if status == 0
+        fprintf('GPU tools might fail: nvcc found but cuda not in LD_LIBRARY_PATH\n');
+    else
+        fprintf('GPU tools may fail: Unable to find cuda folders in %s\n', pth);
+    end
+end 
 for i = 1 : numel(dcuda)
     cudalib=[[pth, dcuda{i}], filesep, 'lib64'];
     if ~exist(cudalib), continue; end
@@ -1094,7 +1448,10 @@ end
 
 function command  = fslCmdSub (command)
 fsldir = fslDirSub;
-cmd=sprintf('sh -c ". %setc/fslconf/fsl.sh; ',fsldir);
+opts = '';
+global noGz % <- your need this!
+if ~isempty(noGz) && noGz, opts = 'export FSLOUTPUTTYPE=NIFTI;'; end
+cmd=sprintf('sh -c ". %s/etc/fslconf/fsl.sh; %s ',fsldir, opts);
 command = [cmd command '"'];
 %fslCmdSub
 
@@ -1205,6 +1562,9 @@ vox2mat(prefixSub(['wbmaskmean' ],imgs.Rest), 'RestAve', matName); % Grigori add
 
 %end doRestSub()
 
+
+
+
 function delImgs(prefix, fnm)
 %e.g. delImgs('sw', 'X.nii') would delete wX.nii and swX.nii
 [pth,nam] = spm_fileparts(fnm);
@@ -1231,6 +1591,8 @@ if idx < 1, error('Invalid roi name %s', roiName); end;
 
 function imgs = doAslSubOld(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end; %we need these images
+if isempty(which('asl_perf_subtract')), error('%s requires ASLtbx (asl_perf_subtract)\n',which(mfilename)); return; end;
+if isempty(which('spm_realign_asl')), error('%s requires ASLtbx (spm_realign_asl)\n',which(mfilename)); return; end;
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL; %e.g. user can call "global ForceASL;  ForceASL = true;"
 if isempty(ForceASL) && isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
@@ -1262,69 +1624,59 @@ stat.cbf.c2R = c2R;
 save(matName,'-struct', 'stat');
 %end doAslSubOld()
 
-
 function imgs = doAslSub(imgs, matName)
 if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
 imgs.ASL = removeDotSub (imgs.ASL);
 global ForceASL;
-inCalScan = []; %M0 scan
-anatDir = '';
-dryRun=false;
-basilDir = fullfile(fileparts(imgs.T1), 'basil');
-if isempty(ForceASL) && isFieldSub(matName, 'basilStd')
-    fprintf('Skipping ASL (Basil already computed) %s\n', imgs.ASL);
-    return;
-end;
-if exist(basilDir,'file'), rmdir(basilDir,'s'); end; %delete ASL directory
-if ~exist('basilDir', 'dir'), mkdir(basilDir); end;
-[p,n] = fileparts(imgs.ASL);
-inJSON = fullfile(p, [n, '.json']);
-if ~exist(inJSON, 'file')
-   error('Unable to find %s', inJSON); 
-end
-T1 = imgs.T1;
-[p,n,x] = fileparts(T1);
-healedT1 = fullfile(p,['e',n,x]);
-if exist(healedT1, 'file') 
-    T1 = healedT1;
-else
-    error('Unable to find %s\n', healedT1);
-end
-exitCode = nii_basil(imgs.ASL, T1, imgs.ASLrev, inJSON, inCalScan, anatDir, dryRun, basilDir);
-if exitCode ~= 0, return; end;
-basil2mat(basilDir, matName);
-%end doAslSub()
-
-function imgs = doAslSubOldish(imgs, matName)
-if isempty(imgs.T1) || isempty(imgs.ASL), return; end;
-imgs.ASL = removeDotSub (imgs.ASL);
-global ForceASL;
+if isempty(ForceASL) && isFieldSub(matName, 'cbf'), fprintf('Skipping ASL (CBF already computed) %s\n', imgs.ASL); return; end;
 ASLrev = []; %reverse phase encoded image
-jsonFile = [];   %name of json file that stores parameters for this scan
-[numVolASLImg, ~] = nVolSub (imgs.ASL) ;
-switch numVolASLImg
-    case 101 %handles POLAR and legacy pasl sequences
-        jsonFile = which('POLAR_dummy.json');
-    case 74
-        jsonFile = which('LEGACY_PCASL_dummy.json');
-    case 97
-        jsonFile = which('LARC_dummy.json'); 
-        [pth,nam,ext] = spm_fileparts(imgs.ASL);
-        ASLrev = [pth '/' nam 'rev',ext];
-    case 60
-        jsonFile = which('SEN_dummy.json'); 
-    otherwise
-        error('Can''t guess sequence type');
+[p,n] = filepartsSub(imgs.ASL);
+
+jsonFile = fullfile(p, [n, '.json']);   %name of json file that stores parameters for this scan
+if ~exist(jsonFile,'file')
+    [numVolASLImg, ~] = nVolSub (imgs.ASL) ;
+    warning('Guessing ASL parameters: missing JSON "%s"\n', jsonFile)
+    p = fileparts(which(mfilename));
+    p = fullfile(p,'json');
+    switch numVolASLImg
+        case 101 %handles POLAR and legacy pasl sequences
+            jsonFile = fullfile(p,'POLAR_dummy.json');
+        case 74
+            jsonFile = fullfile(p,'LEGACY_PCASL_dummy.json');
+        case 97
+            jsonFile = fullfile(p,'LARC_dummy.json'); 
+            [pth,nam,ext] = spm_fileparts(imgs.ASL);
+            ASLrev = imgs.ASLrev;   % [pth '/' nam 'rev',ext];
+        case 60
+            jsonFile = fullfile(p,'SEN_dummy.json'); 
+        otherwise
+            error('Can''t guess sequence type');
+    end
+    if ~exist(jsonFile,'file')
+        error('Can''t find json %s', jsonFile);
+    end 
 end
 pth = spm_fileparts(imgs.ASL);
 basilDir = fullfile(pth, 'BASIL');
-if ~exist('basilDir', 'dir'), mkdir(basilDir); end;
-[filepath,name,ext] = fileparts(imgs.T1)
-healedT1 = [filepath,'/e',name,ext];
+if exist(fullfile(fullfile(basilDir,'native_space'), 'perfusion_calib.nii.gz'), 'file')
+   fprintf('Skipping ASL (already computed) %s\n', imgs.ASL); return; 
+end
+
+if ~exist(basilDir, 'dir')
+    mkdir(basilDir);
+end
+[filepath,name,ext] = fileparts(imgs.T1);
+healedT1 = fullfile(filepath,['e',name,ext]);
 %function exitCode = nii_basil(asl, t1, aslRev, inJSON, inCalScan, anatDir, dryRun, overwrite, outDir)
-exitCode = nii_basil(imgs.ASL,healedT1, ASLrev, jsonFile, '', '', false, basilDir)
+%if you have a lesion, then use the healed T1 for nii_basil, otherwise use the original T1 for nii_basil
+if(~isempty(imgs.Lesion))
+    exitCode = nii_basil(imgs.ASL,healedT1, ASLrev, jsonFile, '', '', false, basilDir)
+else
+    exitCode = nii_basil(imgs.ASL,imgs.T1, ASLrev, jsonFile, '', '', false, basilDir)
+end
 if exitCode ~= 0, error('BASIL failed\n'); end;
 basil2mat(basilDir, matName);
+warning('cr20200528 todo here - test old sequences\n');
 %end doAslSub()
 
 
@@ -1346,7 +1698,7 @@ end
 function imgs = doI3MSub(imgs, matName)
 if isempty(imgs.T1), return; end; %we need these images
 imgs.T1 = removeDotSub (imgs.T1);
-if isFieldSub(matName, 'i3mT1'), fprintf('Skipping i3m (already computed) %s\n', imgs.ASL); return; end;
+if isFieldSub(matName, 'i3mT1'), fprintf('Skipping i3m (already computed)\n'); return; end;
 w = prefixSub('w',imgs.T1); %warped T1
 if  ~exist(w, 'file')  return; end; %exit: we require warped T1
 i3m = prefixSub('zw',imgs.T1);
@@ -1357,7 +1709,7 @@ nii_nii2mat(i3m, 'i3mT1', matName); %4
 
 function imgs = doT1Sub(imgs, matName)
 if isempty(imgs.T1), return; end;
-if isFieldSub(matName, 'T1'), fprintf('Skipping T1 normalization (already done): %s\n',imgs.T1); return; end;
+if isFieldSub(matName, 'i3mT1'), fprintf('Skipping T1 normalization (already done): %s\n',imgs.T1); return; end;
 imgs.T1 = removeDotSub (imgs.T1);
 if size(imgs.T1,1) > 1 || size(imgs.T2,1) > 1 || size(imgs.Lesion,1) > 1
     error('Require no more than one image for these modalities: T1, T2, lesion');
@@ -1708,6 +2060,12 @@ end
 
 function v = isGpuInstalledSub()
 v = ~isempty(strfind(getenv('PATH'),'cuda'));
+if v, return; end
+[status,cmdout]  = system('nvcc --version');
+if status == 0
+    %fprintf('GPU tools might fail: nvcc found but cuda not in LD_LIBRARY_PATH\n');
+    v = true;
+end 
 %v = 0; %default to 0
 %if ~exist('/usr/local/cuda/bin/nvcc','file')
 %    return;
